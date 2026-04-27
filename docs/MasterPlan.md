@@ -1,0 +1,1410 @@
+# Lucid Game Engine — Master Design Reference
+
+> Last updated: 2026-04-26  
+> Status: Living document — update as decisions are locked in.
+
+**Quick jump:** [Part 1 — Plan Review](#part-1) | [Part 2 — Decisions](#part-2) | [Part 3 — Open Items](#part-3) | [Part 4 — File Structure](#part-4) | [Part 5 — Status Summary](#part-5)
+
+---
+
+## Part 1 — Plan Review
+
+### LucidEngineOverview.md
+
+#### ✅ Strengths
+- **Microkernel model** — C++ kernel for performance, Luc for logic. Clear boundary, proven pattern.
+- **Vulkan-first** — skips legacy OpenGL baggage. Correct for a custom engine.
+- **Phased roadmap** (C++ Bedrock → Luc Bridge → Evolution) — realistic bootstrapping order.
+- **Config-based path resolution** (`engine_settings.json`) — portable, no hardcoded paths.
+- **Command Registry** (VS Code approach) — right architecture for extension extensibility.
+
+#### Gap Status
+
+| Area | Issue | Status |
+|:---|:---|:---|
+| Extension manifest format | Mentioned but not defined. | ✅ Solved — see Decision 7 |
+| FFI stability contract | No versioning strategy. | ✅ Solved — see Decision 2 |
+| Asset pipeline | No raw→engine format conversion plan. | ✅ Solved — see `AssetPipeline.md` + Decision 11 |
+| Scene/Entity model | ECS vs. Scene Tree not decided. | ✅ Solved — see Decision 1 |
+| Scripting hot-reload | File-watcher / re-link flow missing. | ✅ Solved — see Decision 5 |
+| Physics library | Not named. | ✅ Solved — see Decision 3 |
+
+---
+
+### LucidEngineSecurity.md + SecurityKeyGuide.md
+
+#### ✅ Strengths
+- **Three-tier compilation** (Debug / AOT / Secure JIT) — mirrors Unity IL2CPP vs. Mono.
+- **AES-256 encrypted VFS** with RAM-only execution — solid asset protection.
+- **SHA-256 boot checksum** — anti-tamper in the right layer (kernel).
+- **Signed extension manifests** with Ed25519 — prevents malicious injection.
+- **LLVM `CommandLine.h` mutual exclusion** for `--release` / `--release-jit` — correct.
+- **Two-Step Title Key DRM** — console-style hardware-locked licensing, no hardcoded keys in DLL.
+- **Publisher Key lifecycle** — AES-256 encrypted at rest, recovery key system, key rotation documented.
+
+#### Gap Status
+
+| Area | Issue | Status |
+|:---|:---|:---|
+| AES key storage | Seed hidden in DLL = obscurity, not security. | ✅ Solved — Two-Step Derivation (Decision 10) |
+| Signature authority | Who signs extension manifests? | ✅ Solved — `trusted_publishers.json` (Decision 7) |
+| Online licensing | Offline vs. online not decided. | ✅ Solved — Offline-first (Decision 4) |
+| Debug build leakage | No guard against shipping debug binary. | ⏳ Open — build-type flag check needed in kernel boot |
+| Save-game encryption | Runtime save files not mentioned. | ⏳ Open — likely plain (decide before release) |
+
+---
+
+### ControlPanelDesign.md
+
+#### ✅ Strengths
+- **4-Tab Bottom Dock** (Terminal, Output, Problems, Engine Console) — matches VS Code / Unreal standard.
+- **Engine Console is a live memory bridge**, not a text parser — professional design.
+- **3-File Console Ecosystem** clearly separates: Interpreter (C++), Metadata (JSON), Shortcuts (Luc).
+- **`console_interpreter.hpp` header drafted** — defines `Execute`, `RegisterCommand`, `GetSuggestions`.
+- **IPC-aware** — supports both in-process (same window) and out-of-process (separate game `.exe`) modes.
+
+#### Gap Status
+
+| Area | Issue | Status |
+|:---|:---|:---|
+| Console Interpreter logic | `Execute()` body not yet drafted. | ⏳ Open — see Part 3 |
+| Symbol map format | `symbols.json` schema not defined. | ⏳ Open — needed for Autocomplete |
+| Runtime IPC protocol | Packet format for Editor → Game communication not specified. | ⏳ Open |
+
+---
+
+### LucidFileFormats.md
+
+#### ✅ Strengths
+- **3-tier categorization** (Source / Cooked / Distribution) — clean boundary for Git tracking.
+- **All extensions are custom** — no ambiguity with OS-registered formats.
+- **Source formats are plain JSON or text** — human-readable, Git-diff-friendly.
+- **Cooked formats are pure binary memory dumps** — designed for `memcpy` into GPU/RAM.
+- **Distribution formats are signed or encrypted** — `.lucpkg` (Ed25519), `.lucid` (AES-256).
+
+#### Gap Status
+
+| Area | Issue | Status |
+|:---|:---|:---|
+| `.msgpack` save game format | Not listed — MessagePack for runtime saves was confirmed. | ⏳ Should be added when save-game policy is decided |
+| `.lscript` or JIT bytecode | No extension defined for Secure JIT bytecode output. | ⏳ Open — needed for `--release-jit` builds |
+
+---
+
+### AssetPipeline.md
+
+#### ✅ Strengths
+- **Never parse at runtime** — all heavy format work happens offline in the Baker.
+- **`luc_asset_baker.exe`** is a separate CLI tool — correct separation of concerns.
+- **Asset caching by hash** — only re-cooks changed files, fast iteration.
+- **`.lmesh` spec is explicit** — 32-byte header + raw Vulkan-compatible buffers = zero-dependency loader.
+- **`IAssetExporter` interface** — extensions can create/export assets in standard formats (PNG, GLTF) without implementing the specs themselves.
+- **GLTF chosen as the 3D source format** over FBX/OBJ — open standard, fast `cgltf` parser.
+- **`.ltex` over `.ktx2`** — simpler 50-line loader, no external runtime dependency.
+
+#### Gap Status
+
+| Area | Issue | Status |
+|:---|:---|:---|
+| Audio baking (SFX) | Listed as `.adpcm` or `.ogg` but final choice not locked. | ⏳ Open — decide before audio system is built |
+| `.lmesh` LOD support | No Level-of-Detail field in the header spec. | ⏳ To add when LOD system is designed |
+| Texture atlas / sprite sheet | No pipeline for 2D sprite packing. | ⏳ To define when 2D support is scoped |
+
+---
+
+## Part 2 — Resolved Design Decisions
+
+---
+
+### Decision 1 — Scene Model: ECS ✅
+
+**Entity-Component-System** is confirmed. Benefits for Lucid Engine:
+- **Data-oriented** — components are plain POD structs in contiguous arrays → cache-friendly.
+- **System-parallel** — systems on different component sets can run on separate threads.
+- **Extension-friendly** — extensions register new component types and systems without touching core.
+
+```
+Entity (uint64 ID)
+  └── Components (POD structs: Position, Velocity, Mesh, Collider, Health...)
+        └── Systems (Luc or C++: PhysicsSystem, RenderSystem, ScriptSystem...)
+```
+
+---
+
+### Decision 2 — FFI Versioning: Function Table Versioning ✅
+
+**4 strategies exist. Strategy 3 is the right pick.**
+
+| # | Strategy | Cross-platform | Backward-compat | Used by |
+|:--|:---|:---|:---|:---|
+| 1 | Integer Version Guard | ✅ | ❌ Blunt | Quake-era engines |
+| 2 | SemVer Struct | ✅ | ⚠️ Partial | Most custom engines |
+| **3** | **Function Table Versioning** | **✅** | **✅ Full** | **Vulkan, Chromium PPAPI** |
+| 4 | Symbol Versioning (`.so`) | ❌ Linux-only | ✅ | glibc, GTK |
+
+**How it works in Lucid Engine:**
+
+```c
+// lge_api.h — shape never changes
+typedef struct {
+    uint32_t version;       // e.g. 0x00010002 = v1.2
+    void (*render_frame)();
+    void (*spawn_entity)(uint64_t* out_id);
+    void (*add_component)(uint64_t entity, uint32_t component_type, void* data);
+} LGE_ExtensionAPI;
+
+// Kernel exports ONE stable function
+LGE_API const LGE_ExtensionAPI* LGE_GetAPI(uint32_t requested_version);
+```
+
+```c
+// Extension side — on load
+const LGE_ExtensionAPI* api = LGE_GetAPI(0x00010000);
+if (!api) { return LGE_EXTENSION_INCOMPATIBLE; } // graceful fail
+api->spawn_entity(&my_entity);
+```
+
+**Versioning rule:** Encode as `(major << 16) | (minor << 8) | patch`.
+- `major` bump → kernel drops old table → extensions must update.
+- `minor` bump → additive only, old table stays valid.
+- `patch` bump → bug fix, no ABI change.
+
+---
+
+### Decision 3 — Physics Backend: Jolt Physics ✅
+
+**6 libraries compared:**
+
+| Library | License | Maintenance | Modding-friendly |
+|:---|:---|:---|:---|
+| **Jolt Physics** | **MIT** | ✅ Very active | ✅ Full callbacks |
+| NVIDIA PhysX 5 | BSD-3 | ✅ Active | ⚠️ Complex API |
+| Bullet Physics | zlib | ⚠️ Slowing down | ✅ Open source |
+| ReactPhysics3D | zlib | ✅ Active | ✅ Clean API |
+| Box2D v3 | MIT | ✅ Active | ✅ 2D only |
+| Havok | Commercial | ✅ Active | ❌ Closed |
+
+**Jolt wins:** AAA-proven (*Horizon Forbidden West*, *Death Stranding 2*), MIT license, modern C++17, built-in multi-thread support, rich callback system.
+
+**Luc developer access via FFI:**
+
+```c
+// lge_api.h — Luc-visible physics hooks
+LGE_API void LGE_SetOnCollisionCallback(void (*cb)(uint64_t a, uint64_t b));
+LGE_API void LGE_SetGravity(float x, float y, float z);
+LGE_API void LGE_AddForce(uint64_t entity, float fx, float fy, float fz);
+LGE_API void LGE_SetBodyProperties(uint64_t entity, float mass, float friction, float restitution);
+```
+
+**Physics ↔ Rendering coupling: None.**
+
+```
+Frame loop:
+  1. PhysicsSystem::Update(dt)   → Jolt writes → TransformComponent
+  2. RenderSystem::Update()      → Vulkan reads ← TransformComponent
+  
+  Jolt and Vulkan never talk directly. TransformComponent is the only shared data.
+```
+
+> [!IMPORTANT]
+> Always run `PhysicsSystem` **before** `RenderSystem` per frame. The GPU must see this frame's physics result, not last frame's stale positions.
+
+---
+
+### Decision 4 — Licensing Model: Offline-First (with Online Migration Path) ✅
+
+**Start offline. Design the abstraction layer now so online can be added without touching the kernel later.**
+
+#### The Abstraction Layer (the key architectural move)
+
+Instead of calling license verification code directly, the kernel talks to an `ILicenseVerifier` interface:
+
+```cpp
+// kernel/include/lge_license.h
+class ILicenseVerifier {
+public:
+    virtual LicenseResult Verify() = 0;           // called at boot
+    virtual bool HasFeature(uint32_t flag) = 0;   // checked at runtime
+    virtual ~ILicenseVerifier() = default;
+};
+
+// kernel boots with this — swappable without recompiling the kernel
+extern ILicenseVerifier* g_license_verifier;
+```
+
+Now two implementations exist and can be selected at build time or config time:
+
+| Implementation | When | How |
+|:---|:---|:---|
+| `OfflineLicenseVerifier` | **Now** (Phase 1) | Reads `license.lge`, checks Ed25519 signature against public key baked in DLL |
+| `OnlineLicenseVerifier` | Future (Phase 2) | Phones home to a REST endpoint, caches a short-lived JWT, falls back to offline grace period |
+
+#### Phase 1 — Offline Implementation (now)
+
+```
+Boot sequence:
+  OfflineLicenseVerifier::Verify()
+    → read license.lge from engine dir
+    → verify Ed25519 signature (public key baked into luc_kernel.dll)
+    → extract { app_id, expiry_date, feature_flags, machine_fingerprint }
+    → compare machine_fingerprint against current hardware
+    → PASS → proceed  |  FAIL → Trial mode
+```
+
+**Machine fingerprinting** (prevents license file sharing):
+```cpp
+string machine_id = sha256(get_cpu_id() + get_motherboard_serial() + get_disk_serial());
+// machine_fingerprint baked into license.lge at generation time
+// Kernel compares at boot — mismatch = invalid
+```
+
+**Pros of offline-first:**
+- ✅ Zero server infrastructure cost to start.
+- ✅ Works on air-gapped machines, game jams, planes.
+- ✅ No network code in the kernel security layer.
+- ✅ Developer-friendly — engine never refuses to open due to a dead server.
+
+#### Phase 2 — Online Migration (future, no kernel rewrite needed)
+
+When you're ready to add online enforcement:
+1. Write `OnlineLicenseVerifier` as a new `.cpp` — same interface, new implementation.
+2. Switch `g_license_verifier` assignment in `kernel.cpp` based on `engine_settings.json`:
+   ```json
+   { "license_mode": "online", "license_server": "https://license.lucidengine.com" }
+   ```
+3. The rest of the kernel is untouched. The abstraction did its job.
+
+> [!TIP]
+> **The offline verifier always stays as the grace-period fallback** inside `OnlineLicenseVerifier`. If the server can't be reached, it falls back to the last cached JWT. If that expires, it gives a 72-hour offline grace period before blocking.
+
+---
+
+### Decision 5 — Scripting Hot-Reload ✅
+
+Hot-reload means: the developer saves a `.luc` file → the engine recompiles it → the running game reflects the change **without restarting**.
+
+#### The System: Watch → Compile → Swap
+
+Three components work together:
+
+```
+[FileWatcher]  →  [Compiler Subprocess]  →  [Module Swapper]
+   (C++)              (luc_compiler.exe)         (C++ kernel)
+```
+
+---
+
+**Step 1 — FileWatcher (in kernel)**
+
+The kernel spawns a background thread that watches `user_projects/<active>/src/` for file changes.
+
+```cpp
+// kernel/src/core/file_watcher.cpp
+// Uses ReadDirectoryChangesW (Win32) or inotify (Linux)
+
+void FileWatcher::Start(const fs::path& watch_dir) {
+    watcher_thread = std::thread([&] {
+        while (running) {
+            if (HasChangedFiles(watch_dir)) {
+                string changed_file = GetChangedFile();
+                on_file_changed(changed_file);  // fires the compile pipeline
+            }
+            std::this_thread::sleep_for(100ms);
+        }
+    });
+}
+```
+
+**Platform APIs:**
+- Windows → `ReadDirectoryChangesW` (built into Win32, zero deps)
+- Linux → `inotify_add_watch` (built into kernel, zero deps)
+
+---
+
+**Step 2 — Compiler Subprocess**
+
+When a file change is detected, the kernel spawns `luc_compiler.exe` as a child process:
+
+```cpp
+// kernel/src/core/script_manager.cpp
+
+void ScriptManager::RecompileModule(const string& luc_file) {
+    // Output goes to a temp .dll, NOT the live .dll
+    string cmd = "luc_compiler.exe --input " + luc_file 
+               + " --output ./build/hot/" + module_name + "_next.dll";
+    
+    PROCESS_INFORMATION pi;
+    CreateProcess(NULL, cmd.c_str(), ...);
+    WaitForSingleObject(pi.hProcess, INFINITE); // wait for compile
+    
+    DWORD exit_code;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+    if (exit_code == 0) {
+        SwapModule(module_name); // only swap if compile succeeded
+    } else {
+        // Show compiler errors in the IDE log panel — don't swap
+        LogCompilerErrors(module_name + "_next.dll");
+    }
+}
+```
+
+> [!IMPORTANT]
+> Always compile into a **temp file** (`_next.dll`), never directly overwrite the live `.dll`. Only swap after a successful compile. Failed compilations must **never** crash the running game.
+
+---
+
+**Step 3 — Module Swapper**
+
+The swapper waits for the current frame to finish, then atomically replaces the module:
+
+```cpp
+// kernel/src/core/script_manager.cpp
+
+void ScriptManager::SwapModule(const string& module_name) {
+    // 1. Wait for current frame to finish — do NOT swap mid-frame
+    frame_fence.Wait();
+
+    // 2. Call the old module's cleanup hook (if it has one)
+    if (old_api->on_unload) old_api->on_unload();
+
+    // 3. Unload the old DLL
+    FreeLibrary(old_module_handle);
+
+    // 4. Rename _next.dll → live .dll
+    fs::rename("./build/hot/" + module_name + "_next.dll",
+                "./build/hot/" + module_name + ".dll");
+
+    // 5. Load the new DLL
+    HMODULE new_handle = LoadLibrary(("./build/hot/" + module_name + ".dll").c_str());
+    auto* new_api = (LGE_ExtensionAPI*)GetProcAddress(new_handle, "LGE_GetAPI")(LGE_VERSION);
+
+    // 6. Call the new module's init hook
+    if (new_api->on_load) new_api->on_load();
+
+    // 7. Register in the live module table
+    live_modules[module_name] = { new_handle, new_api };
+}
+```
+
+---
+
+**State Persistence across hot-reload**
+
+The hardest part of hot-reload is keeping game state (player position, health, etc.) alive when the script swaps. Two approaches:
+
+| Approach | How | Best for |
+|:---|:---|:---|
+| **Stateless Scripts** | Scripts don't own state — ECS components own all state. Script just reads/writes components. | ✅ Lucid Engine (ECS already solves this) |
+| **Serialized State** | Script serializes its state to JSON before unload, deserializes after load. | Complex stateful extensions |
+
+**ECS makes this free:** Because all entity state lives in `TransformComponent`, `HealthComponent`, etc. (not inside the script), a script swap doesn't lose any data. The new script picks up where the old one left off by reading the same components.
+
+---
+
+**Full hot-reload flow diagram:**
+
+```
+User saves player.luc
+       │
+       ▼
+FileWatcher detects change
+       │
+       ▼
+ScriptManager::RecompileModule("player")
+  → spawns: luc_compiler.exe --input player.luc --output player_next.dll
+       │
+       ├── Compile FAILED → show errors in IDE log, keep old module running
+       │
+       └── Compile OK
+             │
+             ▼
+         Wait for frame fence
+             │
+             ▼
+         old_api->on_unload()
+         FreeLibrary(old .dll)
+         rename _next.dll → .dll
+         LoadLibrary(new .dll)
+         new_api->on_load()
+             │
+             ▼
+         Game continues — no restart, state preserved by ECS
+```
+
+---
+
+### Decision 6 — IntelliSense (Language Server) ✅
+
+The engine needs code completion, go-to-definition, and error squiggles inside the Luc script editor. This is implemented as a **separate `luc_langserver` process** — the same architecture VS Code uses with its Language Server Protocol (LSP).
+
+#### Why a separate process, not a library?
+
+The IDE (written in Luc) cannot call C++ analysis code directly — that would create a circular dependency. A separate process communicates via stdin/stdout JSON, keeping the boundary clean.
+
+```
+IDE (engine/src/editor/script_editor.luc)
+  │
+  │  JSON over stdin/stdout (LSP-style protocol)
+  ▼
+luc_langserver.exe (C++ process, always running in background)
+  │
+  ├── Reuses compiler's Lexer + Parser + Symbol Table (no code-gen)
+  ├── Maintains an in-memory AST index of all open .luc files
+  └── Responds to requests:
+        textDocument/completion   → list of symbols, keywords, types
+        textDocument/hover        → type info, docstring
+        textDocument/definition   → jump to declaration file + line
+        textDocument/diagnostic   → real-time error/warning list
+```
+
+#### How it reuses the compiler
+
+The compiler already builds an AST and symbol table in `lexer/` and `parser/`. The language server **reuses these same modules**, skipping only `codegen/` and `optimizer/`:
+
+```
+luc_compiler.exe:   Lex → Parse → Type-check → Optimize → Codegen → .dll
+luc_langserver.exe: Lex → Parse → Type-check → (respond to IDE queries)
+                                       ↑
+                               Same code, shared as a static library
+```
+
+This means the language server's completions and errors are **always in sync** with what the compiler actually accepts — no drift between "what the IDE shows" and "what actually compiles."
+
+#### IDE integration (Luc side)
+
+```luc
+// engine/src/editor/script_editor.luc
+// The editor starts the langserver as a child process on engine boot
+
+lang_server = Process.spawn("./compiler/luc_langserver.exe")
+
+on_keystroke(file, cursor_pos) {
+    request = { method: "textDocument/completion", file: file, pos: cursor_pos }
+    lang_server.write(json(request))
+    response = lang_server.read_line()
+    show_completion_popup(json_parse(response).items)
+}
+```
+
+> [!NOTE]
+> The langserver runs **one instance per engine session**, not per file. It indexes all `.luc` files in the active project on startup and updates incrementally as files change.
+
+---
+
+### Decision 7 — Extension System ✅
+
+#### Architecture: VS Code-style, adapted for a game engine
+
+Yes — VS Code's extension model is the right reference point. Every extension is a **self-contained folder** with a manifest and a main entry point. The key adaptations for Lucid Engine:
+
+---
+
+#### Extension vs. Library — they are different things
+
+This distinction is critical and must be enforced by the engine:
+
+| | **Extension** | **User Library** |
+|:---|:---|:---|
+| Has `extension.json` manifest | ✅ Required | ❌ None |
+| Lifecycle hooks (`on_load`, `on_unload`) | ✅ Yes — called by kernel | ❌ No |
+| Runs during development | ✅ Yes (always active while engine is open) | ❌ Only when imported |
+| Adds UI, menus, commands | ✅ Yes | ❌ No |
+| How it's used | Engine loads it automatically | Other `.luc` files do `import "my_lib.luc"` |
+| Example | Visual Debugger, Theme Manager, Git Integration | `math_utils.luc`, `enemy_ai.luc`, `pathfinding.luc` |
+
+**Rule:** If it modifies the engine's behavior or UI, it's an **Extension**. If it's just reusable code called by game scripts, it's a **Library** — keep it in the project's `src/libs/` folder.
+
+---
+
+#### Extension ID — How Unique IDs Work, Collision Handling, and Key Safety
+
+---
+
+##### ID Generation — Two-Layer System
+
+**Layer 1 — Human-readable ID (in `extension.json`):**
+```
+com.{publisher_id}.{extension-name}
+```
+This is what humans read, type, and declare as a dependency.
+
+**Layer 2 — UUID v5 (internal machine ID, auto-generated):**
+```
+extension_uuid = uuid5(LUCID_NAMESPACE, "com.taiax.my-extension")
+  → always "a3f8c21e-5b9d-5e4f-8c3a-1d2e4f6a8b0c" for this exact string
+```
+UUID v5 is a deterministic SHA-1 hash of a fixed namespace + the human ID string. Same string → same UUID, always, forever. No random number, no timestamp.
+
+```cpp
+// Generated ONCE at "Create New Extension" time — never regenerated
+std::string generate_extension_uuid(const std::string& human_id) {
+    return uuid5(LUCID_NAMESPACE, human_id);
+}
+```
+
+---
+
+##### Case 1 — What if two developers pick the same human-readable ID?
+
+This will happen, especially offline. There are two sub-cases:
+
+**Sub-case A: Same full ID string (e.g., both use `com.dev.my-extension`)**
+
+Since UUID v5 is deterministic, both produce the *identical* UUID. This is a genuine conflict.
+
+**How the engine handles it:**
+
+```
+Extension loader startup:
+  for each extension in extension_registry.json:
+    1. Read uuid from extension.json
+    2. Check against already-loaded uuid table
+    3. If CONFLICT found:
+         → Do NOT load the second extension
+         → Show in Extensions panel: ⚠️ "com.dev.my-extension" conflicts with an
+           already-loaded extension (same UUID). Rename your extension ID to resolve.
+         → Write conflict to logs/extension_conflicts.log
+    4. If no conflict → load normally
+```
+
+The first extension alphabetically in `extension_registry.json` wins. The engine **never crashes** — it simply refuses to load the conflicting one and tells the developer exactly why.
+
+**Sub-case B: Different publisher_id, same extension name (e.g., `com.alice.shooter` vs `com.bob.shooter`)**
+
+These produce **different UUIDs** — the full string `"com.alice.shooter"` ≠ `"com.bob.shooter"`, so the hashes differ. **No conflict.** This is the intended behavior.
+
+**Online registry enforcement (no conflicts possible after registration):**
+
+| Action | What the registry enforces |
+|:---|:---|
+| Register `alice` as publisher_id | `com.alice.*` is now reserved for Alice's Ed25519 key only |
+| Alice submits `com.alice.shooter` | Registry checks: is `com.alice.shooter` already taken? No → accept |
+| Bob tries to submit `com.alice.shooter` | Signature doesn't match Alice's registered key → rejected immediately |
+| Bob submits `com.bob.shooter` | Completely different ID — accepted with no conflict |
+
+Once online, **the only collisions that can exist are within a publisher's own namespace** — and that's their own responsibility to manage.
+
+---
+
+##### Case 2 — What if the developer changes machine or loses their private key?
+
+The private key (`publisher_private.pem`) is a file on the developer's machine. If the machine dies or the drive fails, **the key is gone unless they backed it up.** This is the same problem SSH keys, PGP keys, and GPG keys have. The solution is a three-layer safety system:
+
+---
+
+**Layer A — Mandatory backup prompt at key generation time**
+
+When a developer first sets up their publisher profile, the engine generates the key pair and **blocks them from continuing** until they acknowledge backup:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ⚠️  IMPORTANT: Back Up Your Publisher Key          │
+│                                                     │
+│  Your private key has been saved to:                │
+│  %APPDATA%\LucidEngine\publisher_private.pem        │
+│                                                     │
+│  If you lose this file, you cannot publish updates  │
+│  to your extensions until you complete key recovery.   │
+│                                                     │
+│  → [Export Key to File...]  [Copy to Clipboard]     │
+│                                                     │
+│  [ ] I have backed up my key in a safe location     │
+│                         [Continue] (disabled until ✓)│
+└─────────────────────────────────────────────────────┘
+```
+
+The engine stores the private key in `%APPDATA%\LucidEngine\` (or `~/.lucid_engine/` on Linux). This is **not** inside the engine install folder — it survives engine updates.
+
+---
+
+**Layer B — Recovery key (generated alongside the main key)**
+
+At key generation time, the engine creates **two** key pairs:
+- `publisher_private.pem` — the main signing key, used every time you publish
+- `publisher_recovery.pem` — stored somewhere completely separate (printed out, USB drive, password manager)
+
+The recovery public key is registered in the registry alongside the main one:
+
+```json
+// Registry record for publisher "taiax"
+{
+  "publisher_id": "taiax",
+  "keys": [
+    { "type": "main",     "public_key": "ed25519:abc123...", "status": "active" },
+    { "type": "recovery", "public_key": "ed25519:xyz789...", "status": "recovery-only" }
+  ]
+}
+```
+
+The recovery key **cannot sign extension manifests** — it can only be used to add/replace the main key.
+
+---
+
+**Layer C — Key rotation (add a new machine without losing access)**
+
+Before moving to a new machine, the developer adds a new key from their old machine:
+
+```
+Old machine:
+  1. Generate new key pair on new machine → get new_public.pem
+  2. On old machine: sign a "key addition request" with old private key
+     { "action": "add_key", "new_public_key": "ed25519:new123...", "publisher": "taiax" }
+  3. Submit to registry → verified with old key → new key added
+  4. Both keys are now valid
+
+New machine:
+  5. Copy new_private.pem to new machine
+  6. (Optional) Revoke old key from new machine using new private key
+```
+
+If the **old machine is already gone** (lost key):
+```
+Recovery path:
+  1. Use publisher_recovery.pem
+  2. Sign a "key replacement request" with the recovery key
+  3. Registry verifies the recovery key → replaces the lost main key
+  4. Generate and register a new main key
+  5. Generate a new recovery key (the old one was used — treat it as spent)
+```
+
+---
+
+**Layer D — Key Encryption at Rest (Preventing Fraud)**
+
+If a developer accidentally uploads their `publisher_private.pem` to a public GitHub repo, or gets malware that steals the file, malicious actors could publish fake updates to their extensions.
+
+To prevent this, the private key is **never stored in plain text**. It is encrypted at rest using AES-256-CBC, protected by a developer-chosen passphrase.
+
+```
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIe3n...
+...
+-----END ENCRYPTED PRIVATE KEY-----
+```
+
+- When running `sign_extension.py`, the developer is prompted to type their passphrase.
+- The engine caches the decrypted key in **secure memory** (cleared on exit) during the active session so they don't have to type it for every single build.
+- If the `.pem` file is stolen, the attacker still cannot use it without the passphrase.
+
+---
+
+**Summary of protection levels:**
+
+| Scenario | What happens | Recovery possible? |
+|:---|:---|:---|
+| Developer gets a new machine | Add new key from old machine before switching | ✅ Yes — key rotation |
+| Old machine dies, key was backed up | Copy backup `.pem` to new machine | ✅ Yes |
+| Old machine dies, no backup, has recovery key | Use recovery key to replace main key | ✅ Yes |
+| Old machine dies, no backup, no recovery key | Contact Lucid team for manual identity verification | ⚠️ Slow — but possible |
+| Key is compromised (stolen) | Revoke with recovery key immediately | ✅ Yes |
+
+> [!IMPORTANT]
+> **For local/offline use only:** Key loss has no consequence. The `signature` field is optional when the engine is running offline-only. The developer can regenerate a new key pair and re-sign their local extensions — no registry interaction needed.
+
+
+
+---
+
+#### Extension Manifest Schema (`extension.json`)
+
+```json
+{
+  "id": "com.yourname.my-extension",        // Human-readable — developers use this
+  "uuid": "a3f8c21e-5b9d-5e4f-8c3a-1d2e4f6a8b0c",  // UUID v5 — auto-generated, NEVER change
+  "name": "My Extension",
+  "version": "1.0.0",                    // SemVer
+  "api_version": "0x00010000",           // Minimum kernel API version required
+  "author": "Your Name",                // Auto-filled from user_settings.json
+  "publisher": "yourname",              // Auto-filled from user_settings.json
+  "description": "What this extension does",
+  "entry_point": "main.luc",            // File with on_load / on_update / on_unload
+  "type": "extension",                  // extension | theme | tool | network-provider
+  "permissions": ["ui.menu", "ecs.read", "ecs.write", "filesystem.project"],
+  "signature": "base64-encoded-sig",    // Ed25519 sig over the rest of this JSON
+  "dependencies": [
+    { "id": "com.lucid.core", "version": ">=1.0.0" }
+  ]
+}
+```
+
+**Permission whitelist** — extensions declare what they need:
+
+| Permission | What it grants | Trust level |
+|:---|:---|:---|
+| `ui.menu` | Register items in the top menu bar | Low |
+| `ui.panel` | Add dockable panels to the workspace | Low |
+| `ecs.read` | Read component data from the world | Low |
+| `ecs.write` | Modify component data | Medium |
+| `filesystem.project` | Read/write inside the active project folder | Medium |
+| `filesystem.global` | Read/write anywhere (warn user on install) | High |
+| `compiler.hook` | Intercept the compile pipeline | High |
+| `network.client` | Open outbound connections via `INetworkProvider` | Medium |
+| `network.server` | Bind and listen as a server | High — explicit user consent required |
+
+
+
+---
+
+#### Extension Entry Point (Luc side)
+
+```luc
+// my-extension/main.luc — the required lifecycle contract
+
+on_load(api) {
+    // Called when the extension is activated
+    api.menu.register("View/My Extension Panel", open_panel)
+    api.commands.register("my-extension.run", run_action)
+    log("My Extension loaded!")
+}
+
+on_update(dt) {
+    // Called every editor frame (optional — omit if not needed)
+}
+
+on_unload() {
+    // Called before the extension is deactivated or hot-reloaded
+    // Clean up any registered hooks
+}
+```
+
+---
+
+#### Extension UI in the Engine — "Extensions" Panel
+
+The Extensions panel is divided into two sections as you described:
+
+```
+┌─────────────────────────────────────────┐
+│  EXTENSIONS                         [+] │  ← '+' = Create new / Add existing folder
+├─────────────────────────────────────────┤
+│  MY EXTENSIONS                          │  ← Extensions you authored or added locally
+│  ┌─────────────────────────────────┐   │
+│  │ 🟢 Visual Debugger    v1.2.0   │   │  ← green dot = active
+│  │ 🔴 Git Integration    v0.9.0   │   │  ← red dot = inactive / error
+│  │ [+ Create New Extension]       │   │
+│  └─────────────────────────────────┘   │
+├─────────────────────────────────────────┤
+│  OTHER EXTENSIONS                       │  ← Community / marketplace extensions
+│  ┌─────────────────────────────────┐   │
+│  │ 🟢 Theme Manager      v2.1.0   │   │
+│  │ 🟢 Shader Graph       v1.0.3   │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+```
+
+**"+ Create New Extension" flow:**
+1. Engine reads `user_settings.json` → pre-fills `author` and `publisher` fields.
+2. User enters only: Extension Name + Description.
+3. Engine generates the full folder structure:
+   ```
+   user_extensions/my-extension/
+   ├── extension.json     ← auto-generated with all fields filled in
+   └── main.luc           ← starter template with on_load/on_unload stubs
+   ```
+4. Extension immediately appears in "My Extensions" and is ready to edit.
+
+**"+ Add Existing Folder" flow:**
+1. File picker → user selects a folder containing an `extension.json`.
+2. Engine validates the manifest (checks schema, api_version compatibility).
+3. If valid → adds to the extension registry (`user_extensions/` or symlinks the folder).
+
+---
+
+#### No Database Needed — Pure Local JSON Storage
+
+**Do not use a database.** Everything lives as local files:
+
+```
+%APPDATA%\LucidEngine\                  ← or ~/.lucid_engine/ on Linux
+├── user_settings.json                  ← developer profile (author, publisher, theme prefs)
+└── extension_registry.json             ← list of installed extension IDs and their folder paths
+```
+
+**`user_settings.json`** (auto-filled into new extension manifests):
+```json
+{
+  "display_name": "Tai Ax",
+  "publisher_id": "taiax",
+  "email": "",
+  "preferred_theme": "dark",
+  "editor_font_size": 14
+}
+```
+
+**`extension_registry.json`** (the engine's installed extension list — no server needed):
+```json
+{
+  "installed": [
+    { "id": "com.taiax.visual-debugger", "path": "./user_extensions/visual-debugger/", "active": true },
+    { "id": "com.lucid.theme-manager",   "path": "./core_extensions/theme-manager/",   "active": true }
+  ]
+}
+```
+
+**Advantages of flat-file storage:**
+- ✅ Zero dependencies — no SQLite, no embedded DB.
+- ✅ Human-readable and version-controllable.
+- ✅ Works fully offline — aligns with the licensing model.
+- ✅ Users can inspect/edit it if something goes wrong.
+- ✅ No user data is ever sent to a server — privacy by default.
+
+> [!NOTE]
+> `user_settings.json` is stored in `%APPDATA%` (not the engine folder) so it persists across engine updates and is shared across all projects on that machine.
+
+---
+
+#### Extension Distribution Lifecycle
+
+This section covers the complete end-to-end flow: from writing an extension to a user installing it. It is designed for **Phase 1 (now — closed group)** with clear markers for **Phase 2 (future — public website)**.
+
+---
+
+##### Phase 1 — Closed Group Distribution (Current)
+
+Since Lucid is a small project, the distribution channel is a **trusted group** (Discord, private GitHub, shared link). The infrastructure is minimal — just a JSON file hosted on GitHub Gist.
+
+```
+Infrastructure needed right now:
+  ├── GitHub Gist (or raw GitHub file)  ← trusted_publishers.json
+  ├── Discord server / GitHub Releases  ← where extension zip files are shared
+  └── scripts/sign_extension.py            ← already in your repo
+```
+
+**`trusted_publishers.json`** — hosted at a fixed URL, maintained by you:
+```json
+{
+  "_comment": "Lucid Engine trusted publishers registry — Phase 1",
+  "_updated": "2026-04-25",
+  "publishers": [
+    {
+      "publisher_id": "taiax",
+      "display_name": "Tai Ax",
+      "public_key": "ed25519:abc123def456...",
+      "recovery_key": "ed25519:xyz789uvw012...",
+      "status": "active"
+    },
+    {
+      "publisher_id": "alice",
+      "display_name": "Alice Dev",
+      "public_key": "ed25519:mno345pqr678...",
+      "recovery_key": "ed25519:stu901vwx234...",
+      "status": "active"
+    }
+  ]
+}
+```
+
+The engine fetches this file **once per session** (or uses a cached copy if offline). This is the only "server" needed for Phase 1.
+
+> [!TIP]
+> Host `trusted_publishers.json` on a GitHub Gist. The raw URL is stable and free. When Phase 2 arrives, you just change `trusted_publishers_url` in `engine_settings.json` to point to your real API endpoint. **Zero code change in the engine.**
+
+---
+
+##### Step-by-Step: Publisher Key Setup (One-Time)
+
+```
+Step 1 — Generate key pair (engine does this automatically on first publish)
+  scripts/generate_publisher_key.py --publisher taiax
+  
+  Prompt: "Enter a strong passphrase to encrypt your private key:"
+  Prompt: "Confirm passphrase:"
+
+  → Creates: %APPDATA%\LucidEngine\publisher_private.pem   ← ENCRYPTED (AES-256)
+  → Creates: %APPDATA%\LucidEngine\publisher_recovery.pem  ← KEEP OFFLINE
+  → Prints:  publisher_public.pem content to console        ← SHARE THIS
+
+Step 2 — Register with Lucid team (Phase 1: send a Discord DM)
+  → Send your publisher_id + public key to the Lucid team
+  → Team adds your entry to trusted_publishers.json on GitHub Gist
+  → You are now a "trusted publisher"
+
+Step 3 — Verify registration
+  → Open engine → Extensions panel → "Verify Publisher Key" button
+  → Engine fetches trusted_publishers.json and confirms your key is listed
+  → ✅ "Publisher 'taiax' verified"
+```
+
+---
+
+##### Step-by-Step: Signing and Publishing an Extension
+
+```
+Step 4 — Write your extension
+  user_extensions/my-extension/
+  ├── extension.json   ← id, uuid, permissions declared
+  └── main.luc      ← on_load / on_update / on_unload
+
+Step 5 — Sign the extension
+  scripts/sign_extension.py --extension ./user_extensions/my-extension/ --key publisher_private.pem
+
+  What the script does internally:
+    a. Reads extension.json (without the "signature" field)
+    b. SHA-256 hashes every file in the extension folder
+    c. Builds a payload:
+         { "manifest": {...extension.json...}, "file_hashes": { "main.luc": "sha256:abc..." } }
+    d. Signs the payload with Ed25519 private key
+    e. Base64-encodes the signature
+    f. Writes it into extension.json → "signature": "base64:..."
+    g. Writes a sidecar: extension.json.sig (for human inspection)
+
+Step 6 — Package for distribution
+  scripts/pack_extension.py --extension ./user_extensions/my-extension/
+  → Creates: my-extension-v1.0.0.lucext   ← a renamed zip
+
+Step 7 — Distribute (Phase 1: Discord / GitHub Release)
+  → Upload my-extension-v1.0.0.lucext to the Lucid Discord #extensions channel
+    or as a GitHub Release asset
+  → Post: extension name, version, permissions list, and a short description
+  → Users download the .lucpkg file
+```
+
+---
+
+##### Step-by-Step: Installing an Extension (User Side)
+
+```
+Step 8 — User downloads the .lucpkg file
+
+Step 9 — User adds it to the engine
+  Engine Extensions panel → [+] → "Add .lucext file"
+  
+  Engine install flow:
+    a. Unzip .lucext → extract extension folder to user_extensions/
+    b. Read extension.json → extract publisher_id and signature
+    c. Fetch trusted_publishers.json (cached or live from Gist URL)
+    d. Look up the publisher's public key
+
+         publisher_id = "taiax"
+         public_key   = "ed25519:abc123..."  ← from trusted_publishers.json
+
+    e. Rebuild the signed payload from the extracted files
+    f. Verify Ed25519 signature:
+         PASS → extension is authentic, files are unmodified
+         FAIL → show warning and block install
+
+    g. Permission review dialog shown to user:
+
+         ┌─────────────────────────────────────────────┐
+         │  Install "Visual Debugger" by taiax?        │
+         │  Version: 1.2.0  |  Publisher: ✅ Verified  │
+         ├─────────────────────────────────────────────┤
+         │  This extension requests:                    │
+         │    • ui.panel      — Add editor panels      │
+         │    • ecs.read      — Read entity data       │
+         │    • ecs.write     — Modify entity data     │
+         ├─────────────────────────────────────────────┤
+         │            [Cancel]    [Install]            │
+         └─────────────────────────────────────────────┘
+
+    h. User clicks Install → extension added to extension_registry.json → active
+```
+
+---
+
+##### What happens with an unknown publisher (not in trusted_publishers.json)?
+
+```
+Unverified extension install flow:
+  → Signature check: public key NOT found in trusted_publishers.json
+  
+  ┌─────────────────────────────────────────────────┐
+  │  ⚠️  Unverified Publisher                       │
+  │                                                 │
+  │  "My Sketchy Extension" claims publisher "unknown" │
+  │  This publisher is not in the trusted list.     │
+  │                                                 │
+  │  Only install extensions from sources you trust.   │
+  │                                                 │
+  │  [Cancel]   [Install Anyway — I trust this]    │
+  └─────────────────────────────────────────────────┘
+
+  → If user accepts: extension installed with a ⚠️ badge in the Extensions panel
+  → Engine logs: "Unverified extension installed: com.unknown.extension"
+```
+
+This allows full local flexibility while still making the trust boundary visible.
+
+---
+
+##### Phase 2 Migration — When You're Ready for a Public Website
+
+When the project grows, migration is **four changes only**. Nothing in the kernel changes.
+
+| What changes | How |
+|:---|:---|
+| `engine_settings.json` → `trusted_publishers_url` | Point from GitHub Gist URL to `https://api.lucidengine.com/publishers` |
+| `engine_settings.json` → `extension_repository_url` | Add `https://extensions.lucidengine.com` for browse/search |
+| `scripts/sign_extension.py` | Stays identical — signing process doesn't change |
+| Engine Extensions panel | Add a "Browse" tab that fetches from the new extension API |
+
+Everything else — the key format, the signature algorithm, the manifest schema, the `.lucext` format, `trusted_publishers.json` structure — is **identical between Phase 1 and Phase 2**. Phase 1 extensions work in Phase 2 without re-signing.
+
+```json
+// engine_settings.json — the only thing that changes between phases
+{
+  "trusted_publishers_url": "https://gist.githubusercontent.com/.../trusted_publishers.json",
+  // ↑ Phase 1: GitHub Gist
+  // ↓ Phase 2: just change this one line
+  "trusted_publishers_url": "https://api.lucidengine.com/v1/publishers",
+  "extension_repository_url": "https://extensions.lucidengine.com"
+}
+```
+
+---
+
+### Decision 8 — Network Extension API ✅
+
+**Yes — allow developers to write their own server extensions, choose their own provider, and implement their own transport.** The engine provides a clean **Network Abstraction Layer (NAL)** — the same pattern as the `ILicenseVerifier` and the Vulkan RHI.
+
+#### Why this is the right call
+
+Different game types need radically different networking:
+- A **real-time FPS** needs low-latency UDP with custom reliability.
+- A **turn-based strategy** needs reliable TCP, can tolerate latency.
+- A **co-op RPG** might use a hosted service like Steam Relay or Epic Online Services.
+- A **custom MMO backend** needs a fully custom server.
+
+No single networking solution covers all of these. The engine should not pick one.
+
+---
+
+#### The Network Abstraction Layer
+
+The kernel defines one interface. Developers implement it.
+
+```cpp
+// kernel/include/lge_network.h
+
+class INetworkProvider {
+public:
+    // Lifecycle
+    virtual bool   Initialize(const NetworkConfig& config) = 0;
+    virtual void   Shutdown() = 0;
+
+    // Connection
+    virtual ConnHandle Connect(const char* address, uint16_t port) = 0;
+    virtual void       Disconnect(ConnHandle conn) = 0;
+    virtual bool       Listen(uint16_t port) = 0;  // server mode
+
+    // Data transfer — the engine only hands you a flat byte buffer
+    virtual void   Send(ConnHandle conn, const uint8_t* data, uint32_t size, SendFlags flags) = 0;
+    virtual int32_t Receive(ConnHandle conn, uint8_t* buffer, uint32_t buffer_size) = 0;
+
+    // Events (polled per frame, not callback-based — keeps it thread-safe)
+    virtual NetworkEvent PollEvent() = 0;
+
+    virtual ~INetworkProvider() = default;
+};
+
+// Flags for Send()
+enum SendFlags : uint32_t {
+    SEND_RELIABLE    = 1 << 0,  // TCP-style: guarantee delivery and order
+    SEND_UNRELIABLE  = 1 << 1,  // UDP-style: best-effort, low latency
+    SEND_ENCRYPTED   = 1 << 2,  // Extension handles its own encryption layer
+};
+```
+
+#### Built-in providers (shipped with engine core)
+
+| Provider | Protocol | Use case |
+|:---|:---|:---|
+| `TcpNetworkProvider` | TCP | Turn-based, low-frequency data |
+| `UdpNetworkProvider` | Raw UDP | Custom real-time, maximum control |
+
+#### Developer-written providers (network extensions)
+
+A developer writes their own `INetworkProvider` implementation as an extension:
+
+```json
+// extension.json for a Steam networking extension
+{
+  "id": "com.taiax.steam-network",
+  "type": "network-provider",
+  "permissions": ["network.client", "network.server"],
+  "entry_point": "steam_provider.luc"
+}
+```
+
+```luc
+// steam_provider.luc — Luc wraps the Steamworks C++ SDK via FFI
+
+import "steam_sdk.luc"   // FFI bindings to Steamworks
+
+on_load(api) {
+    // Register this as the active network provider
+    api.network.set_provider(SteamNetworkProvider)
+}
+
+// The provider itself — implements the INetworkProvider contract via FFI
+SteamNetworkProvider {
+    connect(address, port) { return steam.CreateConnection(address) }
+    send(conn, data, flags) { steam.SendMessage(conn, data) }
+    poll_event() { return steam.ReceiveMessages() }
+}
+```
+
+Developers can implement providers for:
+- **Steam Networking Sockets** (Relay + P2P)
+- **Epic Online Services** (Crossplay sessions)
+- **WebSocket** (browser clients, web dashboards)
+- **WebRTC** (browser P2P)
+- **Custom UDP + QUIC** (full control)
+- **Any cloud provider** (AWS GameLift, Photon, Mirror, etc.)
+
+---
+
+#### Security boundaries the engine enforces (regardless of provider)
+
+The kernel manages the buffer layer — extensions cannot bypass it:
+
+```cpp
+// kernel/src/network/network_manager.cpp
+
+void NetworkManager::Send(ConnHandle conn, const uint8_t* data, uint32_t size) {
+    // 1. Enforce max packet size — prevent buffer overflow attacks
+    if (size > MAX_PACKET_SIZE) { LogError("Packet too large"); return; }
+
+    // 2. Rate limiting — prevent accidental (or malicious) flood
+    if (!rate_limiter.Allow(conn)) { LogWarn("Rate limit hit"); return; }
+
+    // 3. Hand off to the extension's provider — the kernel never sees the bytes after this
+    active_provider->Send(conn, data, size, flags);
+}
+```
+
+**What the kernel enforces:**
+- ✅ Max packet size (configurable, default 64KB)
+- ✅ Send rate limiting per connection
+- ✅ Connection count limits
+- ✅ `network.client` / `network.server` permission checks before any call
+
+**What the developer controls:**
+- ✅ Transport protocol (TCP, UDP, WebSocket, custom)
+- ✅ Encryption (TLS, DTLS, custom AES, or none — their choice)
+- ✅ Reliability / ordering layer (if using raw UDP)
+- ✅ Server provider (self-hosted, Steam, Epic, Photon, etc.)
+- ✅ Serialization format (JSON, Protobuf, Flatbuffers, raw binary)
+
+> [!IMPORTANT]
+> The engine **never** reads or inspects packet payloads. It only enforces size and rate limits at the boundary. All encryption, serialization, and protocol logic is entirely the developer's responsibility — this is intentional.
+
+---
+
+### Decision 9 — IDE Bottom Panel & Console Ecosystem ✅
+
+**Architecture: The VS Code / Unreal "Unified Feedback" Model.** 
+The IDE docks a primary feedback panel at the bottom, split into four distinct contexts.
+
+| Tab | Context | Data Source | Interaction |
+|:---|:---|:---|:---|
+| **Terminal** | OS Shell | PowerShell / Bash | Bi-directional (Run git, build scripts) |
+| **Output** | Engine Logs | Kernel stdout/stderr | Read-only (Filters: Error, Warn, Info) |
+| **Problems** | Compilation | `luc_langserver` | Read-only (Clickable diagnostics) |
+| **Engine Console** | Runtime Commands | `console_interpreter.cpp` | Interactive REPL (Reflected memory access) |
+
+#### The Console Ecosystem (The 3-File System)
+The "Engine Console" is not a text parser; it is a live memory bridge.
+
+1.  **The Interpreter (`luc_console.cpp`):** Core kernel logic. Receives string → Tokenizes → Finds memory via Symbols → Executes.
+2.  **The Metadata (`symbols.json`):** Generated by the Luc compiler. Maps human names (e.g., `player.health`) to binary offsets (e.g., `0xAC + 8`).
+3.  **The Shortcuts (`debug_commands.luc`):** User-defined Luc functions for complex testing (e.g., `spawn_boss()`).
+
+---
+
+### Decision 10 — AES Key Hardening (Two-Step DRM) ✅
+
+**Architecture: The "Console-Style" Decoupled Key Model.**
+Instead of hiding a single master key in the C++ DLL, the engine uses a two-step derivation process to protect game assets (`.lucid` bundles) while allowing hardware-locked distribution.
+
+| Component | Protection | Distribution |
+|:---|:---|:---|
+| **Title Key** | AES-256 | Hidden inside the `license.lge` ticket. |
+| **VFS Bundle** | AES-256 | Encrypted once with Title Key (Same 50GB file for all users). |
+| **License Ticket** | PBKDF2/HKDF | Encrypted with **(Machine UUID + AppID)**. Unique per user. |
+
+#### Why this works:
+1.  **No Hardcoded Seeds:** The kernel derives the Ticket Key from the machine hardware at runtime. There is no secret string for a hacker to find in the DLL.
+2.  **Multi-Device Friendly:** Store platforms (Steam/Epic) can generate multiple 1KB tickets for a single user (one for Desktop, one for Steam Deck), all containing the same Title Key.
+3.  **Hardware Locked:** Copying the game folder to a different PC fails because the hardware fingerprint won't unlock the `license.lge` ticket.
+
+---
+
+## Part 3 — Open Items (Still to Decide)
+
+> [!WARNING]
+> These are unresolved. They will block implementation if left too long.
+
+| # | Item | Source Doc | Why it matters | Urgency |
+|:--|:---|:---|:---|:---|
+| 1 | **Debug build guard** | `LucidEngineSecurity.md` | Kernel refuses to run `--debug` binary in production. Needs build-type flag in compiled output. | 🟡 Medium |
+| 2 | **Save-game data policy** | `LucidEngineSecurity.md` | VFS encrypts game assets. Should runtime save files also be encrypted, or plain? | 🟢 Low |
+| 3 | **Math library** | Core Architecture | Built-in `math.luc` or bind to `glm`/`DirectXMath` via FFI? | 🟡 Medium |
+| 4 | **Built-in network providers** | Decision 8 | Ship TCP + UDP in core. Should WebSocket also be built-in, or left to community extensions? | 🟢 Low |
+| 5 | **Console `Execute()` body** | `ControlPanelDesign.md` | The C++ interpreter header is drafted but the body logic is not yet written. | 🟡 Medium |
+| 6 | **`symbols.json` schema** | `ControlPanelDesign.md` | The compiler must generate this file but its structure is not defined. Needed for Autocomplete. | 🟡 Medium |
+| 7 | **Runtime IPC protocol** | `ControlPanelDesign.md` | The packet format for Editor → Game console commands is not specified. | 🟢 Low |
+| 8 | **Audio SFX format** | `AssetPipeline.md` | Listed as `.adpcm` or `.ogg` Vorbis but a final pick has not been locked. | 🟡 Medium |
+| 9 | **JIT bytecode extension** | `LucidFileFormats.md` | `--release-jit` produces bytecode but no file extension is defined for it. | 🟢 Low |
+
+---
+
+## Part 4 — Suggested File Structure
+
+```
+Lucid-Game-Engine/
+│
+├── docs/
+│   ├── LucidEngineOverview.md
+│   ├── LucidEngineSecurity.md
+│   ├── ECS_SceneModel.md               ← To write
+│   └── ExtensionManifestSchema.md         ← To write
+│
+├── kernel/                             ← C++ → luc_kernel.dll / .so
+│   ├── CMakeLists.txt
+│   ├── include/                        ← Public C-ABI (FFI contract)
+│   │   ├── lge_api.h                   ← LGE_ExtensionAPI struct, LGE_GetAPI()
+│   │   ├── lge_render.h
+│   │   ├── lge_input.h
+│   │   ├── lge_physics.h               ← Jolt bridge headers
+│   │   └── lge_vfs.h
+│   └── src/
+│       ├── core/
+│       │   ├── kernel.cpp              ← Boot sequence, frame loop
+│       │   ├── clock.cpp               ← Delta-time, V-Sync pacing
+│       │   ├── checksum.cpp            ← SHA-256 boot integrity
+│       │   ├── file_watcher.cpp        ← Hot-reload file monitor
+│       │   ├── script_manager.cpp      ← Compile → swap pipeline
+│       │   └── console_interpreter.cpp ← String → Command execution logic
+│       ├── ecs/
+│       │   ├── world.cpp               ← Entity registry, archetype storage
+│       │   ├── component_store.cpp     ← Contiguous component arrays
+│       │   └── system_scheduler.cpp    ← System ordering, parallel groups
+│       ├── render/
+│       │   ├── vulkan_rhi.cpp
+│       │   └── sdf_font.cpp
+│       ├── physics/
+│       │   ├── physics_bridge.cpp      ← Jolt integration, LucContactListener
+│       │   └── debug_renderer.cpp      ← Jolt → Vulkan Editor Pass wireframes
+│       ├── input/
+│       │   └── input_bridge.cpp
+│       ├── vfs/
+│       │   ├── vfs_reader.cpp          ← RAM-only AES-256 decrypt
+│       │   └── vfs_packer.cpp          ← Pack raw assets → .lucid bundle
+│       ├── security/
+│       │   ├── license_verifier.cpp    ← Offline RSA/Ed25519 license check
+│       │   ├── key_derivation.cpp      ← PBKDF2/HKDF(AppID + machine UUID)
+│       │   └── extension_verifier.cpp     ← Signature check for extensions
+│       └── platform/
+│           ├── win32_loader.cpp        ← LoadLibrary, GetProcAddress
+│           └── linux_loader.cpp        ← dlopen, dlsym
+│
+├── compiler/                           ← Pre-built Luc compiler binaries (separate repo)
+│   ├── luc_compiler.exe                ← Windows build (copied from compiler repo)
+│   ├── luc_compiler                    ← Linux build
+│   └── luc_langserver.exe              ← Language server binary (IntelliSense)
+│       NOTE: Compiler source lives in a separate repository.
+│             Only the compiled binaries are checked in here.
+│
+├── engine/                             ← IDE host (written in Luc)
+│   ├── src/
+│   │   ├── main.luc
+│   │   ├── ui/
+│   │   │   ├── workspace_manager.luc
+│   │   │   ├── menu_bar.luc
+│   │   │   └── theme.luc
+│   │   ├── editor/
+│   │   │   ├── scene_view.luc          ← Editor pass (gizmos, grid, Jolt wireframes)
+│   │   │   ├── game_view.luc           ← Game pass (player POV)
+│   │   │   ├── command_registry.luc    ← VS Code-style command bus
+│   │   │   └── console_manager.luc     ← UI logic for the Engine Console tab
+│   │   └── visual_programming/
+│   │       ├── node_graph.luc
+│   │       └── code_generator.luc      ← Nodes → .luc source
+│   └── config/
+│       └── engine_settings.json        ← compiler_path, extension_root, api_version
+│
+├── core_lib/                           ← Standard Luc library (shipped with release)
+│   ├── vulkan.luc
+│   ├── math.luc
+│   ├── input.luc
+│   ├── physics.luc                     ← FFI bindings: set_gravity, add_force...
+│   └── vfs.luc
+│
+├── core_extensions/                      ← First-party extensions (Lucid-signed)
+│   ├── visual_editor/
+│   │   ├── extension.json
+│   │   └── main.luc
+│   └── theme_manager/
+│       ├── extension.json
+│       └── main.luc
+│
+├── user_extensions/                      ← Community extensions (gitignored)
+├── user_projects/                      ← Developer games (gitignored)
+│   └── MyFirstGame/
+│       ├── src/
+│       │   ├── main.luc
+│       │   └── debug_commands.luc      ← Console shortcuts & macros
+│       ├── assets/                     ← Raw assets (pre-packing)
+│       └── build/
+│           ├── hot/                    ← Hot-reload temp DLLs
+│           ├── symbols.json            ← Generated symbol map for console
+│           └── *.lucid                 ← Packed encrypted bundles
+│
+├── externals/
+│   ├── vulkan/
+│   ├── vma/
+│   ├── glfw/
+│   ├── jolt/                           ← NEW: Jolt Physics source
+│   └── llvm/
+│
+├── scripts/
+│   ├── build_kernel.py
+│   ├── build_compiler.py
+│   ├── pack_release.py
+│   ├── sign_extension.py
+│   └── generate_license.py             ← signs a license.lge file
+│
+├── dist/                               ← Release output (gitignored)
+│   ├── luc_engine.exe
+│   ├── luc_kernel.dll
+│   ├── luc_compiler.exe
+│   ├── engine_settings.json
+│   ├── license.lge                     ← offline signed license file
+│   ├── core_lib/
+│   ├── core_extensions/
+│   ├── images/
+│   └── logs/
+│
+├── .gitignore
+├── CMakeLists.txt                      ← Kernel only (compiler is separate repo)
+├── LICENSE
+└── README.md
+```
+
+---
+
+## Part 5 — Decision Status Summary
+
+| Decision | Choice | Status |
+|:---|:---|:---|
+| Scene model | ECS | ✅ Confirmed |
+| FFI versioning | Function Table Versioning (Strategy 3) | ✅ Confirmed |
+| Physics library | Jolt Physics (MIT) | ✅ Confirmed |
+| Physics ↔ Render coupling | None — shared TransformComponent only | ✅ Confirmed |
+| Licensing model | Offline-first, `ILicenseVerifier` interface for online migration | ✅ Confirmed |
+| Scripting hot-reload | FileWatcher → Compiler Subprocess → Module Swapper | ✅ Confirmed |
+| IntelliSense | `luc_langserver` process, LSP-style protocol, reuses compiler frontend | ✅ Confirmed |
+| Extension system | VS Code-style, UUID v5 IDs, lifecycle hooks, Extension ≠ Library, local JSON | ✅ Confirmed |
+| Extension ID uniqueness | UUID v5(LUCID_NAMESPACE, human_id) + publisher namespace for online | ✅ Confirmed |
+| Network extension API | `INetworkProvider` interface, kernel enforces limits, dev owns protocol | ✅ Confirmed |
+| Asset pipeline format | Custom binary formats (`.ltex`, `.lmesh`, `.lanim`), GLTF for source | ✅ Confirmed |
+| ECS serialization format | Hybrid: JSON (Editor/Source) / MessagePack (Runtime/SaveGames) | ✅ Confirmed |
+| Extension signing authority | `trusted_publishers.json` (Gist for Phase 1, API for Phase 2) | ✅ Confirmed |
+| Publisher namespace registration | Discord DM (Phase 1), API registration (Phase 2), AES-256 encrypted keys | ✅ Confirmed |
+| AES key hardening | Two-Step Derivation (Title Key + Hardware-locked License Ticket) | ✅ Confirmed |
+| IDE Bottom Panel | 4-Tab Dock (Terminal, Output, Problems, Console) | ✅ Confirmed |
+| Console Architecture | 3-File Ecosystem (Interpreter, Metadata, Shortcuts) | ✅ Confirmed |
+| Save-game data policy | Likely plain (decide before release) | ⏳ Open |
+| Math library | Built-in `math.luc` vs. GLM FFI binding | ⏳ Open |
+| Built-in network providers | TCP + UDP in core, WebSocket TBD | ⏳ Open |
