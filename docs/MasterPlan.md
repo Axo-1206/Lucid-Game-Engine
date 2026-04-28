@@ -3,9 +3,12 @@
 > Last updated: 2026-04-26  
 > Status: Living document — update as decisions are locked in.
 
-**Quick jump:** [Part 1 — Plan Review](#part-1) | [Part 2 — Decisions](#part-2) | [Part 3 — Open Items](#part-3) | [Part 4 — File Structure](#part-4) | [Part 5 — Status Summary](#part-5)
-
----
+**Quick jump:**      
+[Part 1 — Plan Review](#part-1---plan-review)  
+[Part 2 — Decisions](#part-2---resolved-design-decisions)  
+[Part 3 — Open Items](#part-3---open-items-still-to-decide)  
+[Part 4 — File Structure](#part-4---suggested-file-structure)  
+[Part 5 — Status Summary](#part-5---decision-status-summary)
 
 ## Part 1 — Plan Review
 
@@ -125,8 +128,8 @@
 
 ```
 Entity (uint64 ID)
-  └── Components (POD structs: Position, Velocity, Mesh, Collider, Health...)
-        └── Systems (Luc or C++: PhysicsSystem, RenderSystem, ScriptSystem...)
+└── Components (POD structs: Position, Velocity, Mesh, Collider, Health...)
+		└── Systems (Luc or C++: PhysicsSystem, RenderSystem, ScriptSystem...)
 ```
 
 ---
@@ -147,10 +150,10 @@ Entity (uint64 ID)
 ```c
 // lge_api.h — shape never changes
 typedef struct {
-    uint32_t version;       // e.g. 0x00010002 = v1.2
-    void (*render_frame)();
-    void (*spawn_entity)(uint64_t* out_id);
-    void (*add_component)(uint64_t entity, uint32_t component_type, void* data);
+	uint32_t version;       // e.g. 0x00010002 = v1.2
+	void (*render_frame)();
+	void (*spawn_entity)(uint64_t* out_id);
+	void (*add_component)(uint64_t entity, uint32_t component_type, void* data);
 } LGE_ExtensionAPI;
 
 // Kernel exports ONE stable function
@@ -168,6 +171,12 @@ api->spawn_entity(&my_entity);
 - `major` bump → kernel drops old table → extensions must update.
 - `minor` bump → additive only, old table stays valid.
 - `patch` bump → bug fix, no ABI change.
+
+#### The Luc Bridge (Scripting FFI)
+While C++ extensions call `LGE_GetAPI` directly, **Luc extensions** receive a pre-negotiated `api` object. The Kernel performs the version check against the `api_version` declared in `extension.json` before passing the object to `on_load(api)`.
+
+This ensures that Luc scripts are **always type-safe** and never have to deal with raw function pointers or version mismatch crashes. The `api` object in Luc is a high-level projection of the C++ function table, where each namespace (e.g., `api.ui`, `api.fs`) corresponds to a specific subsystem in the Kernel.
+
 
 ---
 
@@ -200,10 +209,10 @@ LGE_API void LGE_SetBodyProperties(uint64_t entity, float mass, float friction, 
 
 ```
 Frame loop:
-  1. PhysicsSystem::Update(dt)   → Jolt writes → TransformComponent
-  2. RenderSystem::Update()      → Vulkan reads ← TransformComponent
-  
-  Jolt and Vulkan never talk directly. TransformComponent is the only shared data.
+1. PhysicsSystem::Update(dt)   → Jolt writes → TransformComponent
+2. RenderSystem::Update()      → Vulkan reads ← TransformComponent
+
+Jolt and Vulkan never talk directly. TransformComponent is the only shared data.
 ```
 
 > [!IMPORTANT]
@@ -223,9 +232,9 @@ Instead of calling license verification code directly, the kernel talks to an `I
 // kernel/include/lge_license.h
 class ILicenseVerifier {
 public:
-    virtual LicenseResult Verify() = 0;           // called at boot
-    virtual bool HasFeature(uint32_t flag) = 0;   // checked at runtime
-    virtual ~ILicenseVerifier() = default;
+	virtual LicenseResult Verify() = 0;           // called at boot
+	virtual bool HasFeature(uint32_t flag) = 0;   // checked at runtime
+	virtual ~ILicenseVerifier() = default;
 };
 
 // kernel boots with this — swappable without recompiling the kernel
@@ -243,12 +252,12 @@ Now two implementations exist and can be selected at build time or config time:
 
 ```
 Boot sequence:
-  OfflineLicenseVerifier::Verify()
-    → read license.lge from engine dir
-    → verify Ed25519 signature (public key baked into luc_kernel.dll)
-    → extract { app_id, expiry_date, feature_flags, machine_fingerprint }
-    → compare machine_fingerprint against current hardware
-    → PASS → proceed  |  FAIL → Trial mode
+OfflineLicenseVerifier::Verify()
+	→ read license.lge from engine dir
+	→ verify Ed25519 signature (public key baked into luc_kernel.dll)
+	→ extract { app_id, expiry_date, feature_flags, machine_fingerprint }
+	→ compare machine_fingerprint against current hardware
+	→ PASS → proceed  |  FAIL → Trial mode
 ```
 
 **Machine fingerprinting** (prevents license file sharing):
@@ -269,9 +278,9 @@ string machine_id = sha256(get_cpu_id() + get_motherboard_serial() + get_disk_se
 When you're ready to add online enforcement:
 1. Write `OnlineLicenseVerifier` as a new `.cpp` — same interface, new implementation.
 2. Switch `g_license_verifier` assignment in `kernel.cpp` based on `engine_settings.json`:
-   ```json
-   { "license_mode": "online", "license_server": "https://license.lucidengine.com" }
-   ```
+```json
+{ "license_mode": "online", "license_server": "https://license.lucidengine.com" }
+```
 3. The rest of the kernel is untouched. The abstraction did its job.
 
 > [!TIP]
@@ -289,7 +298,7 @@ Three components work together:
 
 ```
 [FileWatcher]  →  [Compiler Subprocess]  →  [Module Swapper]
-   (C++)              (luc_compiler.exe)         (C++ kernel)
+(C++)              (luc_compiler.exe)         (C++ kernel)
 ```
 
 ---
@@ -303,15 +312,15 @@ The kernel spawns a background thread that watches `user_projects/<active>/src/`
 // Uses ReadDirectoryChangesW (Win32) or inotify (Linux)
 
 void FileWatcher::Start(const fs::path& watch_dir) {
-    watcher_thread = std::thread([&] {
-        while (running) {
-            if (HasChangedFiles(watch_dir)) {
-                string changed_file = GetChangedFile();
-                on_file_changed(changed_file);  // fires the compile pipeline
-            }
-            std::this_thread::sleep_for(100ms);
-        }
-    });
+	watcher_thread = std::thread([&] {
+		while (running) {
+			if (HasChangedFiles(watch_dir)) {
+				string changed_file = GetChangedFile();
+				on_file_changed(changed_file);  // fires the compile pipeline
+			}
+			std::this_thread::sleep_for(100ms);
+		}
+	});
 }
 ```
 
@@ -329,22 +338,22 @@ When a file change is detected, the kernel spawns `luc_compiler.exe` as a child 
 // kernel/src/core/script_manager.cpp
 
 void ScriptManager::RecompileModule(const string& luc_file) {
-    // Output goes to a temp .dll, NOT the live .dll
-    string cmd = "luc_compiler.exe --input " + luc_file 
-               + " --output ./build/hot/" + module_name + "_next.dll";
-    
-    PROCESS_INFORMATION pi;
-    CreateProcess(NULL, cmd.c_str(), ...);
-    WaitForSingleObject(pi.hProcess, INFINITE); // wait for compile
-    
-    DWORD exit_code;
-    GetExitCodeProcess(pi.hProcess, &exit_code);
-    if (exit_code == 0) {
-        SwapModule(module_name); // only swap if compile succeeded
-    } else {
-        // Show compiler errors in the IDE log panel — don't swap
-        LogCompilerErrors(module_name + "_next.dll");
-    }
+	// Output goes to a temp .dll, NOT the live .dll
+	string cmd = "luc_compiler.exe --input " + luc_file 
+			+ " --output ./build/hot/" + module_name + "_next.dll";
+	
+	PROCESS_INFORMATION pi;
+	CreateProcess(NULL, cmd.c_str(), ...);
+	WaitForSingleObject(pi.hProcess, INFINITE); // wait for compile
+	
+	DWORD exit_code;
+	GetExitCodeProcess(pi.hProcess, &exit_code);
+	if (exit_code == 0) {
+		SwapModule(module_name); // only swap if compile succeeded
+	} else {
+		// Show compiler errors in the IDE log panel — don't swap
+		LogCompilerErrors(module_name + "_next.dll");
+	}
 }
 ```
 
@@ -361,28 +370,28 @@ The swapper waits for the current frame to finish, then atomically replaces the 
 // kernel/src/core/script_manager.cpp
 
 void ScriptManager::SwapModule(const string& module_name) {
-    // 1. Wait for current frame to finish — do NOT swap mid-frame
-    frame_fence.Wait();
+	// 1. Wait for current frame to finish — do NOT swap mid-frame
+	frame_fence.Wait();
 
-    // 2. Call the old module's cleanup hook (if it has one)
-    if (old_api->on_unload) old_api->on_unload();
+	// 2. Call the old module's cleanup hook (if it has one)
+	if (old_api->on_unload) old_api->on_unload();
 
-    // 3. Unload the old DLL
-    FreeLibrary(old_module_handle);
+	// 3. Unload the old DLL
+	FreeLibrary(old_module_handle);
 
-    // 4. Rename _next.dll → live .dll
-    fs::rename("./build/hot/" + module_name + "_next.dll",
-                "./build/hot/" + module_name + ".dll");
+	// 4. Rename _next.dll → live .dll
+	fs::rename("./build/hot/" + module_name + "_next.dll",
+				"./build/hot/" + module_name + ".dll");
 
-    // 5. Load the new DLL
-    HMODULE new_handle = LoadLibrary(("./build/hot/" + module_name + ".dll").c_str());
-    auto* new_api = (LGE_ExtensionAPI*)GetProcAddress(new_handle, "LGE_GetAPI")(LGE_VERSION);
+	// 5. Load the new DLL
+	HMODULE new_handle = LoadLibrary(("./build/hot/" + module_name + ".dll").c_str());
+	auto* new_api = (LGE_ExtensionAPI*)GetProcAddress(new_handle, "LGE_GetAPI")(LGE_VERSION);
 
-    // 6. Call the new module's init hook
-    if (new_api->on_load) new_api->on_load();
+	// 6. Call the new module's init hook
+	if (new_api->on_load) new_api->on_load();
 
-    // 7. Register in the live module table
-    live_modules[module_name] = { new_handle, new_api };
+	// 7. Register in the live module table
+	live_modules[module_name] = { new_handle, new_api };
 }
 ```
 
@@ -405,30 +414,30 @@ The hardest part of hot-reload is keeping game state (player position, health, e
 
 ```
 User saves player.luc
-       │
-       ▼
+	│
+	▼
 FileWatcher detects change
-       │
-       ▼
+	│
+	▼
 ScriptManager::RecompileModule("player")
-  → spawns: luc_compiler.exe --input player.luc --output player_next.dll
-       │
-       ├── Compile FAILED → show errors in IDE log, keep old module running
-       │
-       └── Compile OK
-             │
-             ▼
-         Wait for frame fence
-             │
-             ▼
-         old_api->on_unload()
-         FreeLibrary(old .dll)
-         rename _next.dll → .dll
-         LoadLibrary(new .dll)
-         new_api->on_load()
-             │
-             ▼
-         Game continues — no restart, state preserved by ECS
+→ spawns: luc_compiler.exe --input player.luc --output player_next.dll
+	│
+	├── Compile FAILED → show errors in IDE log, keep old module running
+	│
+	└── Compile OK
+			│
+			▼
+		Wait for frame fence
+			│
+			▼
+		old_api->on_unload()
+		FreeLibrary(old .dll)
+		rename _next.dll → .dll
+		LoadLibrary(new .dll)
+		new_api->on_load()
+			│
+			▼
+		Game continues — no restart, state preserved by ECS
 ```
 
 ---
@@ -443,18 +452,18 @@ The IDE (written in Luc) cannot call C++ analysis code directly — that would c
 
 ```
 IDE (engine/src/editor/script_editor.luc)
-  │
-  │  JSON over stdin/stdout (LSP-style protocol)
-  ▼
+│
+│  JSON over stdin/stdout (LSP-style protocol)
+▼
 luc_langserver.exe (C++ process, always running in background)
-  │
-  ├── Reuses compiler's Lexer + Parser + Symbol Table (no code-gen)
-  ├── Maintains an in-memory AST index of all open .luc files
-  └── Responds to requests:
-        textDocument/completion   → list of symbols, keywords, types
-        textDocument/hover        → type info, docstring
-        textDocument/definition   → jump to declaration file + line
-        textDocument/diagnostic   → real-time error/warning list
+│
+├── Reuses compiler's Lexer + Parser + Symbol Table (no code-gen)
+├── Maintains an in-memory AST index of all open .luc files
+└── Responds to requests:
+		textDocument/completion   → list of symbols, keywords, types
+		textDocument/hover        → type info, docstring
+		textDocument/definition   → jump to declaration file + line
+		textDocument/diagnostic   → real-time error/warning list
 ```
 
 #### How it reuses the compiler
@@ -464,8 +473,8 @@ The compiler already builds an AST and symbol table in `lexer/` and `parser/`. T
 ```
 luc_compiler.exe:   Lex → Parse → Type-check → Optimize → Codegen → .dll
 luc_langserver.exe: Lex → Parse → Type-check → (respond to IDE queries)
-                                       ↑
-                               Same code, shared as a static library
+									↑
+							Same code, shared as a static library
 ```
 
 This means the language server's completions and errors are **always in sync** with what the compiler actually accepts — no drift between "what the IDE shows" and "what actually compiles."
@@ -473,16 +482,21 @@ This means the language server's completions and errors are **always in sync** w
 #### IDE integration (Luc side)
 
 ```luc
-// engine/src/editor/script_editor.luc
-// The editor starts the langserver as a child process on engine boot
+-- engine/src/editor/script_editor.luc
+-- The editor starts the langserver as a child process on engine boot
 
-lang_server = Process.spawn("./compiler/luc_langserver.exe")
+const lang_server &Process = Process:spawn("./compiler/luc_langserver.exe")
 
-on_keystroke(file, cursor_pos) {
-    request = { method: "textDocument/completion", file: file, pos: cursor_pos }
-    lang_server.write(json(request))
-    response = lang_server.read_line()
-    show_completion_popup(json_parse(response).items)
+let on_keystroke (file string, cursor_pos Vec2) = {
+    let request Request = Request { 
+        method = "textDocument/completion"
+        file   = file
+        pos    = cursor_pos 
+    }
+    
+    lang_server:write(json:serialize(request))
+    let response string = lang_server:read_line()
+    show_completion_popup(json:parse(response).items)
 }
 ```
 
@@ -531,14 +545,14 @@ This is what humans read, type, and declare as a dependency.
 **Layer 2 — UUID v5 (internal machine ID, auto-generated):**
 ```
 extension_uuid = uuid5(LUCID_NAMESPACE, "com.taiax.my-extension")
-  → always "a3f8c21e-5b9d-5e4f-8c3a-1d2e4f6a8b0c" for this exact string
+→ always "a3f8c21e-5b9d-5e4f-8c3a-1d2e4f6a8b0c" for this exact string
 ```
 UUID v5 is a deterministic SHA-1 hash of a fixed namespace + the human ID string. Same string → same UUID, always, forever. No random number, no timestamp.
 
 ```cpp
 // Generated ONCE at "Create New Extension" time — never regenerated
 std::string generate_extension_uuid(const std::string& human_id) {
-    return uuid5(LUCID_NAMESPACE, human_id);
+	return uuid5(LUCID_NAMESPACE, human_id);
 }
 ```
 
@@ -556,15 +570,15 @@ Since UUID v5 is deterministic, both produce the *identical* UUID. This is a gen
 
 ```
 Extension loader startup:
-  for each extension in extension_registry.json:
-    1. Read uuid from extension.json
-    2. Check against already-loaded uuid table
-    3. If CONFLICT found:
-         → Do NOT load the second extension
-         → Show in Extensions panel: ⚠️ "com.dev.my-extension" conflicts with an
-           already-loaded extension (same UUID). Rename your extension ID to resolve.
-         → Write conflict to logs/extension_conflicts.log
-    4. If no conflict → load normally
+for each extension in extension_registry.json:
+	1. Read uuid from extension.json
+	2. Check against already-loaded uuid table
+	3. If CONFLICT found:
+		→ Do NOT load the second extension
+		→ Show in Extensions panel: ⚠️ "com.dev.my-extension" conflicts with an
+		already-loaded extension (same UUID). Rename your extension ID to resolve.
+		→ Write conflict to logs/extension_conflicts.log
+	4. If no conflict → load normally
 ```
 
 The first extension alphabetically in `extension_registry.json` wins. The engine **never crashes** — it simply refuses to load the conflicting one and tells the developer exactly why.
@@ -628,11 +642,11 @@ The recovery public key is registered in the registry alongside the main one:
 ```json
 // Registry record for publisher "taiax"
 {
-  "publisher_id": "taiax",
-  "keys": [
-    { "type": "main",     "public_key": "ed25519:abc123...", "status": "active" },
-    { "type": "recovery", "public_key": "ed25519:xyz789...", "status": "recovery-only" }
-  ]
+"publisher_id": "taiax",
+"keys": [
+	{ "type": "main",     "public_key": "ed25519:abc123...", "status": "active" },
+	{ "type": "recovery", "public_key": "ed25519:xyz789...", "status": "recovery-only" }
+]
 }
 ```
 
@@ -646,25 +660,25 @@ Before moving to a new machine, the developer adds a new key from their old mach
 
 ```
 Old machine:
-  1. Generate new key pair on new machine → get new_public.pem
-  2. On old machine: sign a "key addition request" with old private key
-     { "action": "add_key", "new_public_key": "ed25519:new123...", "publisher": "taiax" }
-  3. Submit to registry → verified with old key → new key added
-  4. Both keys are now valid
+1. Generate new key pair on new machine → get new_public.pem
+2. On old machine: sign a "key addition request" with old private key
+	{ "action": "add_key", "new_public_key": "ed25519:new123...", "publisher": "taiax" }
+3. Submit to registry → verified with old key → new key added
+4. Both keys are now valid
 
 New machine:
-  5. Copy new_private.pem to new machine
-  6. (Optional) Revoke old key from new machine using new private key
+5. Copy new_private.pem to new machine
+6. (Optional) Revoke old key from new machine using new private key
 ```
 
 If the **old machine is already gone** (lost key):
 ```
 Recovery path:
-  1. Use publisher_recovery.pem
-  2. Sign a "key replacement request" with the recovery key
-  3. Registry verifies the recovery key → replaces the lost main key
-  4. Generate and register a new main key
-  5. Generate a new recovery key (the old one was used — treat it as spent)
+1. Use publisher_recovery.pem
+2. Sign a "key replacement request" with the recovery key
+3. Registry verifies the recovery key → replaces the lost main key
+4. Generate and register a new main key
+5. Generate a new recovery key (the old one was used — treat it as spent)
 ```
 
 ---
@@ -709,23 +723,63 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIe3n...
 
 ```json
 {
-  "id": "com.yourname.my-extension",        // Human-readable — developers use this
-  "uuid": "a3f8c21e-5b9d-5e4f-8c3a-1d2e4f6a8b0c",  // UUID v5 — auto-generated, NEVER change
-  "name": "My Extension",
-  "version": "1.0.0",                    // SemVer
-  "api_version": "0x00010000",           // Minimum kernel API version required
-  "author": "Your Name",                // Auto-filled from user_settings.json
-  "publisher": "yourname",              // Auto-filled from user_settings.json
-  "description": "What this extension does",
-  "entry_point": "main.luc",            // File with on_load / on_update / on_unload
-  "type": "extension",                  // extension | theme | tool | network-provider
-  "permissions": ["ui.menu", "ecs.read", "ecs.write", "filesystem.project"],
-  "signature": "base64-encoded-sig",    // Ed25519 sig over the rest of this JSON
-  "dependencies": [
-    { "id": "com.lucid.core", "version": ">=1.0.0" }
-  ]
+"id": "com.yourname.my-extension",        // Human-readable — developers use this
+"uuid": "a3f8c21e-5b9d-5e4f-8c3a-1d2e4f6a8b0c",  // UUID v5 — auto-generated, NEVER change
+"name": "My Extension",
+"version": "1.0.0",                    // SemVer
+"api_version": "0x00010000",           // Minimum kernel API version required
+"author": "Your Name",                // Auto-filled from user_settings.json
+"publisher": "yourname",              // Auto-filled from user_settings.json
+"description": "What this extension does",
+"entry_point": "main.luc",            // File with on_load / on_update / on_unload
+"type": "extension",                  // extension | theme | tool | network-provider
+"permissions": ["ui.menu", "ecs.read", "ecs.write", "filesystem.project"],
+
+// LAZY LOADING (When should the engine run main.luc?)
+"activationEvents": [
+	"onCommand:my-extension.run",
+	"onView:my-extension-panel"
+],
+
+// STATIC UI DEFINITIONS (What does this add to the IDE?)
+"contributes": {
+	"commands": [{ "command": "my-extension.run", "title": "Run My Tool" }],
+	"menus": { "editor/context": [{ "command": "my-extension.run" }] },
+	"viewsContainers": {
+	"activitybar": [{ "id": "my-extension-panel", "title": "My Tool", "icon": "icons/panel.svg" }]
+	}
+},
+
+"signature": "base64-encoded-sig",    // Ed25519 sig over the rest of this JSON
+"dependencies": [
+	{ "id": "com.lucid.core", "version": ">=1.0.0" }
+]
 }
 ```
+
+#### Why `contributes` and `activationEvents` are critical
+Just like VS Code's `package.json`, this declarative approach solves two massive problems:
+1. **Zero-Cost Startup:** The engine reads all `extension.json` files on boot and builds the UI menus, activity bar, and command palette *without executing a single line of Luc code*. 
+2. **Lazy Loading:** `main.luc` is strictly ignored until the user clicks the button defined in `contributes`. This keeps the engine's memory footprint incredibly small, no matter how many extensions are installed.
+
+#### How Permissions are Resolved and Enforced
+Permissions are not just a warning; they are enforced at the C++ Kernel boundary.
+
+1. **Installation (User Consent):** When a user downloads an extension, the IDE parses the `permissions` array in `extension.json`. If it contains `network.server` or `filesystem.global`, a large warning prompts the user for consent. If they decline, the installation aborts.
+2. **Runtime Enforcement (The Kernel Gatekeeper):** 
+When an extension's `main.luc` is eventually loaded, the engine assigns it an **Execution Context ID**. This ID maps to the approved permissions.
+If the script tries to call a sensitive FFI function (e.g., `api.network.listen(8080)`), the C++ Kernel intercepts the call:
+```cpp
+// Inside luc_kernel.dll
+LGE_API void LGE_Network_Listen(ExecutionContext context, int port) {
+	if (!HasPermission(context, "network.server")) {
+		LogError("Extension denied: Missing 'network.server' permission");
+		return; // Hard block at the C++ level
+	}
+	// Proceed with binding the port...
+}
+```
+Because the enforcement happens in C++, a malicious Luc script cannot bypass it.
 
 **Permission whitelist** — extensions declare what they need:
 
@@ -748,22 +802,22 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIe3n...
 #### Extension Entry Point (Luc side)
 
 ```luc
-// my-extension/main.luc — the required lifecycle contract
+-- my-extension/main.luc — the required lifecycle contract
 
-on_load(api) {
-    // Called when the extension is activated
-    api.menu.register("View/My Extension Panel", open_panel)
-    api.commands.register("my-extension.run", run_action)
-    log("My Extension loaded!")
+export const on_load (api &Api) = {
+    -- Called when the extension is activated
+    api.menu:register("View/My Extension Panel", open_panel)
+    api.commands:register("my-extension.run", run_action)
+    io.printl("My Extension loaded!")
 }
 
-on_update(dt) {
-    // Called every editor frame (optional — omit if not needed)
+export const on_update (dt float) = {
+    -- Called every editor frame (optional — omit if not needed)
 }
 
-on_unload() {
-    // Called before the extension is deactivated or hot-reloaded
-    // Clean up any registered hooks
+export const on_unload () = {
+    -- Called before the extension is deactivated or hot-reloaded
+    -- Clean up any registered hooks
 }
 ```
 
@@ -796,11 +850,11 @@ The Extensions panel is divided into two sections as you described:
 1. Engine reads `user_settings.json` → pre-fills `author` and `publisher` fields.
 2. User enters only: Extension Name + Description.
 3. Engine generates the full folder structure:
-   ```
-   user_extensions/my-extension/
-   ├── extension.json     ← auto-generated with all fields filled in
-   └── main.luc           ← starter template with on_load/on_unload stubs
-   ```
+```
+user_extensions/my-extension/
+├── extension.json     ← auto-generated with all fields filled in
+└── main.luc           ← starter template with on_load/on_unload stubs
+```
 4. Extension immediately appears in "My Extensions" and is ready to edit.
 
 **"+ Add Existing Folder" flow:**
@@ -823,21 +877,21 @@ The Extensions panel is divided into two sections as you described:
 **`user_settings.json`** (auto-filled into new extension manifests):
 ```json
 {
-  "display_name": "Tai Ax",
-  "publisher_id": "taiax",
-  "email": "",
-  "preferred_theme": "dark",
-  "editor_font_size": 14
+"display_name": "Tai Ax",
+"publisher_id": "taiax",
+"email": "",
+"preferred_theme": "dark",
+"editor_font_size": 14
 }
 ```
 
 **`extension_registry.json`** (the engine's installed extension list — no server needed):
 ```json
 {
-  "installed": [
-    { "id": "com.taiax.visual-debugger", "path": "./user_extensions/visual-debugger/", "active": true },
-    { "id": "com.lucid.theme-manager",   "path": "./core_extensions/theme-manager/",   "active": true }
-  ]
+"installed": [
+	{ "id": "com.taiax.visual-debugger", "path": "./user_extensions/visual-debugger/", "active": true },
+	{ "id": "com.lucid.theme-manager",   "path": "./core_extensions/theme-manager/",   "active": true }
+]
 }
 ```
 
@@ -865,32 +919,32 @@ Since Lucid is a small project, the distribution channel is a **trusted group** 
 
 ```
 Infrastructure needed right now:
-  ├── GitHub Gist (or raw GitHub file)  ← trusted_publishers.json
-  ├── Discord server / GitHub Releases  ← where extension zip files are shared
-  └── scripts/sign_extension.py            ← already in your repo
+├── GitHub Gist (or raw GitHub file)  ← trusted_publishers.json
+├── Discord server / GitHub Releases  ← where extension zip files are shared
+└── scripts/sign_extension.py            ← already in your repo
 ```
 
 **`trusted_publishers.json`** — hosted at a fixed URL, maintained by you:
 ```json
 {
-  "_comment": "Lucid Engine trusted publishers registry — Phase 1",
-  "_updated": "2026-04-25",
-  "publishers": [
-    {
-      "publisher_id": "taiax",
-      "display_name": "Tai Ax",
-      "public_key": "ed25519:abc123def456...",
-      "recovery_key": "ed25519:xyz789uvw012...",
-      "status": "active"
-    },
-    {
-      "publisher_id": "alice",
-      "display_name": "Alice Dev",
-      "public_key": "ed25519:mno345pqr678...",
-      "recovery_key": "ed25519:stu901vwx234...",
-      "status": "active"
-    }
-  ]
+"_comment": "Lucid Engine trusted publishers registry — Phase 1",
+"_updated": "2026-04-25",
+"publishers": [
+	{
+	"publisher_id": "taiax",
+	"display_name": "Tai Ax",
+	"public_key": "ed25519:abc123def456...",
+	"recovery_key": "ed25519:xyz789uvw012...",
+	"status": "active"
+	},
+	{
+	"publisher_id": "alice",
+	"display_name": "Alice Dev",
+	"public_key": "ed25519:mno345pqr678...",
+	"recovery_key": "ed25519:stu901vwx234...",
+	"status": "active"
+	}
+]
 }
 ```
 
@@ -905,24 +959,24 @@ The engine fetches this file **once per session** (or uses a cached copy if offl
 
 ```
 Step 1 — Generate key pair (engine does this automatically on first publish)
-  scripts/generate_publisher_key.py --publisher taiax
-  
-  Prompt: "Enter a strong passphrase to encrypt your private key:"
-  Prompt: "Confirm passphrase:"
+scripts/generate_publisher_key.py --publisher taiax
 
-  → Creates: %APPDATA%\LucidEngine\publisher_private.pem   ← ENCRYPTED (AES-256)
-  → Creates: %APPDATA%\LucidEngine\publisher_recovery.pem  ← KEEP OFFLINE
-  → Prints:  publisher_public.pem content to console        ← SHARE THIS
+Prompt: "Enter a strong passphrase to encrypt your private key:"
+Prompt: "Confirm passphrase:"
+
+→ Creates: %APPDATA%\LucidEngine\publisher_private.pem   ← ENCRYPTED (AES-256)
+→ Creates: %APPDATA%\LucidEngine\publisher_recovery.pem  ← KEEP OFFLINE
+→ Prints:  publisher_public.pem content to console        ← SHARE THIS
 
 Step 2 — Register with Lucid team (Phase 1: send a Discord DM)
-  → Send your publisher_id + public key to the Lucid team
-  → Team adds your entry to trusted_publishers.json on GitHub Gist
-  → You are now a "trusted publisher"
+→ Send your publisher_id + public key to the Lucid team
+→ Team adds your entry to trusted_publishers.json on GitHub Gist
+→ You are now a "trusted publisher"
 
 Step 3 — Verify registration
-  → Open engine → Extensions panel → "Verify Publisher Key" button
-  → Engine fetches trusted_publishers.json and confirms your key is listed
-  → ✅ "Publisher 'taiax' verified"
+→ Open engine → Extensions panel → "Verify Publisher Key" button
+→ Engine fetches trusted_publishers.json and confirms your key is listed
+→ ✅ "Publisher 'taiax' verified"
 ```
 
 ---
@@ -931,32 +985,32 @@ Step 3 — Verify registration
 
 ```
 Step 4 — Write your extension
-  user_extensions/my-extension/
-  ├── extension.json   ← id, uuid, permissions declared
-  └── main.luc      ← on_load / on_update / on_unload
+user_extensions/my-extension/
+├── extension.json   ← id, uuid, permissions declared
+└── main.luc      ← on_load / on_update / on_unload
 
 Step 5 — Sign the extension
-  scripts/sign_extension.py --extension ./user_extensions/my-extension/ --key publisher_private.pem
+scripts/sign_extension.py --extension ./user_extensions/my-extension/ --key publisher_private.pem
 
-  What the script does internally:
-    a. Reads extension.json (without the "signature" field)
-    b. SHA-256 hashes every file in the extension folder
-    c. Builds a payload:
-         { "manifest": {...extension.json...}, "file_hashes": { "main.luc": "sha256:abc..." } }
-    d. Signs the payload with Ed25519 private key
-    e. Base64-encodes the signature
-    f. Writes it into extension.json → "signature": "base64:..."
-    g. Writes a sidecar: extension.json.sig (for human inspection)
+What the script does internally:
+	a. Reads extension.json (without the "signature" field)
+	b. SHA-256 hashes every file in the extension folder
+	c. Builds a payload:
+		{ "manifest": {...extension.json...}, "file_hashes": { "main.luc": "sha256:abc..." } }
+	d. Signs the payload with Ed25519 private key
+	e. Base64-encodes the signature
+	f. Writes it into extension.json → "signature": "base64:..."
+	g. Writes a sidecar: extension.json.sig (for human inspection)
 
 Step 6 — Package for distribution
-  scripts/pack_extension.py --extension ./user_extensions/my-extension/
-  → Creates: my-extension-v1.0.0.lucext   ← a renamed zip
+scripts/pack_extension.py --extension ./user_extensions/my-extension/
+→ Creates: my-extension-v1.0.0.lucext   ← a renamed zip
 
 Step 7 — Distribute (Phase 1: Discord / GitHub Release)
-  → Upload my-extension-v1.0.0.lucext to the Lucid Discord #extensions channel
-    or as a GitHub Release asset
-  → Post: extension name, version, permissions list, and a short description
-  → Users download the .lucpkg file
+→ Upload my-extension-v1.0.0.lucext to the Lucid Discord #extensions channel
+	or as a GitHub Release asset
+→ Post: extension name, version, permissions list, and a short description
+→ Users download the .lucpkg file
 ```
 
 ---
@@ -967,37 +1021,37 @@ Step 7 — Distribute (Phase 1: Discord / GitHub Release)
 Step 8 — User downloads the .lucpkg file
 
 Step 9 — User adds it to the engine
-  Engine Extensions panel → [+] → "Add .lucext file"
-  
-  Engine install flow:
-    a. Unzip .lucext → extract extension folder to user_extensions/
-    b. Read extension.json → extract publisher_id and signature
-    c. Fetch trusted_publishers.json (cached or live from Gist URL)
-    d. Look up the publisher's public key
+Engine Extensions panel → [+] → "Add .lucext file"
 
-         publisher_id = "taiax"
-         public_key   = "ed25519:abc123..."  ← from trusted_publishers.json
+Engine install flow:
+	a. Unzip .lucext → extract extension folder to user_extensions/
+	b. Read extension.json → extract publisher_id and signature
+	c. Fetch trusted_publishers.json (cached or live from Gist URL)
+	d. Look up the publisher's public key
 
-    e. Rebuild the signed payload from the extracted files
-    f. Verify Ed25519 signature:
-         PASS → extension is authentic, files are unmodified
-         FAIL → show warning and block install
+		publisher_id = "taiax"
+		public_key   = "ed25519:abc123..."  ← from trusted_publishers.json
 
-    g. Permission review dialog shown to user:
+	e. Rebuild the signed payload from the extracted files
+	f. Verify Ed25519 signature:
+		PASS → extension is authentic, files are unmodified
+		FAIL → show warning and block install
 
-         ┌─────────────────────────────────────────────┐
-         │  Install "Visual Debugger" by taiax?        │
-         │  Version: 1.2.0  |  Publisher: ✅ Verified  │
-         ├─────────────────────────────────────────────┤
-         │  This extension requests:                    │
-         │    • ui.panel      — Add editor panels      │
-         │    • ecs.read      — Read entity data       │
-         │    • ecs.write     — Modify entity data     │
-         ├─────────────────────────────────────────────┤
-         │            [Cancel]    [Install]            │
-         └─────────────────────────────────────────────┘
+	g. Permission review dialog shown to user:
 
-    h. User clicks Install → extension added to extension_registry.json → active
+		┌─────────────────────────────────────────────┐
+		│  Install "Visual Debugger" by taiax?        │
+		│  Version: 1.2.0  |  Publisher: ✅ Verified  │
+		├─────────────────────────────────────────────┤
+		│  This extension requests:                    │
+		│    • ui.panel      — Add editor panels      │
+		│    • ecs.read      — Read entity data       │
+		│    • ecs.write     — Modify entity data     │
+		├─────────────────────────────────────────────┤
+		│            [Cancel]    [Install]            │
+		└─────────────────────────────────────────────┘
+
+	h. User clicks Install → extension added to extension_registry.json → active
 ```
 
 ---
@@ -1006,21 +1060,21 @@ Step 9 — User adds it to the engine
 
 ```
 Unverified extension install flow:
-  → Signature check: public key NOT found in trusted_publishers.json
-  
-  ┌─────────────────────────────────────────────────┐
-  │  ⚠️  Unverified Publisher                       │
-  │                                                 │
-  │  "My Sketchy Extension" claims publisher "unknown" │
-  │  This publisher is not in the trusted list.     │
-  │                                                 │
-  │  Only install extensions from sources you trust.   │
-  │                                                 │
-  │  [Cancel]   [Install Anyway — I trust this]    │
-  └─────────────────────────────────────────────────┘
+→ Signature check: public key NOT found in trusted_publishers.json
 
-  → If user accepts: extension installed with a ⚠️ badge in the Extensions panel
-  → Engine logs: "Unverified extension installed: com.unknown.extension"
+┌─────────────────────────────────────────────────┐
+│  ⚠️  Unverified Publisher                       │
+│                                                 │
+│  "My Sketchy Extension" claims publisher "unknown" │
+│  This publisher is not in the trusted list.     │
+│                                                 │
+│  Only install extensions from sources you trust.   │
+│                                                 │
+│  [Cancel]   [Install Anyway — I trust this]    │
+└─────────────────────────────────────────────────┘
+
+→ If user accepts: extension installed with a ⚠️ badge in the Extensions panel
+→ Engine logs: "Unverified extension installed: com.unknown.extension"
 ```
 
 This allows full local flexibility while still making the trust boundary visible.
@@ -1043,11 +1097,11 @@ Everything else — the key format, the signature algorithm, the manifest schema
 ```json
 // engine_settings.json — the only thing that changes between phases
 {
-  "trusted_publishers_url": "https://gist.githubusercontent.com/.../trusted_publishers.json",
-  // ↑ Phase 1: GitHub Gist
-  // ↓ Phase 2: just change this one line
-  "trusted_publishers_url": "https://api.lucidengine.com/v1/publishers",
-  "extension_repository_url": "https://extensions.lucidengine.com"
+"trusted_publishers_url": "https://gist.githubusercontent.com/.../trusted_publishers.json",
+// ↑ Phase 1: GitHub Gist
+// ↓ Phase 2: just change this one line
+"trusted_publishers_url": "https://api.lucidengine.com/v1/publishers",
+"extension_repository_url": "https://extensions.lucidengine.com"
 }
 ```
 
@@ -1078,30 +1132,30 @@ The kernel defines one interface. Developers implement it.
 
 class INetworkProvider {
 public:
-    // Lifecycle
-    virtual bool   Initialize(const NetworkConfig& config) = 0;
-    virtual void   Shutdown() = 0;
+	// Lifecycle
+	virtual bool   Initialize(const NetworkConfig& config) = 0;
+	virtual void   Shutdown() = 0;
 
-    // Connection
-    virtual ConnHandle Connect(const char* address, uint16_t port) = 0;
-    virtual void       Disconnect(ConnHandle conn) = 0;
-    virtual bool       Listen(uint16_t port) = 0;  // server mode
+	// Connection
+	virtual ConnHandle Connect(const char* address, uint16_t port) = 0;
+	virtual void       Disconnect(ConnHandle conn) = 0;
+	virtual bool       Listen(uint16_t port) = 0;  // server mode
 
-    // Data transfer — the engine only hands you a flat byte buffer
-    virtual void   Send(ConnHandle conn, const uint8_t* data, uint32_t size, SendFlags flags) = 0;
-    virtual int32_t Receive(ConnHandle conn, uint8_t* buffer, uint32_t buffer_size) = 0;
+	// Data transfer — the engine only hands you a flat byte buffer
+	virtual void   Send(ConnHandle conn, const uint8_t* data, uint32_t size, SendFlags flags) = 0;
+	virtual int32_t Receive(ConnHandle conn, uint8_t* buffer, uint32_t buffer_size) = 0;
 
-    // Events (polled per frame, not callback-based — keeps it thread-safe)
-    virtual NetworkEvent PollEvent() = 0;
+	// Events (polled per frame, not callback-based — keeps it thread-safe)
+	virtual NetworkEvent PollEvent() = 0;
 
-    virtual ~INetworkProvider() = default;
+	virtual ~INetworkProvider() = default;
 };
 
 // Flags for Send()
 enum SendFlags : uint32_t {
-    SEND_RELIABLE    = 1 << 0,  // TCP-style: guarantee delivery and order
-    SEND_UNRELIABLE  = 1 << 1,  // UDP-style: best-effort, low latency
-    SEND_ENCRYPTED   = 1 << 2,  // Extension handles its own encryption layer
+	SEND_RELIABLE    = 1 << 0,  // TCP-style: guarantee delivery and order
+	SEND_UNRELIABLE  = 1 << 1,  // UDP-style: best-effort, low latency
+	SEND_ENCRYPTED   = 1 << 2,  // Extension handles its own encryption layer
 };
 ```
 
@@ -1119,10 +1173,10 @@ A developer writes their own `INetworkProvider` implementation as an extension:
 ```json
 // extension.json for a Steam networking extension
 {
-  "id": "com.taiax.steam-network",
-  "type": "network-provider",
-  "permissions": ["network.client", "network.server"],
-  "entry_point": "steam_provider.luc"
+"id": "com.taiax.steam-network",
+"type": "network-provider",
+"permissions": ["network.client", "network.server"],
+"entry_point": "steam_provider.luc"
 }
 ```
 
@@ -1132,15 +1186,15 @@ A developer writes their own `INetworkProvider` implementation as an extension:
 import "steam_sdk.luc"   // FFI bindings to Steamworks
 
 on_load(api) {
-    // Register this as the active network provider
-    api.network.set_provider(SteamNetworkProvider)
+	// Register this as the active network provider
+	api.network.set_provider(SteamNetworkProvider)
 }
 
 // The provider itself — implements the INetworkProvider contract via FFI
 SteamNetworkProvider {
-    connect(address, port) { return steam.CreateConnection(address) }
-    send(conn, data, flags) { steam.SendMessage(conn, data) }
-    poll_event() { return steam.ReceiveMessages() }
+	connect(address, port) { return steam.CreateConnection(address) }
+	send(conn, data, flags) { steam.SendMessage(conn, data) }
+	poll_event() { return steam.ReceiveMessages() }
 }
 ```
 
@@ -1162,14 +1216,14 @@ The kernel manages the buffer layer — extensions cannot bypass it:
 // kernel/src/network/network_manager.cpp
 
 void NetworkManager::Send(ConnHandle conn, const uint8_t* data, uint32_t size) {
-    // 1. Enforce max packet size — prevent buffer overflow attacks
-    if (size > MAX_PACKET_SIZE) { LogError("Packet too large"); return; }
+	// 1. Enforce max packet size — prevent buffer overflow attacks
+	if (size > MAX_PACKET_SIZE) { LogError("Packet too large"); return; }
 
-    // 2. Rate limiting — prevent accidental (or malicious) flood
-    if (!rate_limiter.Allow(conn)) { LogWarn("Rate limit hit"); return; }
+	// 2. Rate limiting — prevent accidental (or malicious) flood
+	if (!rate_limiter.Allow(conn)) { LogWarn("Rate limit hit"); return; }
 
-    // 3. Hand off to the extension's provider — the kernel never sees the bytes after this
-    active_provider->Send(conn, data, size, flags);
+	// 3. Hand off to the extension's provider — the kernel never sees the bytes after this
+	active_provider->Send(conn, data, size, flags);
 }
 ```
 
@@ -1227,6 +1281,196 @@ Instead of hiding a single master key in the C++ DLL, the engine uses a two-step
 1.  **No Hardcoded Seeds:** The kernel derives the Ticket Key from the machine hardware at runtime. There is no secret string for a hacker to find in the DLL.
 2.  **Multi-Device Friendly:** Store platforms (Steam/Epic) can generate multiple 1KB tickets for a single user (one for Desktop, one for Steam Deck), all containing the same Title Key.
 3.  **Hardware Locked:** Copying the game folder to a different PC fails because the hardware fingerprint won't unlock the `license.lge` ticket.
+
+---
+
+### Decision 11 — UI Icon Architecture ✅
+
+**Architecture: Pure SVG (Vector) with Kernel Rasterization.**
+To achieve a premium, VS Code-like aesthetic with infinite DPI scaling and seamless Light/Dark theme switching, the engine **will not use PNG files for UI icons**. All IDE and extension icons must be SVG.
+
+#### How it works (The Architecture):
+1. **The Rasterizer:** The C++ Kernel embeds a lightweight, single-header SVG library (e.g., [NanoSVG](https://github.com/memononen/nanosvg)) into `externals/`.
+2. **The Pipeline:** When the Luc UI layer requests `ui.draw_svg("icon.svg", 24, 24)`, the kernel reads the file, rasterizes the vector math into a 24x24 RGBA texture, uploads it to the GPU via Vulkan, and caches it.
+3. **Core Icons:** All default engine icons (Explorer, Debug, Git, folder icons, file type icons) are stored centrally inside `core_extensions/theme_manager/icons/`.
+
+#### How developers create an Icon Theme (Step-by-Step):
+Just like VS Code, users can install "Icon Theme Extensions" to completely replace the core icons. 
+1. **Create the Extension:** Generate a new extension folder.
+2. **Define the Type:** In `extension.json`, declare it as an icon theme:
+```json
+"contributes": {
+	"iconThemes": [{ "id": "my-cool-icons", "label": "Cool Icons", "path": "icon_map.json" }]
+}
+```
+3. **Provide the SVGs:** Create a folder inside the extension (e.g., `icons/`) and drop in the pure white SVG files.
+4. **Map the IDs:** Create the `icon_map.json` file. This tells the engine which SVG maps to which core feature:
+```json
+{
+	"iconDefinitions": {
+		"explorer_icon": { "iconPath": "icons/my_explorer.svg" },
+		"luc_file": { "iconPath": "icons/luc_script.svg" }
+	},
+	"core": {
+		"activityBar.explorer": "explorer_icon"
+	},
+	"fileExtensions": {
+		"luc": "luc_file"
+	}
+}
+```
+5. **Activate:** When the user goes to `Settings > Icon Theme` and selects "Cool Icons", the engine reads `icon_map.json` and swaps the SVGs instantly.
+
+#### Color Themes vs. Icon Themes
+**Can one extension handle both? Yes.** 
+Color Themes (which change the background colors and text colors) and Icon Themes (which change the SVGs) are two separate *settings* in the engine, but they can be bundled inside the **same extension package**. 
+Your `extension.json` can contribute both:
+```json
+"contributes": {
+	"colorThemes": [{ "id": "my-dark-theme", "path": "colors.json" }],
+	"iconThemes": [{ "id": "my-cool-icons", "path": "icon_map.json" }]
+}
+```
+The user will still activate them separately in the engine settings (e.g., Active Color Theme: *My Dark Theme*, Active Icon Theme: *My Cool Icons*).
+
+#### Conflict Resolution (What overwrites what?)
+What happens if two extensions try to change the same icon? The engine has strict rules to prevent "extension wars":
+
+**Rule 1: Core Icons (e.g., Explorer, Search)**
+Standard extensions **cannot** overwrite core icons. Only the single, user-selected **Active Icon Theme** can change core icons. Therefore, conflicts are impossible because only one Icon Theme is active at a time in `engine_settings.json`.
+
+**Rule 2: File Type Icons (e.g., `.json` files)**
+If two regular extensions both try to register an icon for `.json` files via the Luc API, the engine uses the following hierarchy:
+1. **The Active Icon Theme wins.** If the user's selected icon theme has a `.json` icon, it overrides everything else.
+2. **Standard Extension Registration.** If the icon theme doesn't have one, but Extension A and Extension B both register an icon for `.json`, the engine picks the one that loads last (based on the alphabetical order of their Extension UUIDs). The engine will log a quiet warning to the developer console: `Warning: Extension B overwrote the .json file icon previously registered by Extension A.`
+
+#### How Colors are Handled:
+Because SVGs are drawn dynamically, **all UI SVGs should be solid white (`#FFFFFF`)**.
+When the Luc UI code calls `ui.draw_svg`, it passes an active theme color. The Vulkan shader multiplies the white texture by this color. 
+- If the dark theme is active, it tints the white SVG to `rgb(200, 200, 200)`. 
+- If the user hovers over the icon, the shader dynamically tints it to `rgb(50, 150, 255)` (Lucid Blue). 
+This allows users to change the engine's color palette without ever having to touch the icon files!
+
+#### Extension Icons: 
+User extensions bundle their own `.svg` files in their folder and register them via the `api` during the `on_load` hook:
+```luc
+export const on_load (api &Api) = {
+    api.ui:register_activity_bar("Animation", "resources/anim_panel.svg", open_anim)
+    api.ui:register_file_icon(".lanim", "resources/anim_file.svg")
+}
+```
+
+
+**Why this is the right call:** While PNGs are easier to implement initially (since the texture loader already exists), they scale poorly on 4K/Retina displays and fail when the UI theme changes (e.g., black PNGs vanish on a dark theme). SVGs allow the Vulkan shader to dynamically tint the math-generated curves to perfectly match the active theme.
+
+---
+
+### Decision 12 — The Extension API Surface (The `api` object) ✅
+
+**Architecture: The "God Object" passed via FFI.**
+To achieve "infinite scale for infinite demands," the C++ Kernel exposes a massive, modular API surface to `main.luc`. When the engine loads an extension, it passes an `api` object into the `on_load(api)` function.
+
+The features available inside the `api` object are **strictly determined by the permissions** requested in `extension.json`.
+
+#### The Subsystem Namespaces:
+If an extension requests all permissions, the `api` object contains:
+
+*   **`api.workspace`**: Manage IDE tabs. Open files, register **Custom Editor Providers** (like your custom drawing tab), read the active file, or listen for drag-and-drop events from the Explorer.
+*   **`api.ui`**: Draw custom panels, buttons, and most importantly, instantiate a **Vulkan Canvas** (`api.ui.create_canvas()`) to draw raw pixels, lines, and shapes directly to the GPU.
+*   **`api.fs`**: Read and write files. Create directories, or prompt the user with a File Save Dialog.
+*   **`api.input`**: Read raw mouse X/Y and keyboard states for interactive custom tabs.
+*   **`api.render`**: Hook into the Vulkan rendering pipeline. Override the default shaders, add post-processing effects, or change how shadows are calculated.
+*   **`api.physics`**: Hook into Jolt Physics. Change the gravity solver, intercept collision events, or modify rigidbodies.
+*   **`api.compiler`**: Hook into the LSP (Language Server). Register custom **Autocomplete Providers**, linting rules, or code-generation tools.
+
+#### Example: Building a Custom Drawing Tool
+Here is exactly how `main.luc` would look for an extension that lets the user open `.ldraw` files, draws pixels in a custom workspace tab, handles drag-and-drop folders, and saves the file.
+
+```luc
+-- main.luc (The Drawing Extension)
+package drawing_tool
+
+use engine.api
+
+-- Extensions use on_load as their entry point
+export const on_load (api &Api) = {
+    -- 1. Register a provider for .ldraw files
+    -- We pass the constructor reference DrawingEditor:new
+    api.workspace:register_editor_provider(".ldraw", DrawingEditor:new)
+}
+
+pub struct DrawingEditor {
+    file_uri   string
+    canvas     &Canvas
+    pixel_data [*]byte
+}
+
+pub impl DrawingEditor {
+    -- Static constructor called by the engine when a tab opens
+    new (file_uri string, tab &Tab) DrawingEditor = {
+        return DrawingEditor {
+            file_uri   = file_uri
+            canvas     = api.ui:create_canvas(tab)
+            pixel_data = api.fs:read_file(file_uri)
+        }
+    }
+
+    -- Called every frame to draw the UI inside the tab
+    on_ui_render (ui &Ui) = {
+        -- 1. Draw a Toolbar
+        ui:begin_toolbar()
+        
+        if ui:button("Save Drawing") {
+            api.fs:write_file(file_uri, pixel_data)
+        }
+        
+        -- Drag-and-drop target to change the save location
+        let out_path string = ""
+        if ui:drop_target("Drag Folder Here", &out_path) {
+            file_uri = out_path + "/new_drawing.ldraw"
+        }
+        
+        ui:end_toolbar()
+
+        -- 2. Draw the interactive Canvas
+        canvas:draw_pixels(pixel_data)
+        
+        -- 3. Handle Mouse Input for painting
+        if api.input:is_mouse_down(MouseButton.Left) {
+            let pos Vec2 = api.input:mouse_position(canvas)
+            pixel_data:set_pixel(pos.x, pos.y, Color.Red)
+        }
+    }
+}
+```
+
+#### Why this scales infinitely:
+Because the C++ Kernel exposes the raw `api.ui:create_canvas()` and `api.render` hooks, the engine doesn't need to know *what* a drawing tool is. The engine simply provides a blank tab and a GPU canvas, and the Luc script defines the logic. This is exactly how VS Code's `CustomEditor` API allows extensions to build hex editors, 3D model viewers, and UI designers entirely via extensions.
+
+---
+
+### Decision 13 — Engine Branding & App Icons ✅
+
+**Architecture: Hybrid Vector/Raster Branding.**
+To maintain the engine's "premium" feel while complying with OS limitations, the branding system uses a dual-path approach.
+
+#### 1. Internal Engine Icons (SVG)
+The main engine logo (shown in the top-left corner of the window, the splash screen, and the "About" dialog) is stored as a **pure white SVG**.
+- **Location:** `core_extensions/theme_manager/branding/logo.svg`
+- **Logic:** Like UI icons, it is rasterized by NanoSVG and tinted via Vulkan shaders to match the user's active theme.
+
+#### 2. External OS Icons (ICO/PNG)
+Windows and Linux cannot use the engine's internal rasterizer for the desktop shortcut or taskbar icon.
+- **Location:** `dist/images/app_icon.ico` (Windows) and `dist/images/app_icon.png` (Linux).
+- **Logic:** These are pre-baked raster files. They do not change with the theme because the OS manages their display before the engine even boots.
+
+#### 3. How to load the App Icon in Luc
+The engine branding is exposed via the `api.kernel` namespace:
+```luc
+let logo &Texture = api.kernel:get_branding_logo()
+-- Then draw it anywhere in the UI
+ui:image(logo, 64, 64)
+```
 
 ---
 
@@ -1337,7 +1581,12 @@ Lucid-Game-Engine/
 │   │   └── main.luc
 │   └── theme_manager/
 │       ├── extension.json
-│       └── main.luc
+│       ├── main.luc
+│       ├── branding/                   ← Engine Logo (SVG)
+│       │   └── logo.svg
+│       └── icons/                      ← Pure SVG Core Icons
+│           ├── activity_bar/           ← Left panel icons (explorer, search, git)
+│           └── files/                  ← File tree icons (folder, luc_file, etc.)
 │
 ├── user_extensions/                      ← Community extensions (gitignored)
 ├── user_projects/                      ← Developer games (gitignored)
@@ -1355,6 +1604,7 @@ Lucid-Game-Engine/
 │   ├── vulkan/
 │   ├── vma/
 │   ├── glfw/
+│   ├── nanosvg/                        ← NEW: SVG Rasterizer
 │   ├── jolt/                           ← NEW: Jolt Physics source
 │   └── llvm/
 │
@@ -1405,6 +1655,7 @@ Lucid-Game-Engine/
 | AES key hardening | Two-Step Derivation (Title Key + Hardware-locked License Ticket) | ✅ Confirmed |
 | IDE Bottom Panel | 4-Tab Dock (Terminal, Output, Problems, Console) | ✅ Confirmed |
 | Console Architecture | 3-File Ecosystem (Interpreter, Metadata, Shortcuts) | ✅ Confirmed |
+| UI Icon Architecture | Pure SVG with NanoSVG rasterization in Kernel | ✅ Confirmed |
 | Save-game data policy | Likely plain (decide before release) | ⏳ Open |
 | Math library | Built-in `math.luc` vs. GLM FFI binding | ⏳ Open |
 | Built-in network providers | TCP + UDP in core, WebSocket TBD | ⏳ Open |
