@@ -8,7 +8,8 @@
 [Part 2 — Decisions](#part-2---resolved-design-decisions)  
 [Part 3 — Open Items](#part-3---open-items-still-to-decide)  
 [Part 4 — File Structure](#part-4---suggested-file-structure)  
-[Part 5 — Status Summary](#part-5---decision-status-summary)
+[Part 5 — Status Summary](#part-5---decision-status-summary)  
+[Part 6 — External Library Summary](#part-6---external-library-summary)
 
 ## Part 1 — Plan Review
 
@@ -1474,6 +1475,131 @@ ui:image(logo, 64, 64)
 
 ---
 
+### Decision 14 — Unified UI Architecture (RmlUI + Luc Bridge) ✅
+
+**Architecture: The "Unified UI Kernel" Model.**
+To achieve a modern, minimal VS Code-like aesthetic for the editor while providing a powerful, design-first workflow for game developers, the engine standardizes on **RmlUI** (v6.0+) as its core UI backend.
+
+#### 1. The Dual-Role Architecture
+RmlUI serves as the high-performance renderer for two distinct contexts:
+*   **The Engine Shell:** The IDE's activity bar, sidebar, status bar, and tabs are built using RmlUI in the Kernel. This ensures a consistent, modern "App" feel with native support for Flexbox, glassmorphism (blur), and dynamic themes via CSS variables.
+*   **The In-Game UI:** Developers build their own HUDs and menus using the same system. The engine provides a **Visual UI Designer** that generates RML/RCSS files, which are then controlled via Luc code.
+
+#### 2. The Luc UI Bridge (Declarative UI)
+Extension and game developers do not write HTML/CSS directly. Instead, they use a high-level, declarative Luc API that maps to RmlUI elements. This ensures type safety and performance while maintaining the flexibility of a DOM-based system.
+
+```luc
+-- Example: A custom panel in the Activity Bar
+export const on_render_panel (ui &Ui) = {
+    ui:div("sidebar-container", () = {
+        ui:header("SEARCH")
+        
+        ui:input_field("Search query...", &this.query)
+        
+        ui:scroll_view("results-list", () = {
+            for result in this.results {
+                ui:button("result-item", result.label, () = {
+                    api.workspace:open_file(result.path)
+                })
+            }
+        })
+    })
+}
+```
+
+#### 3. Why RmlUI?
+*   **Modern Aesthetics:** Supports `box-shadow`, `filter: blur()`, and `conic-gradient` out of the box.
+*   **Performance:** Renderer-agnostic backend; generates simple vertex/index batches for our Vulkan pipeline.
+*   **Standard-Based:** Uses HTML/CSS paradigms, making it easy to recruit designers who already understand web-style layouts.
+*   **MIT License:** Fully permissive and actively maintained.
+
+---
+
+### Decision 15 — The Lucid-UI Bridge & Core Component Library ✅
+
+**Architecture: The "Reflected DOM" Model.**
+To ensure extensions can build modern UIs without fighting raw RmlUI pointers, the engine provides a high-level **Reactive Bridge**. The Kernel manages the RmlUI element tree, while Luc interacts with it via safe, handle-based references.
+
+#### 1. The UI Bridge API (`ui.luc`)
+The bridge maps the C++ DOM to a set of scoped Luc functions. This allows developers to build UIs using a structure that mirrors the visual hierarchy.
+
+```luc
+-- Example: Defining a reusable Component in Luc
+pub const ToolCard (title string, desc string, on_click () -> void) = {
+    ui:div("card", () = {
+        ui:header("card-title", title)
+        ui:text("card-desc", desc)
+        ui:button("card-action", "Open", on_click)
+    })
+}
+```
+
+#### 2. The Core UI Library (Standard Components)
+The engine ships with `core_lib/ui_std.luc`, a library of "Lucid-Styled" components that ensure all extensions look like they belong in the engine.
+*   **Containers:** `panel`, `grid`, `flex_row`, `scroll_view`.
+*   **Controls:** `button`, `toggle`, `slider`, `input_field`, `dropdown`.
+*   **Feedback:** `progress_bar`, `spinner`, `tooltip`, `toast`.
+
+These components are pre-styled with the **Lucid Design System** (Inter font, 4px rounding, semi-transparent backgrounds).
+
+#### 3. Infinite Extensibility (The Expansion Model)
+Extensions can expand the UI system in two ways:
+1.  **Global Styles (RCSS):** An extension can provide a `.rcss` file that adds new CSS classes to the global namespace.
+    *   *Example:* A "Neon Theme" extension injects global styles that add glows to all `ui:button` instances.
+2.  **Custom Layout Builders:** Extensions can define their own complex Luc functions (like `ToolCard` above) and export them for other extensions to use.
+
+#### 4. Data Binding (The Bridge Magic)
+The bridge supports **Reactive Binding**. When a Luc variable is bound to a UI element, the Kernel updates the RmlUI property only when the variable changes, ensuring zero-cost UI updates.
+
+```luc
+let health int = 100
+-- Binding the 'health' variable to a progress bar
+ui:progress_bar("health-bar", &health) 
+-- Any change to 'health' in Luc is instantly reflected in the HUD
+```
+
+---
+
+### Decision 16 — The Math Library (GLM + Luc Projection) ✅
+
+**Architecture: The "Dual-Citizen" Math Model.**
+To ensure high-performance rendering and physics while maintaining a world-class Luc developer experience, the engine standardizes on **GLM (OpenGL Mathematics)** as its internal C++ foundation.
+
+#### 1. C++ Foundation (The Kernel)
+The Kernel uses GLM for all transformations, projection matrices, and physics calculations.
+*   **Zero Overhead:** GLM is header-only and SIMD-accelerated.
+*   **Vulkan-Native:** Memory layouts of `glm::vec3` and `glm::mat4` match Vulkan/GLSL expectations exactly.
+
+#### 2. The Luc Projection (`math.luc`)
+The engine exposes these types to Luc as primitive structs. Heavy math operations are projected via FFI to GLM's optimized C++ implementation.
+
+```luc
+-- core_lib/math.luc
+package math
+
+-- @packed ensures Luc memory matches GLM memory exactly
+@packed
+pub struct Vec3 {
+    x float
+    y float
+    z float
+}
+
+pub impl Vec3 {
+    -- Heavy math calls the C++ GLM backend
+    dot (other Vec3) float = {
+        return api.math:vec3_dot(this, other)
+    }
+}
+```
+
+#### 3. Why GLM?
+*   **Industry Standard:** Widely used in custom engines, Vulkan tools, and research.
+*   **Stability:** Decades of bug fixes and performance optimizations.
+*   **Interoperability:** Eases the bridge between Luc scripting and the Vulkan renderer.
+
+---
+
 ## Part 3 — Open Items (Still to Decide)
 
 > [!WARNING]
@@ -1483,7 +1609,6 @@ ui:image(logo, 64, 64)
 |:--|:---|:---|:---|:---|
 | 1 | **Debug build guard** | `LucidEngineSecurity.md` | Kernel refuses to run `--debug` binary in production. Needs build-type flag in compiled output. | 🟡 Medium |
 | 2 | **Save-game data policy** | `LucidEngineSecurity.md` | VFS encrypts game assets. Should runtime save files also be encrypted, or plain? | 🟢 Low |
-| 3 | **Math library** | Core Architecture | Built-in `math.luc` or bind to `glm`/`DirectXMath` via FFI? | 🟡 Medium |
 | 4 | **Built-in network providers** | Decision 8 | Ship TCP + UDP in core. Should WebSocket also be built-in, or left to community extensions? | 🟢 Low |
 | 5 | **Console `Execute()` body** | `ControlPanelDesign.md` | The C++ interpreter header is drafted but the body logic is not yet written. | 🟡 Medium |
 | 6 | **`symbols.json` schema** | `ControlPanelDesign.md` | The compiler must generate this file but its structure is not defined. Needed for Autocomplete. | 🟡 Medium |
@@ -1604,8 +1729,10 @@ Lucid-Game-Engine/
 │   ├── vulkan/
 │   ├── vma/
 │   ├── glfw/
-│   ├── nanosvg/                        ← NEW: SVG Rasterizer
-│   ├── jolt/                           ← NEW: Jolt Physics source
+│   ├── rmlui/                          ← NEW: UI Kernel (v6.0+)
+│   ├── glm/                            ← NEW: Math Foundation
+│   ├── nanosvg/                        ← SVG Rasterizer
+│   ├── jolt/                           ← Jolt Physics source
 │   └── llvm/
 │
 ├── scripts/
@@ -1656,6 +1783,35 @@ Lucid-Game-Engine/
 | IDE Bottom Panel | 4-Tab Dock (Terminal, Output, Problems, Console) | ✅ Confirmed |
 | Console Architecture | 3-File Ecosystem (Interpreter, Metadata, Shortcuts) | ✅ Confirmed |
 | UI Icon Architecture | Pure SVG with NanoSVG rasterization in Kernel | ✅ Confirmed |
+| Unified UI Architecture | RmlUI (CSS-based) for Shell + In-Game HUDs | ✅ Confirmed |
+| Lucid-UI Bridge & Components | Reactive Luc Bridge + Core Styled Library | ✅ Confirmed |
+| Math library | GLM (C++ Bedrock) + Luc Type Projection | ✅ Confirmed |
 | Save-game data policy | Likely plain (decide before release) | ⏳ Open |
-| Math library | Built-in `math.luc` vs. GLM FFI binding | ⏳ Open |
 | Built-in network providers | TCP + UDP in core, WebSocket TBD | ⏳ Open |
+
+---
+
+## Part 6 — External Library Summary
+
+To maintain the engine's "Microkernel" philosophy, we strictly limit external dependencies to libraries that provide high performance with minimal architectural "opinion."
+
+| Library | Role | License | Rationale |
+|:---|:---|:---|:---|
+| **Vulkan SDK** | Graphics RHI | Apache 2.0 | Explicit GPU control, cross-platform, zero legacy baggage. |
+| **VMA** | GPU Memory | MIT | Industry standard for efficient Vulkan memory allocation. |
+| **GLM** | Math Library | MIT | Header-only, SIMD-accelerated. Supports Vulkan, DirectX, and Metal via config flags. |
+| **GLFW** | Window & Input | Zlib | Lightweight, cross-platform; handles OS windowing and raw input. |
+| **Jolt Physics** | Physics Engine | MIT | AAA-proven, extremely fast multi-threaded performance. |
+| **RmlUI** | UI System | MIT | CSS-based layouts for the editor shell and in-game HUDs. |
+| **NanoSVG / NanoVG** | Vector Graphics | zlib | Tiny footprint, used for UI icons and hardware-accelerated shapes. |
+| **LLVM** | Compiler Backend | Apache 2.0 | Powers the Luc compiler's AOT and Secure JIT compilation. |
+| **cgltf** | GLTF Loader | MIT | Single-header, high-performance parser for 3D source assets. |
+| **MessagePack** | Serialization | Apache 2.0 | Fast binary serialization for runtime ECS and save games. |
+| **nlohmann/json** | JSON Parser | MIT | Used for human-readable project metadata and source configs. |
+| **MbedTLS** | Security | Apache 2.0 | Lightweight crypto for AES-256 (VFS) and Ed25519 (Extensions). |
+
+### Dependency Management Strategy:
+1.  **Vendor-In Tree:** All libraries (except large ones like LLVM/Vulkan SDK) are stored in `externals/` as source code. This ensures the engine is self-contained and builds are reproducible.
+2.  **Static Linking:** We prefer static linking for core dependencies to minimize DLL-hell and improve startup time.
+3.  **No "Bloat" Policy:** If a library includes features we don't need (e.g., a massive math suite or networking stack), we only include the specific headers/files required for our use case.
+
