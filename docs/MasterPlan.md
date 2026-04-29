@@ -1796,6 +1796,62 @@ Because Luc treats functions as types, the graph's arrows map directly to code s
 
 ---
 
+### Decision 27 — The Vulkan RHI Architecture ✅
+
+**Architecture: "The Bindless Abstraction Layer."**
+The RHI (Render Hardware Interface) acts as the bridge between the engine logic and the raw Vulkan SDK. It is designed to be "opinionated," hiding Vulkan's verbosity while maintaining maximum performance.
+
+#### 1. Core Responsibilities
+*   **Memory:** Uses **VMA (Vulkan Memory Allocator)** for all GPU allocations (Buffers, Images).
+*   **Sync:** Internal management of Fences and Semaphores. The engine kernel never touches `VkSubmitInfo` directly.
+*   **Caching:** Automatic caching of Pipeline State Objects (PSOs) to prevent "shader stutter" during gameplay.
+
+#### 2. The Bindless Model
+To ensure maximum compatibility with Luc's dynamic nature, the RHI uses a **Bindless Descriptor** model.
+*   All textures and buffers are stored in a global array on the GPU.
+*   Shaders access resources via a simple integer index (e.g., `textureSampler[textureID]`).
+*   This eliminates the need for complex per-object descriptor set binding, significantly reducing CPU overhead.
+
+#### 3. Simplified Lifecycle
+The RHI provides a high-level API for the Kernel:
+*   `BeginFrame()` / `EndFrame()` / `Submit()` / `Present()`
+*   Handles swapchain recreation (window resizing) automatically without crashing the renderer.
+
+---
+
+### Decision 28 — The Core Component Schema ✅
+
+**Architecture: "The POD Bedrock."**
+To maintain maximum performance and cache locality, all core engine components are defined as POD (Plain Old Data) structs. This ensures they can be serialized, mirrored to Luc, and processed by C++ systems with zero heap allocation.
+
+#### 1. The Relationship System (ERS)
+Instead of a dynamic scene tree, Lucid uses a **Doubly Linked-List Hierarchy** embedded in the components. This allows for an infinite number of children per entity with zero memory fragmentation.
+
+```cpp
+struct RelationshipComponent {
+    EntityID parent;         // 0 if root
+    EntityID first_child;    // Entry point to child list
+    EntityID next_sibling;   // Next child in the same parent
+    EntityID prev_sibling;   // Prev child in the same parent
+    uint32_t depth;          // Hierarchy depth for sorted updates
+};
+```
+
+#### 2. Visual & Geometry Components
+*   **`MeshComponent`**: Links to a `.lmesh` asset and a material.
+*   **`PrimitiveComponent`**: Procedural shapes (Box, Sphere, Capsule) for rapid prototyping.
+*   **`SpriteComponent`**: 2D quad with texture, pivot, and sorting layer support.
+
+#### 3. Media & Interaction Components
+*   **`AudioComponent`**: Handles 2D/3D spatialized audio (`.lsfx` or `.lstream`).
+*   **`AnimationComponent`**: Manages state, playback rate, and blending for skeletal/sprite animations.
+*   **`UIComponent`**: Attaches an **RmlUI** context (World-space or Screen-space) to an entity.
+
+#### 4. Physics & Colliders (Jolt Bridge)
+*   **`PhysicsComponent`**: Stores mass, friction, velocity, and motion type (Static/Dynamic).
+*   **`ColliderComponent`**: Defines the physical volume (Box, Sphere, Capsule, Mesh) and local offset.
+
+---
 
 ## Part 3 — Architecture & Distribution Structures
 
@@ -1949,6 +2005,8 @@ MyAwesomeGame/
 | Network Architecture| Core TCP/UDP + Extensions (WebSockets, Steam, etc.) | ✅ Confirmed |
 | JIT Bytecode Format | Standardized to `.ljit` extension | ✅ Confirmed |
 | Visual Programming | Functional Data Graph, Recursive Structs, Paging | ✅ Confirmed |
+| Vulkan RHI Architecture | Bindless, VMA-backed Resource Management | ✅ Confirmed |
+| Core Component Schema | POD ERS, Visual, Media, and Physics blocks | ✅ Confirmed |
 
 ---
 
