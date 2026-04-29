@@ -1600,6 +1600,37 @@ pub impl Vec3 {
 
 ---
 
+### Decision 17 — Input Architecture (The GLFW ↔ Luc Bridge) ✅
+
+**Architecture: The "Foundation-Surface" Model.**
+To ensure the engine is highly portable across Desktop, Mobile, and Console while maintaining a premium developer experience, the input system is split into two layers.
+
+#### 1. The Low-Level Foundation (C++ Kernel)
+The Kernel uses **GLFW** (on Desktop) as a platform provider. It captures raw OS events and normalizes them into a unified internal format.
+*   **Decoupling:** GLFW is treated as an implementation detail. The Kernel uses an abstract `IInputProvider` interface, allowing us to swap GLFW for native **Android NDK**, **iOS UIKit**, or **Console SDKs** without changing any Luc code.
+
+#### 2. The High-Level Surface (Luc `io` Library)
+Developers interact with the beautiful, callback-based `io` library. This is the "Surface" that remains constant regardless of the hardware.
+
+```luc
+-- Example: Desktop-first logic that works on Mobile via re-mapping
+io.key.W.onHeld(() {
+    player:move_forward()
+})
+
+-- Mobile touch simulation on PC
+io.mouse.left.onPressed(() {
+    io.printl("Touch/Click at: " + string(io.mouse.x()))
+})
+```
+
+#### 3. Cross-Platform Portability (The "Swappable Backend")
+*   **PC Testing:** Developers can test Mobile/Console logic on PC by mapping mouse/keyboard events to virtual touch/gamepad events.
+*   **Native Performance:** Because the Kernel talks directly to the platform (GLFW/NDK/SonySDK), input latency is kept to an absolute minimum, while the Luc layer remains elegant and high-level.
+
+---
+
+
 ## Part 3 — Open Items (Still to Decide)
 
 > [!WARNING]
@@ -1786,6 +1817,7 @@ Lucid-Game-Engine/
 | Unified UI Architecture | RmlUI (CSS-based) for Shell + In-Game HUDs | ✅ Confirmed |
 | Lucid-UI Bridge & Components | Reactive Luc Bridge + Core Styled Library | ✅ Confirmed |
 | Math library | GLM (C++ Bedrock) + Luc Type Projection | ✅ Confirmed |
+| Input Architecture | GLFW Foundation + Swappable Luc Surface | ✅ Confirmed |
 | Save-game data policy | Likely plain (decide before release) | ⏳ Open |
 | Built-in network providers | TCP + UDP in core, WebSocket TBD | ⏳ Open |
 
