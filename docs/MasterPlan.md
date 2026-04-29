@@ -1630,6 +1630,74 @@ io.mouse.left.onPressed(() {
 
 ---
 
+### Decision 18 — ECS Reflection & The Property Inspector ✅
+
+**Architecture: The "Component Metadata" Model.**
+The Property Inspector (docked on the right) is a Luc-based UI that dynamically generates its fields by querying the **ECS Metadata** of the selected entity.
+
+#### 1. How Selection Works
+When you click an object in the 3D Scene View, the engine performs a **Raycast** (via Jolt Physics). The Kernel returns the `EntityID` to the Luc Editor:
+```luc
+on_scene_click (pos Vec2) = {
+    let entity_id EntityID = api.physics:raycast_from_camera(pos)
+    api.editor:set_selection(entity_id)
+}
+```
+
+#### 2. The Property Inspector (Right Dock)
+The Inspector uses the **Reactive Bridge (Decision 15)** to bind UI elements directly to the ECS memory. 
+
+```luc
+-- engine/src/editor/inspector_panel.luc
+export const render_inspector (entity &Entity) = {
+    ui:panel("inspector", () = {
+        -- Physics Component
+        if entity:has_component(PhysicsComponent) {
+            let phys = entity:get_component(PhysicsComponent)
+            ui:header("PHYSICS")
+            ui:number_input("Mass (kg)", &phys.mass)
+            ui:vec3_input("Velocity", &phys.velocity)
+            ui:checkbox("Use Gravity", &phys.use_gravity)
+        }
+
+        -- Material Component
+        if entity:has_component(MaterialComponent) {
+            let mat = entity:get_component(MaterialComponent)
+            ui:header("MATERIAL")
+            ui:dropdown("Type", ["Glass", "Stone", "Metal"], &mat.type_id)
+            ui:asset_picker("Albedo Texture", &mat.texture_path)
+        }
+    })
+}
+```
+
+#### 3. Automatic UI Generation (Reflection)
+The engine reuses the `symbols.json` schema to know which fields in a component are editable. This allows the editor to automatically generate sliders, checkboxes, and pickers for any custom component added by an extension.
+
+---
+
+### Decision 19 — The Core Component Suite ✅
+
+To ensure the engine is ready for both 2D and 3D out of the box, we define a standard set of "High-Performance" components in the Kernel.
+
+#### 1. Core Structural Components
+*   **TransformComponent:** Position, Rotation (Quat), Scale (Vec3). (Z-axis locked for 2D).
+*   **CameraComponent:** FOV, Orthographic/Perspective toggle, clipping planes.
+*   **RelationshipComponent:** Tracks entity hierarchy (Parent/Child).
+
+#### 2. Visual & Media Components
+*   **SpriteComponent:** 2D-optimized quad with sorting layer and texture path.
+*   **MeshComponent:** 3D-optimized model link (`.lmesh`) and Material pointer.
+*   **AnimationComponent:** Controls state playback for skeletal or sprite-sheet animations.
+*   **AudioComponent:** Handles 2D/3D spatialized audio playback (`.ogg`).
+
+#### 3. Physics & Interaction Components
+*   **PhysicsComponent:** Mass, Friction, Restitution, Velocity (Dynamic/Static/Kinematic).
+*   **ColliderComponent:** Defines the collision shape (Box, Sphere, Polygon).
+
+---
+
+
 
 ## Part 3 — Open Items (Still to Decide)
 
@@ -1642,7 +1710,7 @@ io.mouse.left.onPressed(() {
 | 2 | **Save-game data policy** | `LucidEngineSecurity.md` | VFS encrypts game assets. Should runtime save files also be encrypted, or plain? | 🟢 Low |
 | 4 | **Built-in network providers** | Decision 8 | Ship TCP + UDP in core. Should WebSocket also be built-in, or left to community extensions? | 🟢 Low |
 | 5 | **Console `Execute()` body** | `ControlPanelDesign.md` | The C++ interpreter header is drafted but the body logic is not yet written. | 🟡 Medium |
-| 6 | **`symbols.json` schema** | `ControlPanelDesign.md` | The compiler must generate this file but its structure is not defined. Needed for Autocomplete. | 🟡 Medium |
+| 6 | **`symbols.json` schema** | `ControlPanelDesign.md` | The compiler must generate this file. Now also covers **ECS Metadata** for the Property Inspector. | 🟡 Medium |
 | 7 | **Runtime IPC protocol** | `ControlPanelDesign.md` | The packet format for Editor → Game console commands is not specified. | 🟢 Low |
 | 8 | **Audio SFX format** | `AssetPipeline.md` | Listed as `.adpcm` or `.ogg` Vorbis but a final pick has not been locked. | 🟡 Medium |
 | 9 | **JIT bytecode extension** | `LucidFileFormats.md` | `--release-jit` produces bytecode but no file extension is defined for it. | 🟢 Low |
@@ -1679,7 +1747,12 @@ Lucid-Game-Engine/
 │       ├── ecs/
 │       │   ├── world.cpp               ← Entity registry, archetype storage
 │       │   ├── component_store.cpp     ← Contiguous component arrays
-│       │   └── system_scheduler.cpp    ← System ordering, parallel groups
+│       │   ├── system_scheduler.cpp    ← System ordering, parallel groups
+│       │   └── components/             ← Core Component Implementations
+│       │       ├── transform.cpp
+│       │       ├── physics_body.cpp
+│       │       ├── sprite_renderer.cpp
+│       │       └── audio_source.cpp
 │       ├── render/
 │       │   ├── vulkan_rhi.cpp
 │       │   └── sdf_font.cpp
@@ -1818,6 +1891,8 @@ Lucid-Game-Engine/
 | Lucid-UI Bridge & Components | Reactive Luc Bridge + Core Styled Library | ✅ Confirmed |
 | Math library | GLM (C++ Bedrock) + Luc Type Projection | ✅ Confirmed |
 | Input Architecture | GLFW Foundation + Swappable Luc Surface | ✅ Confirmed |
+| ECS Reflection | Auto-generating UI via `symbols.json` metadata | ✅ Confirmed |
+| Core Component Suite | Standard blocks for 2D/3D (Transform, Audio, Physics...) | ✅ Confirmed |
 | Save-game data policy | Likely plain (decide before release) | ⏳ Open |
 | Built-in network providers | TCP + UDP in core, WebSocket TBD | ⏳ Open |
 
