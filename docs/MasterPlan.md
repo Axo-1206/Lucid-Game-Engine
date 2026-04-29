@@ -1853,6 +1853,30 @@ struct RelationshipComponent {
 
 ---
 
+### Decision 29 — Development Workflow & SDK Distribution ✅
+
+**Architecture: "The Live Workspace Model."**
+To ensure a frictionless transition from "Engine Developer" to "Game Developer," we define a dual-layered build and testing strategy.
+
+#### 1. The Development Workspace (`dev_build/`)
+Instead of manually moving binaries, the C++ build system (CMake) is configured to output directly into a `dev_build/` directory at the repository root.
+*   **Binaries:** `luc_kernel.dll` and `luc_compiler.exe` are updated in `dev_build/bin/` upon every successful C++ compile.
+*   **Live Logic:** To prevent redundant copying, the `core_lib/` and `engine/` folders are **symlinked** into `dev_build/`. This allows Luc code changes to be reflected instantly without a re-compile.
+*   **Shortcut:** Developers can create a desktop shortcut to `dev_build/bin/LucidEditor.exe` for one-click engine testing.
+
+#### 2. The SDK Installer (`LucidSetup.exe`)
+For public distribution, a dedicated packaging tool (`tools/package_sdk.py`) gathers the following components into a single installer:
+*   Pre-compiled Kernel and Compiler binaries.
+*   The standard `core_lib` and official extensions.
+*   **Environment Setup:** The installer registers the `.luc` file association, adds the compiler to the system `%PATH%`, and initializes the `%APPDATA%/LucidEngine` directory.
+
+#### 3. Testing Strategy
+*   **Kernel Tests (`tests/kernel/`)**: C++ unit tests for RHI, ECS, and VFS cores (GoogleTest/Catch2).
+*   **Logic Tests (`tests/logic/`)**: Functional Luc scripts that verify engine features (Physics, Rendering, Input).
+*   **Performance Benchmarks**: Automated frame-time and memory tracking within the `dev_build/` environment.
+
+---
+
 ## Part 3 — Architecture & Distribution Structures
 
 To clarify the "Modular Build Model" (Decision 21), we define three distinct folder structures. This separates the engine development environment from the end-user game package.
@@ -2007,6 +2031,7 @@ MyAwesomeGame/
 | Visual Programming | Functional Data Graph, Recursive Structs, Paging | ✅ Confirmed |
 | Vulkan RHI Architecture | Bindless, VMA-backed Resource Management | ✅ Confirmed |
 | Core Component Schema | POD ERS, Visual, Media, and Physics blocks | ✅ Confirmed |
+| Development Workflow | Live dev_build Workspace + SDK Installer | ✅ Confirmed |
 
 ---
 
