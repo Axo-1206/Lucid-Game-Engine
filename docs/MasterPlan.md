@@ -1,8 +1,5 @@
 # Lucid Game Engine — Master Design Reference
 
-> Last updated: 2026-04-26  
-> Status: Living document — update as decisions are locked in.
-
 **Quick jump:**      
 [Part 1 — Plan Review](#part-1---plan-review)  
 [Part 2 — Decisions](#part-2---resolved-design-decisions)  
@@ -30,7 +27,7 @@
 | FFI stability contract | No versioning strategy. | ✅ Solved — see Decision 2 |
 | Asset pipeline | No raw→engine format conversion plan. | ✅ Solved — see `AssetPipeline.md` + Decision 11 |
 | Scene/Entity model | ECS vs. Scene Tree not decided. | ✅ Solved — see Decision 1 |
-| Scripting hot-reload | File-watcher / re-link flow missing. | ✅ Solved — see Decision 5 |
+| Logic Hot-Reload | File-watcher / re-link flow missing. | ✅ Solved — see Decision 5 |
 | Physics library | Not named. | ✅ Solved — see Decision 3 |
 
 ---
@@ -53,8 +50,8 @@
 | AES key storage | Seed hidden in DLL = obscurity, not security. | ✅ Solved — Two-Step Derivation (Decision 10) |
 | Signature authority | Who signs extension manifests? | ✅ Solved — `trusted_publishers.json` (Decision 7) |
 | Online licensing | Offline vs. online not decided. | ✅ Solved — Offline-first (Decision 4) |
-| Debug build leakage | No guard against shipping debug binary. | ⏳ Open — build-type flag check needed in kernel boot |
-| Save-game encryption | Runtime save files not mentioned. | ⏳ Open — likely plain (decide before release) |
+| Debug build leakage | No guard against shipping debug binary. | ✅ Solved — see Decision 24 |
+| Save-game encryption | Runtime save files not mentioned. | ✅ Solved — see Decision 23 |
 
 ---
 
@@ -71,8 +68,8 @@
 
 | Area | Issue | Status |
 |:---|:---|:---|
-| Console Interpreter logic | `Execute()` body not yet drafted. | ⏳ Open — see Part 3 |
-| Symbol map format | `symbols.json` schema not defined. | ⏳ Open — needed for Autocomplete |
+| Console Interpreter logic | `Execute()` body not yet drafted. | ✅ Solved — see Decision 20 |
+| Symbol map format | `symbols.json` schema not defined. | ✅ Solved — see Decision 18 |
 | Runtime IPC protocol | Packet format for Editor → Game communication not specified. | ⏳ Open |
 
 ---
@@ -90,8 +87,8 @@
 
 | Area | Issue | Status |
 |:---|:---|:---|
-| `.msgpack` save game format | Not listed — MessagePack for runtime saves was confirmed. | ⏳ Should be added when save-game policy is decided |
-| `.lscript` or JIT bytecode | No extension defined for Secure JIT bytecode output. | ⏳ Open — needed for `--release-jit` builds |
+| `.msgpack` save game format | Not listed — MessagePack for runtime saves was confirmed. | ✅ Solved — see Decision 23 |
+| `.ljit` bytecode extension | No extension defined for Secure JIT bytecode output. | ✅ Solved — designated as `.ljit` |
 
 ---
 
@@ -110,7 +107,7 @@
 
 | Area | Issue | Status |
 |:---|:---|:---|
-| Audio baking (SFX) | Listed as `.adpcm` or `.ogg` but final choice not locked. | ⏳ Open — decide before audio system is built |
+| Audio baking (SFX) | Listed as `.adpcm` or `.ogg` but final choice not locked. | ✅ Solved — see Decision 22 |
 | `.lmesh` LOD support | No Level-of-Detail field in the header spec. | ⏳ To add when LOD system is designed |
 | Texture atlas / sprite sheet | No pipeline for 2D sprite packing. | ⏳ To define when 2D support is scoped |
 
@@ -173,10 +170,10 @@ api->spawn_entity(&my_entity);
 - `minor` bump → additive only, old table stays valid.
 - `patch` bump → bug fix, no ABI change.
 
-#### The Luc Bridge (Scripting FFI)
+#### The Luc Bridge (Logic FFI)
 While C++ extensions call `LGE_GetAPI` directly, **Luc extensions** receive a pre-negotiated `api` object. The Kernel performs the version check against the `api_version` declared in `extension.json` before passing the object to `on_load(api)`.
 
-This ensures that Luc scripts are **always type-safe** and never have to deal with raw function pointers or version mismatch crashes. The `api` object in Luc is a high-level projection of the C++ function table, where each namespace (e.g., `api.ui`, `api.fs`) corresponds to a specific subsystem in the Kernel.
+This ensures that Luc code is **always type-safe** and never has to deal with raw function pointers or version mismatch crashes. The `api` object in Luc is a high-level projection of the C++ function table, where each namespace (e.g., `api.ui`, `api.fs`) corresponds to a specific subsystem in the Kernel.
 
 
 ---
@@ -289,7 +286,7 @@ When you're ready to add online enforcement:
 
 ---
 
-### Decision 5 — Scripting Hot-Reload ✅
+### Decision 5 — Logic Hot-Reload ✅
 
 Hot-reload means: the developer saves a `.luc` file → the engine recompiles it → the running game reflects the change **without restarting**.
 
@@ -1715,18 +1712,19 @@ If the command is complex logic (e.g., calling macros like `world.spawn_horde(50
 
 ### Decision 21 — The Distribution Model ✅
 
-**Architecture: "Stable Kernel, Fluid Logic."**
-The engine maintains a strict separation between the pre-compiled C++ Kernel and the compiled Luc Logic.
+**Architecture: "Stable Kernel, Dual-Mode Logic Distribution."**
+The engine supports two distinct compilation paths for game logic, allowing developers to balance peak performance against cross-platform portability.
 
-| Component | Source | Format | Shipping Responsibility |
+| Component | Format | Compilation | Shipping Responsibility |
 |:---|:---|:---|:---|
-| **Kernel** | C++ | `luc_kernel.dll` | Copied directly from Engine SDK to the shipped game. |
-| **Logic** | Luc | `game.lmod` | User scripts compiled AOT (Ahead-of-Time) to Native Code. |
-| **Assets** | PNG/GLTF | `.ltex` / `.lmesh` | Packed into VFS containers (`assets.pck`). |
-| **Launcher** | C++ | `Game.exe` | Tiny Bootstrap executable generated by the Engine. |
+| **Kernel** | `luc_kernel.dll` | C++ Native | The pre-compiled bedrock. |
+| **Logic (AOT)** | `game.lmod` | **AOT** (Native) | Best for performance. Requires per-platform builds (Win/Linux). |
+| **Logic (JIT)** | **`game.ljit`** | **JIT** (Bytecode) | Best for portability. One build runs on any kernel-supported OS. |
+| **Assets** | `.pck` | Encrypted VFS | All textures, meshes, and audio bundles. |
 
-**Rationale:** 
-Using an interpreter for the console provides instant (zero-latency) feedback for debugging, while using AOT compilation for the final `game.lmod` ensures maximum security, obfuscation, and runtime performance for the shipped product.
+**Rationale:**
+- **AOT (`.lmod`):** Compiles Luc directly to platform-specific machine code (Win-x64, Linux-ARM64). Offers the highest possible performance and best obfuscation.
+- **JIT (`.ljit`):** Compiles Luc to secure LLVM Bytecode. The `luc_kernel` JIT-compiles this to memory on boot. This enables "Build Once, Run Anywhere" and is the ideal format for cross-platform distribution and modding.
 
 ---
 
@@ -1768,6 +1766,36 @@ To prevent developers from accidentally shipping insecure debug builds (which al
 *   **Extensions:** Modern web protocols like **WebSockets** and **gRPC** are provided as **Core Extensions** (`lucid.net.ws`). This keeps the base Kernel binary small for projects that don't need web connectivity.
 
 ---
+
+### Decision 26 — Visual Programming Architecture ✅
+
+**Architecture: "The Functional Data Graph."**
+Visual programming in Lucid does not use a secondary virtual machine. It is a one-way generator that maps visual nodes directly to Luc's functional paradigms (`->` pipelines and `+>` composition).
+
+#### 1. The Metadata Scanner (No Special Files Required)
+Developers expose custom code to the visual editor using structured comments (`---@node`). The core compiler ignores these, ensuring cross-version stability, while the `luc_langserver` parses them to build the visual palette.
+
+```luc
+---@node(category="Math", name="Calc Damage", color="red")
+pub const calc_damage (base float, type string) float = { ... }
+```
+
+#### 2. Visualizing the Flow (Arrows = Operators)
+Because Luc treats functions as types, the graph's arrows map directly to code syntax:
+*   **Data Wires (Thin):** Dragging an output to an input generates a Pipeline expression (`NodeA -> NodeB`).
+*   **Composition Wires:** Connecting functions without executing them generates a composite (`math.add +> math.clamp`).
+*   **Execution Wires (Thick):** Sequential side-effects map to standard block scopes (Line 1, then Line 2).
+
+#### 3. Structs as Action Centers & Recursive Data
+*   **Action Nodes:** Because structs in Luc use `impl` blocks for behavior, a Struct Node visually displays both **Data Pins** (properties) and **Action Pins** (methods).
+*   **Recursive UI:** The UI handles nested data (e.g., Arrays containing Structs that contain Arrays) using collapsible accordion sections inside the node to prevent screen clutter.
+
+#### 4. File Structure: Paging & Imports (draw.io style)
+*   **Paging:** A single `.lgraph` file can contain multiple "Pages" (tabs at the bottom) to organize logic (e.g., "Movement", "Combat"). The compiler flattens all pages into a single `.luc` package.
+*   **Import/Export UI:** The editor includes a visual manager for `use` (imports) and `export` to manage dependencies between visual graphs and raw code without manual typing.
+
+---
+
 
 ## Part 3 — Architecture & Distribution Structures
 
@@ -1881,7 +1909,7 @@ MyAwesomeGame/
 | 5 | **Console `Execute()` body** | ✅ Solved | Decision 20 (Tri-Level Dispatch) |
 | 6 | **`symbols.json` schema** | ✅ Solved | Decision 18 (ECS Reflection) |
 | 8 | **Audio SFX format** | ✅ Solved | Decision 22 (ADPCM vs Vorbis) |
-| 9 | **JIT bytecode extension** | `LucidFileFormats.md` | `--release-jit` produces bytecode but no file extension is defined for it. | 🟢 Low |
+| 9 | **JIT bytecode extension** | ✅ Solved | Designated as `.ljit` |
 
 ---
 
@@ -1914,9 +1942,13 @@ MyAwesomeGame/
 | ECS Reflection | Auto-generating UI via `symbols.json` metadata | ✅ Confirmed |
 | Core Component Suite | Standard blocks for 2D/3D (Transform, Audio, Physics...) | ✅ Confirmed |
 | Console Architecture | Tri-Level Dispatch (ConCmds → Memory Map → Luc VM) | ✅ Confirmed |
-| Distribution Model | Stable C++ Kernel + Modular AOT Luc Binaries | ✅ Confirmed |
-| Save-game data policy | Likely plain (decide before release) | ⏳ Open |
-| Built-in network providers | TCP + UDP in core, WebSocket TBD | ⏳ Open |
+| Distribution Model | C++ Kernel + AOT/JIT Luc Logic Modules | ✅ Confirmed |
+| Audio Pipeline | Miniaudio with `.lsfx` (ADPCM) and `.lstream` (Vorbis) | ✅ Confirmed |
+| Save-game Security | Policy-Based (Plain, Encrypted, Hardware-Locked) | ✅ Confirmed |
+| Build Integrity | Kernel boot-time signature + DEBUG block | ✅ Confirmed |
+| Network Architecture| Core TCP/UDP + Extensions (WebSockets, Steam, etc.) | ✅ Confirmed |
+| JIT Bytecode Format | Standardized to `.ljit` extension | ✅ Confirmed |
+| Visual Programming | Functional Data Graph, Recursive Structs, Paging | ✅ Confirmed |
 
 ---
 
