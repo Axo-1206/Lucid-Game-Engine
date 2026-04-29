@@ -8,6 +8,10 @@
 [Part 5 — Status Summary](#part-5---decision-status-summary)  
 [Part 6 — External Library Summary](#part-6---external-library-summary)
 
+> **Related Documents:**
+> *   [LUC_GRAMMAR.md](./LUC_GRAMMAR.md) — The Luc Language Specification.
+> *   [ExecutionPlan.md](./ExecutionPlan.md) — The step-by-step implementation roadmap.
+
 ## Part 1 — Plan Review
 
 ### LucidEngineOverview.md
