@@ -1,0 +1,12 @@
+[submodule "externals/glfw"]
+	path = externals/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "externals/jolt"]
+	path = externals/jolt
+	url = https://github.com/jrouwe/JoltPhysics.git
+[submodule "externals/rmlui"]
+	path = externals/rmlui
+	url = https://github.com/mikke89/RmlUI.git
+[submodule "externals/luc_compiler"]
+	path = externals/luc_compiler
+	url = https://github.com/Axo-1206/Luc-Compiler.git

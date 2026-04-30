@@ -1,0 +1,55 @@
+{
+	"abstract" : true,
+	"backtrace" : 3,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"find_package"
+		],
+		"files" : 
+		[
+			"C:/Program Files/CMake/share/cmake-4.3/Modules/FindZLIB.cmake",
+			"externals/luc_compiler/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 24,
+				"parent" : 0
+			},
+			{
+				"file" : 0,
+				"parent" : 1
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 254,
+				"parent" : 2
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 10
+	},
+	"id" : "ZLIB::ZLIB::@7ef40418753800489622",
+	"imported" : true,
+	"local" : true,
+	"name" : "ZLIB::ZLIB",
+	"paths" : 
+	{
+		"build" : "externals/luc_compiler",
+		"source" : "externals/luc_compiler"
+	},
+	"sources" : [],
+	"type" : "UNKNOWN_LIBRARY"
+}

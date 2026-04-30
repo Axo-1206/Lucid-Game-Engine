@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\build\CMakeFiles\9f0654f1d977abd5be7ea88152c8ec83\update_mappings.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\glfw\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\glfw\src\mappings.h.in">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\glfw\CMake\GenerateMappings.cmake" />
+    <None Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\build\externals\glfw\src\CMakeFiles\update_mappings" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{988F6FDF-BA11-3B7C-AE6C-3519A5752FD8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{DE7A1DE2-46B4-3F79-92B8-138693B2C5CE}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

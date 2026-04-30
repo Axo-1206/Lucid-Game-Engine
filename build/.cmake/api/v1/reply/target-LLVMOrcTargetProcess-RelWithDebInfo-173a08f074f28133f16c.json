@@ -1,0 +1,111 @@
+{
+	"abstract" : true,
+	"artifacts" : 
+	[
+		{
+			"path" : "C:/Users/TaiAx/vcpkg/installed/x64-windows/debug/lib/LLVMOrcTargetProcess.lib"
+		}
+	],
+	"backtrace" : 5,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"include",
+			"find_package",
+			"set_target_properties"
+		],
+		"files" : 
+		[
+			"C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVMExports.cmake",
+			"C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVMConfig.cmake",
+			"externals/luc_compiler/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 2
+			},
+			{
+				"command" : 2,
+				"file" : 2,
+				"line" : 27,
+				"parent" : 0
+			},
+			{
+				"file" : 1,
+				"parent" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 252,
+				"parent" : 2
+			},
+			{
+				"file" : 0,
+				"parent" : 3
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 551,
+				"parent" : 4
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 553,
+				"parent" : 4
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 10
+	},
+	"id" : "LLVMOrcTargetProcess::@7ef40418753800489622",
+	"imported" : true,
+	"interfaceCompileDependencies" : 
+	[
+		{
+			"backtrace" : 6,
+			"id" : "LLVMOrcShared::@7ef40418753800489622"
+		},
+		{
+			"backtrace" : 6,
+			"id" : "LLVMSupport::@7ef40418753800489622"
+		},
+		{
+			"backtrace" : 6,
+			"id" : "LLVMTargetParser::@7ef40418753800489622"
+		}
+	],
+	"interfaceLinkLibraries" : 
+	[
+		{
+			"backtrace" : 6,
+			"id" : "LLVMOrcShared::@7ef40418753800489622"
+		},
+		{
+			"backtrace" : 6,
+			"id" : "LLVMSupport::@7ef40418753800489622"
+		},
+		{
+			"backtrace" : 6,
+			"id" : "LLVMTargetParser::@7ef40418753800489622"
+		}
+	],
+	"local" : true,
+	"name" : "LLVMOrcTargetProcess",
+	"nameOnDisk" : "LLVMOrcTargetProcess.lib",
+	"paths" : 
+	{
+		"build" : "externals/luc_compiler",
+		"source" : "externals/luc_compiler"
+	},
+	"sources" : [],
+	"type" : "STATIC_LIBRARY"
+}

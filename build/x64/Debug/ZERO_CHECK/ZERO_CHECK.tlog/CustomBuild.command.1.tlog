@@ -1,0 +1,10 @@
+^C:\USERS\TAIAX\DESKTOP\LUCID-GAME-ENGINE\BUILD\CMAKEFILES\BC5064DD52566BE560BAAE1468B1D60A\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/TaiAx/Desktop/Lucid-Game-Engine -BC:/Users/TaiAx/Desktop/Lucid-Game-Engine/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/LucidEngine.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

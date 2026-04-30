@@ -1,0 +1,79 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\lexer\Lexer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\diagnostics\DiagnosticEngine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\parser\Parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\parser\ParserExpr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\parser\ParserDecl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\parser\ParserType.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\parser\ParserStmt.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\SymbolTable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\SemanticAnalyzer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\TypeResolver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\SemanticCollector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\SemanticDecl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\SemanticExpr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\SemanticStmt.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\TypeChecker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\semantic\Annotator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\codegen\CodeGen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\codegen\CodeGenExpr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\codegen\CodeGenDecl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\codegen\CodeGenStmt.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\src\codegen\luc_runtime.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\externals\luc_compiler\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{A3028B10-9E44-36C0-8A7D-599C18F894BA}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

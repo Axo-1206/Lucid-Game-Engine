@@ -1,0 +1,17 @@
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/CMakeFiles/luc_kernel.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/CMakeFiles/LucidEditor.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/CMakeFiles/RUN_TESTS.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/glfw/CMakeFiles/RUN_TESTS.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/glfw/CMakeFiles/ALL_BUILD.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/glfw/src/CMakeFiles/glfw.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/glfw/src/CMakeFiles/update_mappings.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/glfw/src/CMakeFiles/RUN_TESTS.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/luc_compiler/CMakeFiles/intrinsics_gen.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/luc_compiler/CMakeFiles/omp_gen.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/luc_compiler/CMakeFiles/acc_gen.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/luc_compiler/CMakeFiles/RISCVTargetParserTableGen.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/luc_compiler/CMakeFiles/luc-comp.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/luc_compiler/CMakeFiles/RUN_TESTS.dir
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/luc_compiler/CMakeFiles/ALL_BUILD.dir

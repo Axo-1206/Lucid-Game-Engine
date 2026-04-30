@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/cmake_install.cmake",
+		"C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/glfw/cmake_install.cmake",
+		"C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/glfw/src/cmake_install.cmake",
+		"C:/Users/TaiAx/Desktop/Lucid-Game-Engine/build/externals/luc_compiler/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

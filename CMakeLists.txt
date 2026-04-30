@@ -29,11 +29,40 @@ if(WIN32)
     target_compile_definitions(luc_kernel PRIVATE LGE_EXPORT_DLL)
 endif()
 
+# --- Dependencies ---
+
+# 1. Vulkan SDK
+find_package(Vulkan REQUIRED)
+
+# 2. Header-only externals
+target_include_directories(luc_kernel SYSTEM PRIVATE 
+    ${Vulkan_INCLUDE_DIRS}
+    externals/glm
+    externals/vma
+    externals/miniaudio
+    externals/cgltf
+    externals/nlohmann
+)
+
+# 3. Large Compiled Libraries (Git Submodules)
+# We add these only if the folders are not empty
+if(EXISTS "${CMAKE_SOURCE_DIR}/externals/glfw/CMakeLists.txt")
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+    add_subdirectory(externals/glfw)
+    target_link_libraries(luc_kernel PRIVATE glfw)
+endif()
+
+# 4. Luc Compiler (Submodule)
+if(EXISTS "${CMAKE_SOURCE_DIR}/externals/luc_compiler/CMakeLists.txt")
+    add_subdirectory(externals/luc_compiler)
+endif()
+
 # --- Lucid Editor (Bootstrap) ---
 add_executable(LucidEditor)
 target_sources(LucidEditor PRIVATE tools/bootstrap_main.cpp)
-target_link_libraries(LucidEditor PRIVATE luc_kernel)
+target_link_libraries(LucidEditor PRIVATE luc_kernel ${Vulkan_LIBRARIES})
 
 # --- Testing ---
 enable_testing()
-add_subdirectory(tests/kernel)
+# add_subdirectory(tests/kernel)

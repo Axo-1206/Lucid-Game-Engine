@@ -11,6 +11,7 @@
 > **Related Documents:**
 > *   [LUC_GRAMMAR.md](./LUC_GRAMMAR.md) — The Luc Language Specification.
 > *   [ExecutionPlan.md](./ExecutionPlan.md) — The step-by-step implementation roadmap.
+> *   [BuildSystem.md](./BuildSystem.md) — Directory and dependency mapping.
 
 ## Part 1 — Plan Review
 
@@ -1932,9 +1933,9 @@ Lucid-Game-Engine/
 │       └── platform/
 │           ├── win32_loader.cpp        ← LoadLibrary, GetProcAddress
 │           └── linux_loader.cpp        ← dlopen, dlsym
-├── compiler/                           ← Pre-built binaries (compiler is separate repo)
-│   ├── luc_compiler.exe
-│   └── luc_langserver.exe
+│       ├── platform/
+│           ├── win32_loader.cpp        ← LoadLibrary, GetProcAddress
+│           └── linux_loader.cpp        ← dlopen, dlsym
 ├── engine/                             ← The IDE Editor (Written in Luc)
 │   └── src/                            
 │       ├── main.luc
@@ -1948,7 +1949,8 @@ Lucid-Game-Engine/
 │           └── node_graph.luc
 ├── core_lib/                           ← Standard library (math.luc, io.luc)
 ├── externals/                          ← Jolt, GLFW, Vulkan, RmlUI, GLM
-└── CMakeLists.txt                      ← Builds the Kernel
+│   └── luc_compiler/                   ← Submodule: https://github.com/Axo-1206/Luc-Compiler.git
+└── CMakeLists.txt                      ← Builds both Kernel and Compiler
 ```
 
 ### B. The Engine SDK (What Game Developers Download)

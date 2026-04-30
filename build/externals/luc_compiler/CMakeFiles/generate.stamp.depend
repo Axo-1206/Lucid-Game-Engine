@@ -1,0 +1,18 @@
+# CMake generation dependency list for this directory.
+C:/Program Files/CMake/share/cmake-4.3/Modules/CMakeFindDependencyMacro.cmake
+C:/Program Files/CMake/share/cmake-4.3/Modules/FindPackageHandleStandardArgs.cmake
+C:/Program Files/CMake/share/cmake-4.3/Modules/FindPackageMessage.cmake
+C:/Program Files/CMake/share/cmake-4.3/Modules/FindZLIB.cmake
+C:/Program Files/CMake/share/cmake-4.3/Modules/SelectLibraryConfigurations.cmake
+C:/Users/TaiAx/Desktop/Lucid-Game-Engine/externals/luc_compiler/CMakeLists.txt
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVM-Config.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVMConfig.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVMConfigVersion.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVMExports-debug.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVMExports-release.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVMExports.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/zstd/zstdConfig.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/zstd/zstdConfigVersion.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/zstd/zstdTargets-debug.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/zstd/zstdTargets-release.cmake
+C:/Users/TaiAx/vcpkg/installed/x64-windows/share/zstd/zstdTargets.cmake

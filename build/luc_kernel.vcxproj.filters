@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\core\checksum.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\core\clock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\core\console_interpreter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\core\file_watcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\core\kernel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\core\script_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\ecs\component_store.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\ecs\components\audio_source.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\ecs\components\physics_body.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\ecs\components\sprite_renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\ecs\components\transform.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\ecs\system_scheduler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\ecs\world.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\input\input_bridge.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\physics\debug_renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\physics\physics_bridge.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\platform\linux_loader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\platform\win32_loader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\render\sdf_font.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\render\vulkan_rhi.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\security\extension_verifier.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\security\key_derivation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\security\license_verifier.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\vfs\vfs_packer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\kernel\src\vfs\vfs_reader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\TaiAx\Desktop\Lucid-Game-Engine\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{A3028B10-9E44-36C0-8A7D-599C18F894BA}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

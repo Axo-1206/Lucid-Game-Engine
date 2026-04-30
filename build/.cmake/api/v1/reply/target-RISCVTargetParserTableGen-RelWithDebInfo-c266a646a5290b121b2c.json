@@ -1,0 +1,58 @@
+{
+	"backtrace" : 3,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_custom_target",
+			"find_package"
+		],
+		"files" : 
+		[
+			"C:/Users/TaiAx/vcpkg/installed/x64-windows/share/llvm/LLVMConfig.cmake",
+			"externals/luc_compiler/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 27,
+				"parent" : 0
+			},
+			{
+				"file" : 0,
+				"parent" : 1
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 269,
+				"parent" : 2
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 10
+	},
+	"dependencies" : 
+	[
+		{
+			"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df"
+		}
+	],
+	"id" : "RISCVTargetParserTableGen::@7ef40418753800489622",
+	"name" : "RISCVTargetParserTableGen",
+	"paths" : 
+	{
+		"build" : "externals/luc_compiler",
+		"source" : "externals/luc_compiler"
+	},
+	"sources" : [],
+	"type" : "UTILITY"
+}
