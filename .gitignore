@@ -1,0 +1,32 @@
+# --- Lucid Engine Git Ignore ---
+
+# 1. Build Artifacts (The construction site)
+build/
+bin/
+obj/
+*.pdb
+*.obj
+*.exe
+*.dll
+*.lib
+
+# 2. Live Development Folder (We only keep the structure, not the binaries)
+dev_build/bin/
+dev_build/lib/
+
+# 3. IDE & User Specific
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln
+*.vcxproj
+*.filters
+
+# 4. OS Specific
+[Dd]s.[Ss]tore
+Thumbs.db
+
+# 5. External Source Cleanup
+externals/**/build/
+externals/**/*.zip
