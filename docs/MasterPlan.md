@@ -1,12 +1,12 @@
 # Lucid Game Engine — Master Design Reference
 
 **Quick jump:**      
-[Part 1 — Plan Review](#part-1---plan-review)  
-[Part 2 — Decisions](#part-2---resolved-design-decisions)  
-[Part 3 — Structures](#part-3---architecture--distribution-structures)  
-[Part 4 — Resolved Items](#part-4---complete-design-decisions)  
-[Part 5 — Status Summary](#part-5---decision-status-summary)  
-[Part 6 — External Library Summary](#part-6---external-library-summary)
+[Part 1 — Plan Review](#part-1--plan-review)  
+[Part 2 — Decisions](#part-2--resolved-design-decisions)  
+[Part 3 — Structures](#part-3--architecture--distribution-structures)  
+[Part 4 — Resolved Items](#part-4--complete-design-decisions)  
+[Part 5 — Status Summary](#part-5--decision-status-summary)  
+[Part 6 — External Library Summary](#part-6--external-library-summary)
 
 > **Related Documents:**
 > *   [LUC_GRAMMAR.md](./LUC_GRAMMAR.md) — The Luc Language Specification.
