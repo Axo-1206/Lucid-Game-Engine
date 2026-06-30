@@ -60,37 +60,9 @@ endif()
 
 # 5. RmlUI (Editor shell — Win32 + Vulkan backend)
 if(EXISTS "${CMAKE_SOURCE_DIR}/externals/rmlui/CMakeLists.txt")
-    # Auto-download FreeType 2.14.1 via FetchContent to avoid manual path issues
-    if(NOT TARGET FREETYPE::FREETYPE)
-        include(FetchContent)
-        FetchContent_Declare(
-            freetype
-            GIT_REPOSITORY https://github.com/freetype/freetype.git
-            GIT_TAG        VER-2-14-1
-        )
-        
-        # Force disable modules that cause build issues or are not needed for RmlUI
-        set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_ZSTD ON CACHE BOOL "" FORCE)
-        set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
 
-        FetchContent_GetProperties(freetype)
-        if(NOT freetype_POPULATED)
-            FetchContent_Populate(freetype)
-            add_subdirectory(${freetype_SOURCE_DIR} ${freetype_BINARY_DIR} EXCLUDE_FROM_ALL)
-        endif()
-
-        if(TARGET freetype-interface AND NOT TARGET FREETYPE::FREETYPE)
-            add_library(FREETYPE::FREETYPE ALIAS freetype-interface)
-        endif()
-    endif()
-
-    if(NOT TARGET FREETYPE::FREETYPE)
-        message(FATAL_ERROR "FreeType is required for RmlUI but could not be configured.")
+    if(NOT TARGET Freetype::Freetype)
+            find_package(Freetype REQUIRED)
     endif()
 
     set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
