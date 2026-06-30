@@ -7,6 +7,6 @@
 [submodule "externals/rmlui"]
 	path = externals/rmlui
 	url = https://github.com/mikke89/RmlUI.git
-[submodule "externals/luc_compiler"]
-	path = externals/luc_compiler
-	url = https://github.com/Axo-1206/Luc-Compiler.git
+[submodule "externals/lucid_compiler"]
+	path = externals/lucid_compiler
+	url = https://github.com/Axo-1206/Lucid-Lang.git

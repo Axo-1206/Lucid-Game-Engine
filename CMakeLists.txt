@@ -53,9 +53,75 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/externals/glfw/CMakeLists.txt")
     target_link_libraries(luc_kernel PRIVATE glfw)
 endif()
 
-# 4. Luc Compiler (Submodule)
-if(EXISTS "${CMAKE_SOURCE_DIR}/externals/luc_compiler/CMakeLists.txt")
-    add_subdirectory(externals/luc_compiler)
+# 4. Lucid Compiler (Submodule)
+if(EXISTS "${CMAKE_SOURCE_DIR}/externals/lucid_compiler/CMakeLists.txt")
+    add_subdirectory(externals/lucid_compiler)
+endif()
+
+# 5. RmlUI (Editor shell — Win32 + Vulkan backend)
+if(EXISTS "${CMAKE_SOURCE_DIR}/externals/rmlui/CMakeLists.txt")
+    # Auto-download FreeType 2.14.1 via FetchContent to avoid manual path issues
+    if(NOT TARGET FREETYPE::FREETYPE)
+        include(FetchContent)
+        FetchContent_Declare(
+            freetype
+            GIT_REPOSITORY https://github.com/freetype/freetype.git
+            GIT_TAG        VER-2-14-1
+        )
+        
+        # Force disable modules that cause build issues or are not needed for RmlUI
+        set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_ZSTD ON CACHE BOOL "" FORCE)
+        set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+
+        FetchContent_GetProperties(freetype)
+        if(NOT freetype_POPULATED)
+            FetchContent_Populate(freetype)
+            add_subdirectory(${freetype_SOURCE_DIR} ${freetype_BINARY_DIR} EXCLUDE_FROM_ALL)
+        endif()
+
+        if(TARGET freetype-interface AND NOT TARGET FREETYPE::FREETYPE)
+            add_library(FREETYPE::FREETYPE ALIAS freetype-interface)
+        endif()
+    endif()
+
+    if(NOT TARGET FREETYPE::FREETYPE)
+        message(FATAL_ERROR "FreeType is required for RmlUI but could not be configured.")
+    endif()
+
+    set(RMLUI_SAMPLES OFF CACHE BOOL "" FORCE)
+    set(RMLUI_FONT_ENGINE "freetype" CACHE STRING "" FORCE)
+    set(RMLUI_PRECOMPILED_HEADERS OFF CACHE BOOL "" FORCE)
+    # Force static linking for RmlDebugger (plugin architecture) to avoid DLL hell
+    set(RMLUI_DYNAMIC_LINKING OFF CACHE BOOL "" FORCE)
+
+    add_subdirectory(externals/rmlui)
+
+    # Explicitly build the Vulkan backend
+    set(RMLUI_BACKEND "Win32_VK")
+    add_subdirectory(externals/rmlui/Backends)
+
+    # Link the kernel against RmlUI and its Vulkan backend
+    target_link_libraries(luc_kernel PRIVATE
+        RmlUi::Core
+        RmlUi::Debugger
+        rmlui_backend_Win32_VK
+        Vulkan::Vulkan
+    )
+
+    # Include RmlUI headers in the kernel's public include path
+    target_include_directories(luc_kernel SYSTEM PRIVATE
+        externals/rmlui/Include
+        externals/rmlui/Backends
+    )
+
+    if(WIN32)
+        target_link_libraries(luc_kernel PRIVATE imm32)
+    endif()
 endif()
 
 # --- Lucid Editor (Bootstrap) ---

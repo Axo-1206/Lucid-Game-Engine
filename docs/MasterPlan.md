@@ -9,7 +9,7 @@
 [Part 6 — External Library Summary](#part-6--external-library-summary)
 
 > **Related Documents:**
-> *   [LUC_GRAMMAR.md](./LUC_GRAMMAR.md) — The Luc Language Specification.
+> *   [LUCID_GRAMMAR.md](./LUCID_GRAMMAR.md) — The Lucid Language Specification.
 > *   [ExecutionPlan.md](./ExecutionPlan.md) — The step-by-step implementation roadmap.
 > *   [BuildSystem.md](./BuildSystem.md) — Directory and dependency mapping.
 
@@ -18,9 +18,9 @@
 ### LucidEngineOverview.md
 
 #### ✅ Strengths
-- **Microkernel model** — C++ kernel for performance, Luc for logic. Clear boundary, proven pattern.
+- **Microkernel model** — C++ kernel for performance, Lucid for logic. Clear boundary, proven pattern.
 - **Vulkan-first** — skips legacy OpenGL baggage. Correct for a custom engine.
-- **Phased roadmap** (C++ Bedrock → Luc Bridge → Evolution) — realistic bootstrapping order.
+- **Phased roadmap** (C++ Bedrock → Lucid Bridge → Evolution) — realistic bootstrapping order.
 - **Config-based path resolution** (`engine_settings.json`) — portable, no hardcoded paths.
 - **Command Registry** (VS Code approach) — right architecture for extension extensibility.
 
@@ -65,7 +65,7 @@
 #### ✅ Strengths
 - **4-Tab Bottom Dock** (Terminal, Output, Problems, Engine Console) — matches VS Code / Unreal standard.
 - **Engine Console is a live memory bridge**, not a text parser — professional design.
-- **3-File Console Ecosystem** clearly separates: Interpreter (C++), Metadata (JSON), Shortcuts (Luc).
+- **3-File Console Ecosystem** clearly separates: Interpreter (C++), Metadata (JSON), Shortcuts (Lucid).
 - **`console_interpreter.hpp` header drafted** — defines `Execute`, `RegisterCommand`, `GetSuggestions`.
 - **IPC-aware** — supports both in-process (same window) and out-of-process (separate game `.exe`) modes.
 
@@ -132,7 +132,7 @@
 ```
 Entity (uint64 ID)
 └── Components (POD structs: Position, Velocity, Mesh, Collider, Health...)
-		└── Systems (Luc or C++: PhysicsSystem, RenderSystem, ScriptSystem...)
+		└── Systems (Lucid or C++: PhysicsSystem, RenderSystem, ScriptSystem...)
 ```
 
 ---
@@ -175,10 +175,10 @@ api->spawn_entity(&my_entity);
 - `minor` bump → additive only, old table stays valid.
 - `patch` bump → bug fix, no ABI change.
 
-#### The Luc Bridge (Logic FFI)
-While C++ extensions call `LGE_GetAPI` directly, **Luc extensions** receive a pre-negotiated `api` object. The Kernel performs the version check against the `api_version` declared in `extension.json` before passing the object to `on_load(api)`.
+#### The Lucid Bridge (Logic FFI)
+While C++ extensions call `LGE_GetAPI` directly, **Lucid extensions** receive a pre-negotiated `api` object. The Kernel performs the version check against the `api_version` declared in `extension.json` before passing the object to `on_load(api)`.
 
-This ensures that Luc code is **always type-safe** and never has to deal with raw function pointers or version mismatch crashes. The `api` object in Luc is a high-level projection of the C++ function table, where each namespace (e.g., `api.ui`, `api.fs`) corresponds to a specific subsystem in the Kernel.
+This ensures that Lucid code is **always type-safe** and never has to deal with raw function pointers or version mismatch crashes. The `api` object in Lucid is a high-level projection of the C++ function table, where each namespace (e.g., `api.ui`, `api.fs`) corresponds to a specific subsystem in the Kernel.
 
 
 ---
@@ -198,10 +198,10 @@ This ensures that Luc code is **always type-safe** and never has to deal with ra
 
 **Jolt wins:** AAA-proven (*Horizon Forbidden West*, *Death Stranding 2*), MIT license, modern C++17, built-in multi-thread support, rich callback system.
 
-**Luc developer access via FFI:**
+**Lucid developer access via FFI:**
 
 ```c
-// lge_api.h — Luc-visible physics hooks
+// lge_api.h — Lucid-visible physics hooks
 LGE_API void LGE_SetOnCollisionCallback(void (*cb)(uint64_t a, uint64_t b));
 LGE_API void LGE_SetGravity(float x, float y, float z);
 LGE_API void LGE_AddForce(uint64_t entity, float fx, float fy, float fz);
@@ -293,7 +293,7 @@ When you're ready to add online enforcement:
 
 ### Decision 5 — Logic Hot-Reload ✅
 
-Hot-reload means: the developer saves a `.luc` file → the engine recompiles it → the running game reflects the change **without restarting**.
+Hot-reload means: the developer saves a `.Lucid` file → the engine recompiles it → the running game reflects the change **without restarting**.
 
 #### The System: Watch → Compile → Swap
 
@@ -416,14 +416,14 @@ The hardest part of hot-reload is keeping game state (player position, health, e
 **Full hot-reload flow diagram:**
 
 ```
-User saves player.luc
+User saves player.Lucid
 	│
 	▼
 FileWatcher detects change
 	│
 	▼
 ScriptManager::RecompileModule("player")
-→ spawns: luc_compiler.exe --input player.luc --output player_next.dll
+→ spawns: luc_compiler.exe --input player.Lucid --output player_next.dll
 	│
 	├── Compile FAILED → show errors in IDE log, keep old module running
 	│
@@ -447,21 +447,21 @@ ScriptManager::RecompileModule("player")
 
 ### Decision 6 — IntelliSense (Language Server) ✅
 
-The engine needs code completion, go-to-definition, and error squiggles inside the Luc script editor. This is implemented as a **separate `luc_langserver` process** — the same architecture VS Code uses with its Language Server Protocol (LSP).
+The engine needs code completion, go-to-definition, and error squiggles inside the Lucid script editor. This is implemented as a **separate `luc_langserver` process** — the same architecture VS Code uses with its Language Server Protocol (LSP).
 
 #### Why a separate process, not a library?
 
-The IDE (written in Luc) cannot call C++ analysis code directly — that would create a circular dependency. A separate process communicates via stdin/stdout JSON, keeping the boundary clean.
+The IDE (written in Lucid) cannot call C++ analysis code directly — that would create a circular dependency. A separate process communicates via stdin/stdout JSON, keeping the boundary clean.
 
 ```
-IDE (engine/src/editor/script_editor.luc)
+IDE (engine/src/editor/script_editor.Lucid)
 │
 │  JSON over stdin/stdout (LSP-style protocol)
 ▼
 luc_langserver.exe (C++ process, always running in background)
 │
 ├── Reuses compiler's Lexer + Parser + Symbol Table (no code-gen)
-├── Maintains an in-memory AST index of all open .luc files
+├── Maintains an in-memory AST index of all open .Lucid files
 └── Responds to requests:
 		textDocument/completion   → list of symbols, keywords, types
 		textDocument/hover        → type info, docstring
@@ -482,10 +482,10 @@ luc_langserver.exe: Lex → Parse → Type-check → (respond to IDE queries)
 
 This means the language server's completions and errors are **always in sync** with what the compiler actually accepts — no drift between "what the IDE shows" and "what actually compiles."
 
-#### IDE integration (Luc side)
+#### IDE integration (Lucid side)
 
-```luc
--- engine/src/editor/script_editor.luc
+```lucid
+-- engine/src/editor/script_editor.Lucid
 -- The editor starts the langserver as a child process on engine boot
 
 const lang_server &Process = Process:spawn("./compiler/luc_langserver.exe")
@@ -504,7 +504,7 @@ let on_keystroke (file string, cursor_pos Vec2) = {
 ```
 
 > [!NOTE]
-> The langserver runs **one instance per engine session**, not per file. It indexes all `.luc` files in the active project on startup and updates incrementally as files change.
+> The langserver runs **one instance per engine session**, not per file. It indexes all `.Lucid` files in the active project on startup and updates incrementally as files change.
 
 ---
 
@@ -526,8 +526,8 @@ This distinction is critical and must be enforced by the engine:
 | Lifecycle hooks (`on_load`, `on_unload`) | ✅ Yes — called by kernel | ❌ No |
 | Runs during development | ✅ Yes (always active while engine is open) | ❌ Only when imported |
 | Adds UI, menus, commands | ✅ Yes | ❌ No |
-| How it's used | Engine loads it automatically | Other `.luc` files do `import "my_lib.luc"` |
-| Example | Visual Debugger, Theme Manager, Git Integration | `math_utils.luc`, `enemy_ai.luc`, `pathfinding.luc` |
+| How it's used | Engine loads it automatically | Other `.Lucid` files do `import "my_lib.Lucid"` |
+| Example | Visual Debugger, Theme Manager, Git Integration | `math_utils.Lucid`, `enemy_ai.Lucid`, `pathfinding.Lucid` |
 
 **Rule:** If it modifies the engine's behavior or UI, it's an **Extension**. If it's just reusable code called by game scripts, it's a **Library** — keep it in the project's `src/libs/` folder.
 
@@ -734,11 +734,11 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIe3n...
 "author": "Your Name",                // Auto-filled from user_settings.json
 "publisher": "yourname",              // Auto-filled from user_settings.json
 "description": "What this extension does",
-"entry_point": "main.luc",            // File with on_load / on_update / on_unload
+"entry_point": "main.Lucid",            // File with on_load / on_update / on_unload
 "type": "extension",                  // extension | theme | tool | network-provider
 "permissions": ["ui.menu", "ecs.read", "ecs.write", "filesystem.project"],
 
-// LAZY LOADING (When should the engine run main.luc?)
+// LAZY LOADING (When should the engine run main.Lucid?)
 "activationEvents": [
 	"onCommand:my-extension.run",
 	"onView:my-extension-panel"
@@ -762,15 +762,15 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIe3n...
 
 #### Why `contributes` and `activationEvents` are critical
 Just like VS Code's `package.json`, this declarative approach solves two massive problems:
-1. **Zero-Cost Startup:** The engine reads all `extension.json` files on boot and builds the UI menus, activity bar, and command palette *without executing a single line of Luc code*. 
-2. **Lazy Loading:** `main.luc` is strictly ignored until the user clicks the button defined in `contributes`. This keeps the engine's memory footprint incredibly small, no matter how many extensions are installed.
+1. **Zero-Cost Startup:** The engine reads all `extension.json` files on boot and builds the UI menus, activity bar, and command palette *without executing a single line of Lucid code*. 
+2. **Lazy Loading:** `main.Lucid` is strictly ignored until the user clicks the button defined in `contributes`. This keeps the engine's memory footprint incredibly small, no matter how many extensions are installed.
 
 #### How Permissions are Resolved and Enforced
 Permissions are not just a warning; they are enforced at the C++ Kernel boundary.
 
 1. **Installation (User Consent):** When a user downloads an extension, the IDE parses the `permissions` array in `extension.json`. If it contains `network.server` or `filesystem.global`, a large warning prompts the user for consent. If they decline, the installation aborts.
 2. **Runtime Enforcement (The Kernel Gatekeeper):** 
-When an extension's `main.luc` is eventually loaded, the engine assigns it an **Execution Context ID**. This ID maps to the approved permissions.
+When an extension's `main.Lucid` is eventually loaded, the engine assigns it an **Execution Context ID**. This ID maps to the approved permissions.
 If the script tries to call a sensitive FFI function (e.g., `api.network.listen(8080)`), the C++ Kernel intercepts the call:
 ```cpp
 // Inside luc_kernel.dll
@@ -782,7 +782,7 @@ LGE_API void LGE_Network_Listen(ExecutionContext context, int port) {
 	// Proceed with binding the port...
 }
 ```
-Because the enforcement happens in C++, a malicious Luc script cannot bypass it.
+Because the enforcement happens in C++, a malicious Lucid script cannot bypass it.
 
 **Permission whitelist** — extensions declare what they need:
 
@@ -802,10 +802,10 @@ Because the enforcement happens in C++, a malicious Luc script cannot bypass it.
 
 ---
 
-#### Extension Entry Point (Luc side)
+#### Extension Entry Point (Lucid side)
 
-```luc
--- my-extension/main.luc — the required lifecycle contract
+```lucid
+-- my-extension/main.Lucid — the required lifecycle contract
 
 export const on_load (api &Api) = {
     -- Called when the extension is activated
@@ -856,7 +856,7 @@ The Extensions panel is divided into two sections as you described:
 ```
 user_extensions/my-extension/
 ├── extension.json     ← auto-generated with all fields filled in
-└── main.luc           ← starter template with on_load/on_unload stubs
+└── main.Lucid           ← starter template with on_load/on_unload stubs
 ```
 4. Extension immediately appears in "My Extensions" and is ready to edit.
 
@@ -990,7 +990,7 @@ Step 3 — Verify registration
 Step 4 — Write your extension
 user_extensions/my-extension/
 ├── extension.json   ← id, uuid, permissions declared
-└── main.luc      ← on_load / on_update / on_unload
+└── main.Lucid      ← on_load / on_update / on_unload
 
 Step 5 — Sign the extension
 scripts/sign_extension.py --extension ./user_extensions/my-extension/ --key publisher_private.pem
@@ -999,7 +999,7 @@ What the script does internally:
 	a. Reads extension.json (without the "signature" field)
 	b. SHA-256 hashes every file in the extension folder
 	c. Builds a payload:
-		{ "manifest": {...extension.json...}, "file_hashes": { "main.luc": "sha256:abc..." } }
+		{ "manifest": {...extension.json...}, "file_hashes": { "main.Lucid": "sha256:abc..." } }
 	d. Signs the payload with Ed25519 private key
 	e. Base64-encodes the signature
 	f. Writes it into extension.json → "signature": "base64:..."
@@ -1179,14 +1179,14 @@ A developer writes their own `INetworkProvider` implementation as an extension:
 "id": "com.taiax.steam-network",
 "type": "network-provider",
 "permissions": ["network.client", "network.server"],
-"entry_point": "steam_provider.luc"
+"entry_point": "steam_provider.Lucid"
 }
 ```
 
-```luc
-// steam_provider.luc — Luc wraps the Steamworks C++ SDK via FFI
+```lucid
+// steam_provider.Lucid — Lucid wraps the Steamworks C++ SDK via FFI
 
-import "steam_sdk.luc"   // FFI bindings to Steamworks
+import "steam_sdk.Lucid"   // FFI bindings to Steamworks
 
 on_load(api) {
 	// Register this as the active network provider
@@ -1264,8 +1264,8 @@ The IDE docks a primary feedback panel at the bottom, split into four distinct c
 The "Engine Console" is not a text parser; it is a live memory bridge.
 
 1.  **The Interpreter (`luc_console.cpp`):** Core kernel logic. Receives string → Tokenizes → Finds memory via Symbols → Executes.
-2.  **The Metadata (`symbols.json`):** Generated by the Luc compiler. Maps human names (e.g., `player.health`) to binary offsets (e.g., `0xAC + 8`).
-3.  **The Shortcuts (`debug_commands.luc`):** User-defined Luc functions for complex testing (e.g., `spawn_boss()`).
+2.  **The Metadata (`symbols.json`):** Generated by the Lucid compiler. Maps human names (e.g., `player.health`) to binary offsets (e.g., `0xAC + 8`).
+3.  **The Shortcuts (`debug_commands.Lucid`):** User-defined Lucid functions for complex testing (e.g., `spawn_boss()`).
 
 ---
 
@@ -1294,7 +1294,7 @@ To achieve a premium, VS Code-like aesthetic with infinite DPI scaling and seaml
 
 #### How it works (The Architecture):
 1. **The Rasterizer:** The C++ Kernel embeds a lightweight, single-header SVG library (e.g., [NanoSVG](https://github.com/memononen/nanosvg)) into `externals/`.
-2. **The Pipeline:** When the Luc UI layer requests `ui.draw_svg("icon.svg", 24, 24)`, the kernel reads the file, rasterizes the vector math into a 24x24 RGBA texture, uploads it to the GPU via Vulkan, and caches it.
+2. **The Pipeline:** When the Lucid UI layer requests `ui.draw_svg("icon.svg", 24, 24)`, the kernel reads the file, rasterizes the vector math into a 24x24 RGBA texture, uploads it to the GPU via Vulkan, and caches it.
 3. **Core Icons:** All default engine icons (Explorer, Debug, Git, folder icons, file type icons) are stored centrally inside `core_extensions/theme_manager/icons/`.
 
 #### How developers create an Icon Theme (Step-by-Step):
@@ -1318,7 +1318,7 @@ Just like VS Code, users can install "Icon Theme Extensions" to completely repla
 		"activityBar.explorer": "explorer_icon"
 	},
 	"fileExtensions": {
-		"luc": "luc_file"
+		"Lucid": "luc_file"
 	}
 }
 ```
@@ -1343,20 +1343,20 @@ What happens if two extensions try to change the same icon? The engine has stric
 Standard extensions **cannot** overwrite core icons. Only the single, user-selected **Active Icon Theme** can change core icons. Therefore, conflicts are impossible because only one Icon Theme is active at a time in `engine_settings.json`.
 
 **Rule 2: File Type Icons (e.g., `.json` files)**
-If two regular extensions both try to register an icon for `.json` files via the Luc API, the engine uses the following hierarchy:
+If two regular extensions both try to register an icon for `.json` files via the Lucid API, the engine uses the following hierarchy:
 1. **The Active Icon Theme wins.** If the user's selected icon theme has a `.json` icon, it overrides everything else.
 2. **Standard Extension Registration.** If the icon theme doesn't have one, but Extension A and Extension B both register an icon for `.json`, the engine picks the one that loads last (based on the alphabetical order of their Extension UUIDs). The engine will log a quiet warning to the developer console: `Warning: Extension B overwrote the .json file icon previously registered by Extension A.`
 
 #### How Colors are Handled:
 Because SVGs are drawn dynamically, **all UI SVGs should be solid white (`#FFFFFF`)**.
-When the Luc UI code calls `ui.draw_svg`, it passes an active theme color. The Vulkan shader multiplies the white texture by this color. 
+When the Lucid UI code calls `ui.draw_svg`, it passes an active theme color. The Vulkan shader multiplies the white texture by this color. 
 - If the dark theme is active, it tints the white SVG to `rgb(200, 200, 200)`. 
 - If the user hovers over the icon, the shader dynamically tints it to `rgb(50, 150, 255)` (Lucid Blue). 
 This allows users to change the engine's color palette without ever having to touch the icon files!
 
 #### Extension Icons: 
 User extensions bundle their own `.svg` files in their folder and register them via the `api` during the `on_load` hook:
-```luc
+```lucid
 export const on_load (api &Api) = {
     api.ui:register_activity_bar("Animation", "resources/anim_panel.svg", open_anim)
     api.ui:register_file_icon(".lanim", "resources/anim_file.svg")
@@ -1371,7 +1371,7 @@ export const on_load (api &Api) = {
 ### Decision 12 — The Extension API Surface (The `api` object) ✅
 
 **Architecture: The "God Object" passed via FFI.**
-To achieve "infinite scale for infinite demands," the C++ Kernel exposes a massive, modular API surface to `main.luc`. When the engine loads an extension, it passes an `api` object into the `on_load(api)` function.
+To achieve "infinite scale for infinite demands," the C++ Kernel exposes a massive, modular API surface to `main.Lucid`. When the engine loads an extension, it passes an `api` object into the `on_load(api)` function.
 
 The features available inside the `api` object are **strictly determined by the permissions** requested in `extension.json`.
 
@@ -1387,10 +1387,10 @@ If an extension requests all permissions, the `api` object contains:
 *   **`api.compiler`**: Hook into the LSP (Language Server). Register custom **Autocomplete Providers**, linting rules, or code-generation tools.
 
 #### Example: Building a Custom Drawing Tool
-Here is exactly how `main.luc` would look for an extension that lets the user open `.ldraw` files, draws pixels in a custom workspace tab, handles drag-and-drop folders, and saves the file.
+Here is exactly how `main.Lucid` would look for an extension that lets the user open `.ldraw` files, draws pixels in a custom workspace tab, handles drag-and-drop folders, and saves the file.
 
-```luc
--- main.luc (The Drawing Extension)
+```lucid
+-- main.Lucid (The Drawing Extension)
 package drawing_tool
 
 use engine.api
@@ -1448,7 +1448,7 @@ pub impl DrawingEditor {
 ```
 
 #### Why this scales infinitely:
-Because the C++ Kernel exposes the raw `api.ui:create_canvas()` and `api.render` hooks, the engine doesn't need to know *what* a drawing tool is. The engine simply provides a blank tab and a GPU canvas, and the Luc script defines the logic. This is exactly how VS Code's `CustomEditor` API allows extensions to build hex editors, 3D model viewers, and UI designers entirely via extensions.
+Because the C++ Kernel exposes the raw `api.ui:create_canvas()` and `api.render` hooks, the engine doesn't need to know *what* a drawing tool is. The engine simply provides a blank tab and a GPU canvas, and the Lucid script defines the logic. This is exactly how VS Code's `CustomEditor` API allows extensions to build hex editors, 3D model viewers, and UI designers entirely via extensions.
 
 ---
 
@@ -1467,9 +1467,9 @@ Windows and Linux cannot use the engine's internal rasterizer for the desktop sh
 - **Location:** `dist/images/app_icon.ico` (Windows) and `dist/images/app_icon.png` (Linux).
 - **Logic:** These are pre-baked raster files. They do not change with the theme because the OS manages their display before the engine even boots.
 
-#### 3. How to load the App Icon in Luc
+#### 3. How to load the App Icon in Lucid
 The engine branding is exposed via the `api.kernel` namespace:
-```luc
+```lucid
 let logo &Texture = api.kernel:get_branding_logo()
 -- Then draw it anywhere in the UI
 ui:image(logo, 64, 64)
@@ -1477,31 +1477,59 @@ ui:image(logo, 64, 64)
 
 ---
 
-### Decision 14 — Unified UI Architecture (RmlUI + Luc Bridge) ✅
+### Decision 14 — Dual-Backend UI Architecture (ImGui Shell + RmlUI In-Game) ✅
 
-**Architecture: The "Unified UI Kernel" Model.**
-To achieve a modern, minimal VS Code-like aesthetic for the editor while providing a powerful, design-first workflow for game developers, the engine standardizes on **RmlUI** (v6.0+) as its core UI backend.
+**Architecture: The "Split Kernel" Model.**
+The engine standardizes on **two** UI backends, each scoped to the context it's actually good at, rather than a single system stretched across both:
 
-#### 1. The Dual-Role Architecture
-RmlUI serves as the high-performance renderer for two distinct contexts:
-*   **The Engine Shell:** The IDE's activity bar, sidebar, status bar, and tabs are built using RmlUI in the Kernel. This ensures a consistent, modern "App" feel with native support for Flexbox, glassmorphism (blur), and dynamic themes via CSS variables.
-*   **The In-Game UI:** Developers build their own HUDs and menus using the same system. The engine provides a **Visual UI Designer** that generates RML/RCSS files, which are then controlled via Luc code.
+*   **ImGui** (docking branch) renders the **Engine Shell** — the editor's activity bar, sidebar, inspector, hierarchy, console, and all other tool/dev-facing panels.
+*   **RmlUI** (v6.0+) renders **In-Game UI** — HUDs, menus, and any UI a game developer ships to players.
 
-#### 2. The Luc UI Bridge (Declarative UI)
-Extension and game developers do not write HTML/CSS directly. Instead, they use a high-level, declarative Luc API that maps to RmlUI elements. This ensures type safety and performance while maintaining the flexibility of a DOM-based system.
+This mirrors a proven pattern from other engines: Unity runs IMGUI (`EditorGUI`) for its editor and a separate retained-mode system (UGUI / UI Toolkit) for game UI; CryEngine's Qt-based Sandbox editor is likewise entirely separate from its runtime UI stack. The split was chosen over a single-backend approach (either "RmlUI for everything" or building a bespoke system) after evaluating both alternatives — see the comparison below.
 
-```luc
--- Example: A custom panel in the Activity Bar
-export const on_render_panel (ui &Ui) = {
-    ui:div("sidebar-container", () = {
-        ui:header("SEARCH")
-        
-        ui:input_field("Search query...", &this.query)
-        
-        ui:scroll_view("results-list", () = {
-            for result in this.results {
-                ui:button("result-item", result.label, () = {
-                    api.workspace:open_file(result.path)
+#### 1. Why Two Systems Instead of One
+
+| | Single RmlUI | Custom-built | **Dual (ImGui + RmlUI)** |
+|---|---|---|---|
+| Editor performance at high panel count | Needs active discipline (stable DOM, shared atlases, profiling) — RmlUI's weak point relative to ImGui | Best possible, but you pay for it elsewhere | Native strength of ImGui |
+| In-game UI richness (CSS layout, animation, theming, designer workflow) | Excellent | Built from scratch, multi-year effort to match | Excellent (RmlUI keeps this role) |
+| Engineering cost | One bridge, one render path | Years of work: text shaping, bidi, IME, layout engine, styling system — and still maintained forever in-house | Two render paths, two input pipelines to arbitrate where they coexist on screen |
+| Ecosystem / hiring | CSS-literate designers for both contexts | None — bespoke API, zero transferable skill or community | CSS-literate designers for game UI; ImGui is an industry-standard tool API for engine programmers |
+
+A bespoke system was rejected primarily because of cost #2 above: building a competitive text/layout/styling engine is a multi-year undertaking that, once finished, tends to converge on something worse than RmlUI already is — for a benefit (perf headroom) that's smaller than expected once flexbox-equivalent layout and text shaping are actually implemented.
+
+Single-RmlUI was rejected because the Engine Shell's actual visual requirements — flat colors, transparency/alpha, rounded corners, simple borders, gradients, and PNG/texture backgrounds (the requirement set the editor needs, deliberately modeled on tools like Roblox Studio's UI) — are all natively free in ImGui's draw-list/style API, with **no blur or glassmorphism requirement** to justify RmlUI's heavier CSS engine on the editor side. Where RmlUI's strengths (true CSS, flexbox, animation/transitions, accessibility-friendly DOM structure) matter is precisely where players, not engine developers, are the audience — i.e. in-game UI.
+
+#### 2. The Engine Shell (ImGui)
+ImGui panels are written directly in C++ against the Kernel's live state — no Lucid bridge, no markup. This keeps editor tooling fast to build and cheap to render:
+
+*   **Color** — every widget has a corresponding `ImGuiCol_*` slot (`WindowBg`, `Button`, `FrameBg`, `Text`, etc.), settable globally via theme or per-widget via `PushStyleColor`/`PopStyleColor`. Full RGBA, so transparency is native (no extra pass).
+*   **Rounded corners** — `ImGuiStyleVar_*Rounding` per element type, or per-corner control via `ImDrawList::AddRectFilled(..., rounding, corner_flags)`.
+*   **Borders** — `ImGuiStyleVar_*BorderSize` for thickness, `ImGuiCol_Border` for color. (No built-in inner/middle/outer alignment mode — not required for the editor; can be hand-rolled via `AddRect()` if ever needed.)
+*   **Textures / PNGs** — loaded via `stb_image`, uploaded as a Vulkan texture, drawn with `ImGui::Image()` / `ImDrawList::AddImage()`. Used for icons, thumbnails, and pre-baked "fake blur" backgrounds where a soft look is wanted without a real blur pass.
+*   **Shadows / gradients** — gradients via `AddRectFilledMultiColor()`; flat drop-shadows via layered offset rects with falling alpha. True gaussian blur of live background content is explicitly **not** implemented for the Shell (not required — see Decision 14.1), avoiding the extra render-pass cost it would need.
+
+##### Editor Performance Practices
+Because the Shell renders many simultaneous small panels (inspector + hierarchy + console + viewport + asset browser, all docked and live every frame), three practices keep it fast as panel/element count grows:
+1.  **Stable structure, in-place updates** — panels bind data into existing widget calls rather than rebuilding their structure each frame; only the *number or kind* of elements changing triggers a structural rebuild.
+2.  **Shared icon/font atlases** — all editor iconography and the editor font are packed into one shared atlas at build time, instead of being loaded per-panel, minimizing texture-bind switches per frame.
+3.  **Continuous profiling under realistic load** — frame time, draw-call count, and per-panel cost are profiled with a fully populated editor (large hierarchy, big asset list), not an empty scene, since panel-count stress is where cost actually shows up.
+
+#### 3. The In-Game UI (RmlUI)
+Game developers build HUDs and menus using the **Lucid UI Bridge** (unchanged from the original design) — a declarative Lucid API mapping to RmlUI elements, so extension and game developers never write raw HTML/CSS/RML directly:
+
+```lucid
+-- Example: A custom HUD element
+export const on_render_hud (ui &Ui) = {
+    ui:div("health-container", () = {
+        ui:header("STATUS")
+
+        ui:progress_bar("health-bar", &this.health)
+
+        ui:scroll_view("buff-list", () = {
+            for buff in this.activeBuffs {
+                ui:button("buff-item", buff.label, () = {
+                    api.player:inspect_buff(buff.id)
                 })
             }
         })
@@ -1509,24 +1537,32 @@ export const on_render_panel (ui &Ui) = {
 }
 ```
 
-#### 3. Why RmlUI?
-*   **Modern Aesthetics:** Supports `box-shadow`, `filter: blur()`, and `conic-gradient` out of the box.
+The engine provides a **Visual UI Designer** that generates RML/RCSS files, controlled via Lucid code at runtime.
+
+#### 4. Why RmlUI for In-Game UI
+*   **Modern Aesthetics:** Supports `box-shadow`, `filter: blur()`, and `conic-gradient` out of the box — relevant here, where shipped UI polish matters.
 *   **Performance:** Renderer-agnostic backend; generates simple vertex/index batches for our Vulkan pipeline.
 *   **Standard-Based:** Uses HTML/CSS paradigms, making it easy to recruit designers who already understand web-style layouts.
+*   **Layout & Animation:** Flexbox layout and CSS-style transitions handle responsive, multi-resolution HUDs and animated UI state without hand-rolled interpolation code.
 *   **MIT License:** Fully permissive and actively maintained.
+
+#### 5. Coexistence Notes
+ImGui and RmlUI render through the same Vulkan pipeline (each emits its own vertex/index batches, submitted in sequence) but are **not** composited in the same screen region simultaneously — the Shell (ImGui) and a running game's viewport (which may show RmlUI in-game UI, e.g. for world-space `UIComponent` previews) occupy logically separate areas, so the two systems' input/focus handling never needs to arbitrate the same click. If an editor feature ever needs to preview in-game UI inside a Shell panel, that panel hosts RmlUI's output as a texture rather than interleaving draw calls live.
 
 ---
 
 ### Decision 15 — The Lucid-UI Bridge & Core Component Library ✅
 
 **Architecture: The "Reflected DOM" Model.**
-To ensure extensions can build modern UIs without fighting raw RmlUI pointers, the engine provides a high-level **Reactive Bridge**. The Kernel manages the RmlUI element tree, while Luc interacts with it via safe, handle-based references.
+*Scope note: following Decision 14's split, this bridge targets **RmlUI only** — i.e. in-game UI (HUDs, menus) and any extension UI that renders inside a game's RmlUI context. The Engine Shell itself is plain C++ ImGui and does not go through this bridge (see Decision 14 §2); an extension adding a Shell tool panel writes ImGui calls directly, not Lucid `ui:` calls.*
 
-#### 1. The UI Bridge API (`ui.luc`)
-The bridge maps the C++ DOM to a set of scoped Luc functions. This allows developers to build UIs using a structure that mirrors the visual hierarchy.
+To ensure extensions and game developers can build modern in-game UIs without fighting raw RmlUI pointers, the engine provides a high-level **Reactive Bridge**. The Kernel manages the RmlUI element tree, while Lucid interacts with it via safe, handle-based references.
 
-```luc
--- Example: Defining a reusable Component in Luc
+#### 1. The UI Bridge API (`ui.Lucid`)
+The bridge maps the C++ DOM to a set of scoped Lucid functions. This allows developers to build UIs using a structure that mirrors the visual hierarchy.
+
+```lucid
+-- Example: Defining a reusable Component in Lucid
 pub const ToolCard (title string, desc string, on_click () -> void) = {
     ui:div("card", () = {
         ui:header("card-title", title)
@@ -1537,7 +1573,7 @@ pub const ToolCard (title string, desc string, on_click () -> void) = {
 ```
 
 #### 2. The Core UI Library (Standard Components)
-The engine ships with `core_lib/ui_std.luc`, a library of "Lucid-Styled" components that ensure all extensions look like they belong in the engine.
+The engine ships with `core_lib/ui_std.Lucid`, a library of "Lucid-Styled" components that ensure all in-game/RmlUI-rendered UI looks consistent across extensions.
 *   **Containers:** `panel`, `grid`, `flex_row`, `scroll_view`.
 *   **Controls:** `button`, `toggle`, `slider`, `input_field`, `dropdown`.
 *   **Feedback:** `progress_bar`, `spinner`, `tooltip`, `toast`.
@@ -1548,38 +1584,38 @@ These components are pre-styled with the **Lucid Design System** (Inter font, 4p
 Extensions can expand the UI system in two ways:
 1.  **Global Styles (RCSS):** An extension can provide a `.rcss` file that adds new CSS classes to the global namespace.
     *   *Example:* A "Neon Theme" extension injects global styles that add glows to all `ui:button` instances.
-2.  **Custom Layout Builders:** Extensions can define their own complex Luc functions (like `ToolCard` above) and export them for other extensions to use.
+2.  **Custom Layout Builders:** Extensions can define their own complex Lucid functions (like `ToolCard` above) and export them for other extensions to use.
 
 #### 4. Data Binding (The Bridge Magic)
-The bridge supports **Reactive Binding**. When a Luc variable is bound to a UI element, the Kernel updates the RmlUI property only when the variable changes, ensuring zero-cost UI updates.
+The bridge supports **Reactive Binding**. When a Lucid variable is bound to a UI element, the Kernel updates the RmlUI property only when the variable changes, ensuring zero-cost UI updates.
 
-```luc
+```lucid
 let health int = 100
 -- Binding the 'health' variable to a progress bar
 ui:progress_bar("health-bar", &health) 
--- Any change to 'health' in Luc is instantly reflected in the HUD
+-- Any change to 'health' in Lucid is instantly reflected in the HUD
 ```
 
 ---
 
-### Decision 16 — The Math Library (GLM + Luc Projection) ✅
+### Decision 16 — The Math Library (GLM + Lucid Projection) ✅
 
 **Architecture: The "Dual-Citizen" Math Model.**
-To ensure high-performance rendering and physics while maintaining a world-class Luc developer experience, the engine standardizes on **GLM (OpenGL Mathematics)** as its internal C++ foundation.
+To ensure high-performance rendering and physics while maintaining a world-class Lucid developer experience, the engine standardizes on **GLM (OpenGL Mathematics)** as its internal C++ foundation.
 
 #### 1. C++ Foundation (The Kernel)
 The Kernel uses GLM for all transformations, projection matrices, and physics calculations.
 *   **Zero Overhead:** GLM is header-only and SIMD-accelerated.
 *   **Vulkan-Native:** Memory layouts of `glm::vec3` and `glm::mat4` match Vulkan/GLSL expectations exactly.
 
-#### 2. The Luc Projection (`math.luc`)
-The engine exposes these types to Luc as primitive structs. Heavy math operations are projected via FFI to GLM's optimized C++ implementation.
+#### 2. The Lucid Projection (`math.Lucid`)
+The engine exposes these types to Lucid as primitive structs. Heavy math operations are projected via FFI to GLM's optimized C++ implementation.
 
-```luc
--- core_lib/math.luc
+```lucid
+-- core_lib/math.Lucid
 package math
 
--- @packed ensures Luc memory matches GLM memory exactly
+-- @packed ensures Lucid memory matches GLM memory exactly
 @packed
 pub struct Vec3 {
     x float
@@ -1598,23 +1634,23 @@ pub impl Vec3 {
 #### 3. Why GLM?
 *   **Industry Standard:** Widely used in custom engines, Vulkan tools, and research.
 *   **Stability:** Decades of bug fixes and performance optimizations.
-*   **Interoperability:** Eases the bridge between Luc scripting and the Vulkan renderer.
+*   **Interoperability:** Eases the bridge between Lucid scripting and the Vulkan renderer.
 
 ---
 
-### Decision 17 — Input Architecture (The GLFW ↔ Luc Bridge) ✅
+### Decision 17 — Input Architecture (The GLFW ↔ Lucid Bridge) ✅
 
 **Architecture: The "Foundation-Surface" Model.**
 To ensure the engine is highly portable across Desktop, Mobile, and Console while maintaining a premium developer experience, the input system is split into two layers.
 
 #### 1. The Low-Level Foundation (C++ Kernel)
 The Kernel uses **GLFW** (on Desktop) as a platform provider. It captures raw OS events and normalizes them into a unified internal format.
-*   **Decoupling:** GLFW is treated as an implementation detail. The Kernel uses an abstract `IInputProvider` interface, allowing us to swap GLFW for native **Android NDK**, **iOS UIKit**, or **Console SDKs** without changing any Luc code.
+*   **Decoupling:** GLFW is treated as an implementation detail. The Kernel uses an abstract `IInputProvider` interface, allowing us to swap GLFW for native **Android NDK**, **iOS UIKit**, or **Console SDKs** without changing any Lucid code.
 
-#### 2. The High-Level Surface (Luc `io` Library)
+#### 2. The High-Level Surface (Lucid `io` Library)
 Developers interact with the beautiful, callback-based `io` library. This is the "Surface" that remains constant regardless of the hardware.
 
-```luc
+```lucid
 -- Example: Desktop-first logic that works on Mobile via re-mapping
 io.key.W.onHeld(() {
     player:move_forward()
@@ -1628,18 +1664,18 @@ io.mouse.left.onPressed(() {
 
 #### 3. Cross-Platform Portability (The "Swappable Backend")
 *   **PC Testing:** Developers can test Mobile/Console logic on PC by mapping mouse/keyboard events to virtual touch/gamepad events.
-*   **Native Performance:** Because the Kernel talks directly to the platform (GLFW/NDK/SonySDK), input latency is kept to an absolute minimum, while the Luc layer remains elegant and high-level.
+*   **Native Performance:** Because the Kernel talks directly to the platform (GLFW/NDK/SonySDK), input latency is kept to an absolute minimum, while the Lucid layer remains elegant and high-level.
 
 ---
 
 ### Decision 18 — ECS Reflection & The Property Inspector ✅
 
 **Architecture: The "Component Metadata" Model.**
-The Property Inspector (docked on the right) is a Luc-based UI that dynamically generates its fields by querying the **ECS Metadata** of the selected entity.
+The Property Inspector (docked on the right) is a Lucid-based UI that dynamically generates its fields by querying the **ECS Metadata** of the selected entity.
 
 #### 1. How Selection Works
-When you click an object in the 3D Scene View, the engine performs a **Raycast** (via Jolt Physics). The Kernel returns the `EntityID` to the Luc Editor:
-```luc
+When you click an object in the 3D Scene View, the engine performs a **Raycast** (via Jolt Physics). The Kernel returns the `EntityID` to the Lucid Editor:
+```lucid
 on_scene_click (pos Vec2) = {
     let entity_id EntityID = api.physics:raycast_from_camera(pos)
     api.editor:set_selection(entity_id)
@@ -1649,8 +1685,8 @@ on_scene_click (pos Vec2) = {
 #### 2. The Property Inspector (Right Dock)
 The Inspector uses the **Reactive Bridge (Decision 15)** to bind UI elements directly to the ECS memory. 
 
-```luc
--- engine/src/editor/inspector_panel.luc
+```lucid
+-- engine/src/editor/inspector_panel.Lucid
 export const render_inspector (entity &Entity) = {
     ui:panel("inspector", () = {
         -- Physics Component
@@ -1710,8 +1746,8 @@ The interpreter first checks a `std::unordered_map` of registered "Engine Comman
 #### Layer 2: The Symbol Metadata Bridge (Live Memory)
 If the input is an assignment (e.g., `player.speed = 25`), the interpreter enters **Reflection Mode**. It uses `symbols.json` to find the exact memory offset in the C++ ECS component store and writes the new value directly into RAM. Strict type-checking is enforced before writing.
 
-#### Layer 3: The Luc REPL (Scripting Layer)
-If the command is complex logic (e.g., calling macros like `world.spawn_horde(50)`), the interpreter passes the string to the **Luc JIT Compiler**. The JIT engine compiles and executes the snippet on the fly.
+#### Layer 3: The Lucid REPL (Scripting Layer)
+If the command is complex logic (e.g., calling macros like `world.spawn_horde(50)`), the interpreter passes the string to the **Lucid JIT Compiler**. The JIT engine compiles and executes the snippet on the fly.
 
 ---
 
@@ -1728,8 +1764,8 @@ The engine supports two distinct compilation paths for game logic, allowing deve
 | **Assets** | `.pck` | Encrypted VFS | All textures, meshes, and audio bundles. |
 
 **Rationale:**
-- **AOT (`.lmod`):** Compiles Luc directly to platform-specific machine code (Win-x64, Linux-ARM64). Offers the highest possible performance and best obfuscation.
-- **JIT (`.ljit`):** Compiles Luc to secure LLVM Bytecode. The `luc_kernel` JIT-compiles this to memory on boot. This enables "Build Once, Run Anywhere" and is the ideal format for cross-platform distribution and modding.
+- **AOT (`.lmod`):** Compiles Lucid directly to platform-specific machine code (Win-x64, Linux-ARM64). Offers the highest possible performance and best obfuscation.
+- **JIT (`.ljit`):** Compiles Lucid to secure LLVM Bytecode. The `luc_kernel` JIT-compiles this to memory on boot. This enables "Build Once, Run Anywhere" and is the ideal format for cross-platform distribution and modding.
 
 ---
 
@@ -1775,28 +1811,28 @@ To prevent developers from accidentally shipping insecure debug builds (which al
 ### Decision 26 — Visual Programming Architecture ✅
 
 **Architecture: "The Functional Data Graph."**
-Visual programming in Lucid does not use a secondary virtual machine. It is a one-way generator that maps visual nodes directly to Luc's functional paradigms (`->` pipelines and `+>` composition).
+Visual programming in Lucid does not use a secondary virtual machine. It is a one-way generator that maps visual nodes directly to Lucid's functional paradigms (`->` pipelines and `+>` composition).
 
 #### 1. The Metadata Scanner (No Special Files Required)
 Developers expose custom code to the visual editor using structured comments (`---@node`). The core compiler ignores these, ensuring cross-version stability, while the `luc_langserver` parses them to build the visual palette.
 
-```luc
+```lucid
 ---@node(category="Math", name="Calc Damage", color="red")
 pub const calc_damage (base float, type string) float = { ... }
 ```
 
 #### 2. Visualizing the Flow (Arrows = Operators)
-Because Luc treats functions as types, the graph's arrows map directly to code syntax:
+Because Lucid treats functions as types, the graph's arrows map directly to code syntax:
 *   **Data Wires (Thin):** Dragging an output to an input generates a Pipeline expression (`NodeA -> NodeB`).
 *   **Composition Wires:** Connecting functions without executing them generates a composite (`math.add +> math.clamp`).
 *   **Execution Wires (Thick):** Sequential side-effects map to standard block scopes (Line 1, then Line 2).
 
 #### 3. Structs as Action Centers & Recursive Data
-*   **Action Nodes:** Because structs in Luc use `impl` blocks for behavior, a Struct Node visually displays both **Data Pins** (properties) and **Action Pins** (methods).
+*   **Action Nodes:** Because structs in Lucid use `impl` blocks for behavior, a Struct Node visually displays both **Data Pins** (properties) and **Action Pins** (methods).
 *   **Recursive UI:** The UI handles nested data (e.g., Arrays containing Structs that contain Arrays) using collapsible accordion sections inside the node to prevent screen clutter.
 
 #### 4. File Structure: Paging & Imports (draw.io style)
-*   **Paging:** A single `.lgraph` file can contain multiple "Pages" (tabs at the bottom) to organize logic (e.g., "Movement", "Combat"). The compiler flattens all pages into a single `.luc` package.
+*   **Paging:** A single `.lgraph` file can contain multiple "Pages" (tabs at the bottom) to organize logic (e.g., "Movement", "Combat"). The compiler flattens all pages into a single `.Lucid` package.
 *   **Import/Export UI:** The editor includes a visual manager for `use` (imports) and `export` to manage dependencies between visual graphs and raw code without manual typing.
 
 ---
@@ -1812,7 +1848,7 @@ The RHI (Render Hardware Interface) acts as the bridge between the engine logic 
 *   **Caching:** Automatic caching of Pipeline State Objects (PSOs) to prevent "shader stutter" during gameplay.
 
 #### 2. The Bindless Model
-To ensure maximum compatibility with Luc's dynamic nature, the RHI uses a **Bindless Descriptor** model.
+To ensure maximum compatibility with Lucid's dynamic nature, the RHI uses a **Bindless Descriptor** model.
 *   All textures and buffers are stored in a global array on the GPU.
 *   Shaders access resources via a simple integer index (e.g., `textureSampler[textureID]`).
 *   This eliminates the need for complex per-object descriptor set binding, significantly reducing CPU overhead.
@@ -1827,7 +1863,7 @@ The RHI provides a high-level API for the Kernel:
 ### Decision 28 — The Core Component Schema ✅
 
 **Architecture: "The POD Bedrock."**
-To maintain maximum performance and cache locality, all core engine components are defined as POD (Plain Old Data) structs. This ensures they can be serialized, mirrored to Luc, and processed by C++ systems with zero heap allocation.
+To maintain maximum performance and cache locality, all core engine components are defined as POD (Plain Old Data) structs. This ensures they can be serialized, mirrored to Lucid, and processed by C++ systems with zero heap allocation.
 
 #### 1. The Relationship System (ERS)
 Instead of a dynamic scene tree, Lucid uses a **Doubly Linked-List Hierarchy** embedded in the components. This allows for an infinite number of children per entity with zero memory fragmentation.
@@ -1850,7 +1886,7 @@ struct RelationshipComponent {
 #### 3. Media & Interaction Components
 *   **`AudioComponent`**: Handles 2D/3D spatialized audio (`.lsfx` or `.lstream`).
 *   **`AnimationComponent`**: Manages state, playback rate, and blending for skeletal/sprite animations.
-*   **`UIComponent`**: Attaches an **RmlUI** context (World-space or Screen-space) to an entity.
+*   **`UIComponent`**: Attaches an **RmlUI** context (World-space or Screen-space) to an entity, for in-game UI rendered to that entity (the Engine Shell itself is rendered separately via ImGui — see Decision 14).
 
 #### 4. Physics & Colliders (Jolt Bridge)
 *   **`PhysicsComponent`**: Stores mass, friction, velocity, and motion type (Static/Dynamic).
@@ -1866,18 +1902,18 @@ To ensure a frictionless transition from "Engine Developer" to "Game Developer,"
 #### 1. The Development Workspace (`dev_build/`)
 Instead of manually moving binaries, the C++ build system (CMake) is configured to output directly into a `dev_build/` directory at the repository root.
 *   **Binaries:** `luc_kernel.dll` and `luc_compiler.exe` are updated in `dev_build/bin/` upon every successful C++ compile.
-*   **Live Logic:** To prevent redundant copying, the `core_lib/` and `engine/` folders are **symlinked** into `dev_build/`. This allows Luc code changes to be reflected instantly without a re-compile.
+*   **Live Logic:** To prevent redundant copying, the `core_lib/` and `engine/` folders are **symlinked** into `dev_build/`. This allows Lucid code changes to be reflected instantly without a re-compile.
 *   **Shortcut:** Developers can create a desktop shortcut to `dev_build/bin/LucidEditor.exe` for one-click engine testing.
 
 #### 2. The SDK Installer (`LucidSetup.exe`)
 For public distribution, a dedicated packaging tool (`tools/package_sdk.py`) gathers the following components into a single installer:
 *   Pre-compiled Kernel and Compiler binaries.
 *   The standard `core_lib` and official extensions.
-*   **Environment Setup:** The installer registers the `.luc` file association, adds the compiler to the system `%PATH%`, and initializes the `%APPDATA%/LucidEngine` directory.
+*   **Environment Setup:** The installer registers the `.Lucid` file association, adds the compiler to the system `%PATH%`, and initializes the `%APPDATA%/LucidEngine` directory.
 
 #### 3. Testing Strategy
 *   **Kernel Tests (`tests/kernel/`)**: C++ unit tests for RHI, ECS, and VFS cores (GoogleTest/Catch2).
-*   **Logic Tests (`tests/logic/`)**: Functional Luc scripts that verify engine features (Physics, Rendering, Input).
+*   **Logic Tests (`tests/logic/`)**: Functional Lucid scripts that verify engine features (Physics, Rendering, Input).
 *   **Performance Benchmarks**: Automated frame-time and memory tracking within the `dev_build/` environment.
 
 ---
@@ -1936,20 +1972,20 @@ Lucid-Game-Engine/
 │       ├── platform/
 │           ├── win32_loader.cpp        ← LoadLibrary, GetProcAddress
 │           └── linux_loader.cpp        ← dlopen, dlsym
-├── engine/                             ← The IDE Editor (Written in Luc)
+├── engine/                             ← The IDE Editor (Written in Lucid)
 │   └── src/                            
-│       ├── main.luc
+│       ├── main.Lucid
 │       ├── ui/
-│       │   └── workspace_manager.luc
+│       │   └── workspace_manager.Lucid
 │       ├── editor/
-│       │   ├── scene_view.luc
-│       │   ├── inspector_panel.luc
-│       │   └── console_manager.luc
+│       │   ├── scene_view.Lucid
+│       │   ├── inspector_panel.Lucid
+│       │   └── console_manager.Lucid
 │       └── visual_programming/
-│           └── node_graph.luc
-├── core_lib/                           ← Standard library (math.luc, io.luc)
-├── externals/                          ← Jolt, GLFW, Vulkan, RmlUI, GLM
-│   └── luc_compiler/                   ← Submodule: https://github.com/Axo-1206/Luc-Compiler.git
+│           └── node_graph.Lucid
+├── core_lib/                           ← Standard library (math.Lucid, io.Lucid)
+├── externals/                          ← Jolt, GLFW, Vulkan, ImGui, RmlUI, GLM
+│   └── luc_compiler/                   ← Submodule: https://github.com/Axo-1206/Lucid-Compiler.git
 └── CMakeLists.txt                      ← Builds both Kernel and Compiler
 ```
 
@@ -1963,12 +1999,12 @@ Lucid-SDK/
 │   ├── luc_compiler.exe                ← The LLVM-based compiler
 │   ├── luc_langserver.exe              ← For IntelliSense in VS Code/Editor
 │   └── LucidEditor.exe                 ← The Bootstrap launcher for the IDE
-├── core_lib/                           ← math.luc, io.luc, etc.
+├── core_lib/                           ← math.Lucid, io.Lucid, etc.
 └── core_extensions/                    ← Official plugins (UI tools, etc.)
 ```
 
 ### C. The Shipped Game (What Players Download)
-When a game developer clicks "Export," the compiler packages their `.luc` code into a native `.lmod` and bundles it with the Kernel.
+When a game developer clicks "Export," the compiler packages their `.Lucid` code into a native `.lmod` and bundles it with the Kernel.
 
 ```text
 MyAwesomeGame/
@@ -2021,14 +2057,14 @@ MyAwesomeGame/
 | IDE Bottom Panel | 4-Tab Dock (Terminal, Output, Problems, Console) | ✅ Confirmed |
 | Console Architecture | 3-File Ecosystem (Interpreter, Metadata, Shortcuts) | ✅ Confirmed |
 | UI Icon Architecture | Pure SVG with NanoSVG rasterization in Kernel | ✅ Confirmed |
-| Unified UI Architecture | RmlUI (CSS-based) for Shell + In-Game HUDs | ✅ Confirmed |
-| Lucid-UI Bridge & Components | Reactive Luc Bridge + Core Styled Library | ✅ Confirmed |
-| Math library | GLM (C++ Bedrock) + Luc Type Projection | ✅ Confirmed |
-| Input Architecture | GLFW Foundation + Swappable Luc Surface | ✅ Confirmed |
+| Dual-Backend UI Architecture | ImGui for Shell + RmlUI for In-Game HUDs | ✅ Confirmed |
+| Lucid-UI Bridge & Components | Reactive Lucid Bridge + Core Styled Library | ✅ Confirmed |
+| Math library | GLM (C++ Bedrock) + Lucid Type Projection | ✅ Confirmed |
+| Input Architecture | GLFW Foundation + Swappable Lucid Surface | ✅ Confirmed |
 | ECS Reflection | Auto-generating UI via `symbols.json` metadata | ✅ Confirmed |
 | Core Component Suite | Standard blocks for 2D/3D (Transform, Audio, Physics...) | ✅ Confirmed |
-| Console Architecture | Tri-Level Dispatch (ConCmds → Memory Map → Luc VM) | ✅ Confirmed |
-| Distribution Model | C++ Kernel + AOT/JIT Luc Logic Modules | ✅ Confirmed |
+| Console Architecture | Tri-Level Dispatch (ConCmds → Memory Map → Lucid VM) | ✅ Confirmed |
+| Distribution Model | C++ Kernel + AOT/JIT Lucid Logic Modules | ✅ Confirmed |
 | Audio Pipeline | Miniaudio with `.lsfx` (ADPCM) and `.lstream` (Vorbis) | ✅ Confirmed |
 | Save-game Security | Policy-Based (Plain, Encrypted, Hardware-Locked) | ✅ Confirmed |
 | Build Integrity | Kernel boot-time signature + DEBUG block | ✅ Confirmed |
@@ -2052,9 +2088,10 @@ To maintain the engine's "Microkernel" philosophy, we strictly limit external de
 | **GLM** | Math Library | MIT | Header-only, SIMD-accelerated. Supports Vulkan, DirectX, and Metal via config flags. |
 | **GLFW** | Window & Input | Zlib | Lightweight, cross-platform; handles OS windowing and raw input. |
 | **Jolt Physics** | Physics Engine | MIT | AAA-proven, extremely fast multi-threaded performance. |
-| **RmlUI** | UI System | MIT | CSS-based layouts for the editor shell and in-game HUDs. |
+| **ImGui** | Engine Shell UI | MIT | Immediate-mode, code-first; flat/fast tool UI for the editor (panels, inspectors, console). No CSS engine overhead for UI that doesn't need it. |
+| **RmlUI** | In-Game UI System | MIT | CSS-based layouts for in-game HUDs and menus shipped to players. |
 | **NanoSVG / NanoVG** | Vector Graphics | zlib | Tiny footprint, used for UI icons and hardware-accelerated shapes. |
-| **LLVM** | Compiler Backend | Apache 2.0 | Powers the Luc compiler's AOT and Secure JIT compilation. |
+| **LLVM** | Compiler Backend | Apache 2.0 | Powers the Lucid compiler's AOT and Secure JIT compilation. |
 | **cgltf** | GLTF Loader | MIT | Single-header, high-performance parser for 3D source assets. |
 | **MessagePack** | Serialization | Apache 2.0 | Fast binary serialization for runtime ECS and save games. |
 | **nlohmann/json** | JSON Parser | MIT | Used for human-readable project metadata and source configs. |
@@ -2065,4 +2102,3 @@ To maintain the engine's "Microkernel" philosophy, we strictly limit external de
 1.  **Vendor-In Tree:** All libraries (except large ones like LLVM/Vulkan SDK) are stored in `externals/` as source code. This ensures the engine is self-contained and builds are reproducible.
 2.  **Static Linking:** We prefer static linking for core dependencies to minimize DLL-hell and improve startup time.
 3.  **No "Bloat" Policy:** If a library includes features we don't need (e.g., a massive math suite or networking stack), we only include the specific headers/files required for our use case.
-
