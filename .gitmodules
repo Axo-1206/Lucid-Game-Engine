@@ -10,6 +10,6 @@
 [submodule "externals/imgui"]
 	path = externals/imgui
 	url = https://github.com/ocornut/imgui.git
-[submodule "externals/lucid-lang"]
-	path = externals/lucid-lang
+[submodule "externals/lucidlang"]
+	path = externals/lucidlang
 	url = https://github.com/Axo-1206/Lucid-Lang.git
