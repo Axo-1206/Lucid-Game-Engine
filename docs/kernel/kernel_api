@@ -1,0 +1,1511 @@
+# Lucid Game Engine — Kernel API Reference
+
+> **Status:** Living document — updated as each subsystem is finalized.  
+> **Companion docs:** `kernel_implementation.md` (how each system works internally), `MasterPlan.md` (design decisions and rationale).
+
+---
+
+## How to Read This Document
+
+Every function listed here is part of the kernel's public C ABI — exposed through `lge_api.h` and accessible to both C++ extensions (via `LGE_GetAPI()`) and Lucid code (via the `api` object passed to `on_load`). The document is organized by subsystem, matching the header files under `kernel/include/`.
+
+Each subsystem section follows this structure:
+- **Header file** — which `.h` to include
+- **Lucid namespace** — the `api.X` equivalent for Lucid callers
+- **Types** — handle types and POD structs introduced by this subsystem
+- **Functions** — every callable, with parameter notes and return values
+- **Notes** — constraints, threading rules, and things to watch out for
+
+---
+
+## Table of Contents
+
+1. [Core / Boot (`lge_core.h`)](#1-core--boot-lge_coreh)
+2. [ECS (`lge_ecs.h`)](#2-ecs-lge_ecsh)
+3. [Rendering / RHI (`lge_render.h`)](#3-rendering--rhi-lge_renderh)
+4. [Physics (`lge_physics.h`)](#4-physics-lge_physicsh)
+5. [Input (`lge_input.h`)](#5-input-lge_inputh)
+6. [UI — Shell (`lge_imgui.h`)](#6-ui--shell-lge_imguih)
+7. [UI — In-Game (`lge_ui.h`)](#7-ui--in-game-lge_uih)
+8. [Audio (`lge_audio.h`)](#8-audio-lge_audioh)
+9. [Virtual File System (`lge_vfs.h`)](#9-virtual-file-system-lge_vfsh)
+10. [Script Manager (`lge_script.h`)](#10-script-manager-lge_scripth)
+11. [Extension System (`lge_ext.h`)](#11-extension-system-lge_exth)
+12. [Console & Commands (`lge_console.h`)](#12-console--commands-lge_consoleh)
+13. [Network (`lge_network.h`)](#13-network-lge_networkh)
+14. [Security (`lge_security.h`)](#14-security-lge_securityh)
+15. [Math (`lge_math.h`)](#15-math-lge_mathh)
+16. [Platform (`lge_platform.h`)](#16-platform-lge_platformh)
+17. [The Extension API Table (`lge_api.h`)](#17-the-extension-api-table-lge_apih)
+
+---
+
+## 1. Core / Boot (`lge_core.h`)
+
+**Lucid namespace:** `api.kernel`
+
+The entry point into the kernel. Called once by the platform bootstrap (`LucidEditor.exe` or a shipped game's `.exe`). Not available to extensions or game scripts — this is engine-internal only.
+
+### Types
+
+```cpp
+struct LGE_BootConfig {
+    const char* window_title;       // displayed in the OS title bar
+    uint32_t    width;              // initial window width in pixels
+    uint32_t    height;             // initial window height in pixels
+    const char* asset_bundle_path;  // path to .pck bundle, or a directory in dev mode
+    const char* entry_module;       // path to the first .lmod to load (editor or game)
+};
+```
+
+### Functions
+
+```cpp
+// Boot the kernel. Blocks until the window is closed or LGE_Shutdown() is called.
+// Called once by the platform bootstrap — never by extensions or game code.
+void LGE_Boot(const LGE_BootConfig& cfg);
+
+// Request a clean shutdown. Safe to call from any thread or Lucid callback.
+// The kernel finishes the current frame, calls on_unload on all live modules,
+// then exits the frame loop.
+void LGE_Shutdown();
+
+// Returns the engine version as a packed uint32: 0xMAJORMINORPATCH
+// Use this to check compatibility before calling version-sensitive APIs.
+uint32_t LGE_GetVersion();
+```
+
+### Lucid-side (`api.kernel`)
+
+```lucid
+-- Read engine branding assets (logo, name, version string)
+let logo    &Texture = api.kernel:get_branding_logo()
+let name    string   = api.kernel:get_engine_name()     -- "Lucid Engine"
+let version string   = api.kernel:get_version_string()  -- "1.0.0"
+
+-- Request shutdown from Lucid code (e.g. File > Quit menu item)
+api.kernel:shutdown()
+```
+
+### Notes
+- `LGE_Boot()` never returns until shutdown — everything after it in the bootstrap's `main()` is dead code.
+- `LGE_Shutdown()` is the only safe way to exit. Calling `exit()` directly skips module cleanup and can corrupt open VFS bundles.
+
+---
+
+## 2. ECS (`lge_ecs.h`)
+
+**Lucid namespace:** `api.ecs`
+
+The data backbone of every scene. Entities are `uint64_t` IDs; components are POD structs stored in contiguous archetype arrays. Systems iterate over matching component sets.
+
+### Types
+
+```cpp
+using EntityID      = uint64_t;
+using ComponentType = uint32_t;   // returned by LGE_RegisterComponent()
+
+// 0 is the null/invalid entity — never a valid EntityID
+#define LGE_NULL_ENTITY ((EntityID)0)
+
+// Passed to LGE_ForEach — receives a flat slice of matching entities
+typedef void (*LGE_ForEachCallback)(
+    EntityID*  entities,       // array of matching entity IDs
+    void**     components,     // parallel array: components[i] is a pointer to the
+                               // i-th requested component type for entities[i]
+    uint32_t   count           // number of entities in this archetype slice
+);
+```
+
+### Functions
+
+```cpp
+// Register a new component type. Call once at extension/game load time.
+// name    — human-readable name shown in the editor inspector
+// size    — sizeof the component struct
+// align   — alignof the component struct
+// Returns a ComponentType handle used in all subsequent ECS calls.
+ComponentType LGE_RegisterComponent(const char* name, size_t size, size_t align);
+
+// Create a new empty entity. Returns LGE_NULL_ENTITY on failure (out of memory).
+EntityID LGE_CreateEntity();
+
+// Destroy an entity and all its components. Safe to call mid-iteration
+// (the entity is marked dead and removed after the current ForEach completes).
+void LGE_DestroyEntity(EntityID id);
+
+// Add a component to an entity. Returns a pointer to the zeroed component memory.
+// Moves the entity to a new archetype bucket — O(1).
+// Calling on an entity that already has this component returns the existing pointer.
+void* LGE_AddComponent(EntityID id, ComponentType type);
+
+// Get a pointer to an entity's component. Returns nullptr if the entity does not
+// have this component type.
+void* LGE_GetComponent(EntityID id, ComponentType type);
+
+// Remove a component from an entity. Moves the entity to a new archetype bucket.
+// No-op if the entity does not have this component.
+void LGE_RemoveComponent(EntityID id, ComponentType type);
+
+// Returns true if the entity currently has the given component type.
+bool LGE_HasComponent(EntityID id, ComponentType type);
+
+// Iterate over all live entities that have ALL of the requested component types.
+// The callback is invoked once per archetype bucket — not once per entity.
+// types     — array of ComponentType values (the query)
+// type_count — length of types array
+void LGE_ForEach(
+    ComponentType*      types,
+    uint32_t            type_count,
+    LGE_ForEachCallback callback
+);
+
+// Returns how many live entities currently exist in the world.
+uint32_t LGE_EntityCount();
+```
+
+### Lucid-side (`api.ecs`)
+
+```lucid
+-- Lucid components are registered automatically by the compiler from struct definitions.
+-- The @component attribute marks a struct as an ECS component.
+
+@component
+struct HealthComponent {
+    max    int   = 100
+    current int  = 100
+    regen  float = 0.5
+}
+
+-- Create and destroy entities
+let entity EntityID = api.ecs:create_entity()
+api.ecs:destroy_entity(entity)
+
+-- Add, get, and check components
+let health &HealthComponent = api.ecs:add_component(entity, HealthComponent)
+let health &HealthComponent = api.ecs:get_component(entity, HealthComponent)
+let has    bool             = api.ecs:has_component(entity, HealthComponent)
+
+-- Iterate matching entities (equivalent to LGE_ForEach)
+api.ecs:for_each([HealthComponent, TransformComponent], (entity, health, transform) = {
+    health.current = health.current + health.regen
+})
+```
+
+### Notes
+- Never hold a raw component pointer across a frame — archetype moves (from `AddComponent` / `RemoveComponent`) can invalidate pointers.
+- `LGE_DestroyEntity` mid-`ForEach` is safe; double-destruction is a no-op.
+- All core engine components (`TransformComponent`, `MeshComponent`, etc.) are pre-registered at boot with fixed `ComponentType` values defined in `lge_components.h`.
+
+---
+
+## 3. Rendering / RHI (`lge_render.h`)
+
+**Lucid namespace:** `api.render`
+
+Abstracts all Vulkan GPU work. Upload textures and meshes, submit draw calls, manage the frame lifecycle. The RHI handles swapchain management, pipeline caching, and memory allocation (via VMA) internally.
+
+### Types
+
+```cpp
+using TextureID = uint32_t;   // handle to a GPU texture in the bindless array
+using BufferID  = uint32_t;   // handle to a GPU vertex/index buffer
+using ShaderID  = uint32_t;   // handle to a compiled shader/PSO
+
+#define LGE_INVALID_ID ((uint32_t)0)  // null handle for all RHI types
+
+enum PixelFormat {
+    LGE_FORMAT_RGBA8,     // standard 8-bit-per-channel color
+    LGE_FORMAT_SRGB8,     // sRGB color (gamma-corrected)
+    LGE_FORMAT_R32F,      // single-channel 32-bit float (heightmaps, masks)
+    LGE_FORMAT_DEPTH32F,  // depth buffer
+};
+
+struct Vertex {
+    float position[3];   // XYZ
+    float normal[3];     // surface normal
+    float uv[2];         // texture coordinates
+    float tangent[4];    // XYZ + handedness (W)
+};
+```
+
+### Functions
+
+```cpp
+// --- Frame lifecycle (called by kernel.cpp only, not by extensions) ---
+
+void LGE_RHI_BeginFrame();   // acquire next swapchain image, reset command buffers
+void LGE_RHI_EndFrame();     // finalize and submit the command buffer
+void LGE_RHI_Present();      // present the swapchain image; handles window resize
+
+// --- Texture management ---
+
+// Upload pixel data to the GPU. Returns a TextureID for use in draw calls.
+// pixels  — raw pixel data in the specified format
+// w, h    — dimensions in pixels
+// Returns LGE_INVALID_ID on failure.
+TextureID LGE_UploadTexture(const void* pixels, uint32_t w, uint32_t h, PixelFormat fmt);
+
+// Free a GPU texture. The TextureID is invalid after this call.
+void LGE_FreeTexture(TextureID id);
+
+// --- Mesh / buffer management ---
+
+// Upload vertex and index data to the GPU. Returns a BufferID.
+BufferID LGE_UploadMesh(
+    const Vertex*   verts,    uint32_t vcount,
+    const uint32_t* indices,  uint32_t icount
+);
+
+// Free a GPU buffer. The BufferID is invalid after this call.
+void LGE_FreeMesh(BufferID id);
+
+// --- Draw calls (valid between BeginFrame and EndFrame) ---
+
+// Submit a mesh draw call with an albedo texture and world transform.
+void LGE_DrawMesh(BufferID mesh, TextureID albedo, const float transform[16]);
+
+// Submit a raw GPU canvas draw (used by api.ui:create_canvas() and custom render hooks).
+void LGE_DrawCanvas(TextureID render_target, const float transform[16]);
+
+// --- Shader / PSO management ---
+
+// Compile and cache a shader pair. Returns a ShaderID.
+// Expensive on first call (compiles SPIR-V); subsequent calls return the cached PSO.
+ShaderID LGE_CompileShader(const char* vert_spirv_path, const char* frag_spirv_path);
+
+// Override the default mesh shader for a draw call.
+void LGE_SetShaderOverride(ShaderID id);
+void LGE_ClearShaderOverride();
+
+// --- Screen / viewport ---
+
+// Returns current backbuffer dimensions.
+uint32_t LGE_GetRenderWidth();
+uint32_t LGE_GetRenderHeight();
+```
+
+### Lucid-side (`api.render`)
+
+```lucid
+-- Hook into the render pipeline (e.g. add post-processing, override shaders)
+api.render:on_post_process((frame &Texture) = {
+    -- frame is the rendered scene before present — apply effects here
+})
+
+-- Create a Vulkan canvas for raw GPU drawing (used by custom editor tabs)
+let canvas &Canvas = api.ui:create_canvas(tab)
+
+-- Override shaders for a material
+let shader ShaderID = api.render:compile_shader("shaders/cel.vert", "shaders/cel.frag")
+api.render:set_shader_override(shader)
+```
+
+### Notes
+- Draw calls submitted outside `BeginFrame`/`EndFrame` are silently dropped.
+- `LGE_CompileShader` caches by file path — changing the file without renaming it requires calling `LGE_InvalidateShaderCache()` to force recompilation.
+- All textures are registered into the global GPU bindless array on upload; the `TextureID` is their index in that array.
+
+---
+
+## 4. Physics (`lge_physics.h`)
+
+**Lucid namespace:** `api.physics`
+
+Wraps Jolt Physics. Create bodies attached to entities, apply forces, perform raycasts, and receive collision callbacks. Jolt writes simulation results back into `TransformComponent` each frame; the Render system reads from there. Jolt and Vulkan never communicate directly.
+
+### Types
+
+```cpp
+using BodyID = uint32_t;
+
+enum MotionType {
+    LGE_MOTION_STATIC,    // immovable — walls, floors
+    LGE_MOTION_DYNAMIC,   // fully simulated — rigidbodies
+    LGE_MOTION_KINEMATIC, // moved by code, not simulation — elevators, moving platforms
+};
+
+enum ColliderShape {
+    LGE_COLLIDER_BOX,
+    LGE_COLLIDER_SPHERE,
+    LGE_COLLIDER_CAPSULE,
+    LGE_COLLIDER_MESH,    // exact mesh shape — expensive; use for static geometry only
+};
+
+struct PhysicsBodyDef {
+    MotionType    motion_type;
+    ColliderShape shape;
+    float         half_extents[3]; // for BOX: half-size on each axis
+    float         radius;          // for SPHERE and CAPSULE
+    float         height;          // for CAPSULE: cylinder height (excluding caps)
+    float         mass;            // kg — ignored for STATIC
+    float         friction;        // 0.0 (ice) to 1.0 (rubber)
+    float         restitution;     // 0.0 (no bounce) to 1.0 (perfect bounce)
+};
+
+struct RaycastHit {
+    EntityID entity;        // entity hit (LGE_NULL_ENTITY if nothing hit)
+    float    position[3];   // world-space hit point
+    float    normal[3];     // surface normal at hit point
+    float    distance;      // distance from ray origin to hit point
+};
+```
+
+### Functions
+
+```cpp
+// Create a physics body attached to an entity.
+// The body's initial position is read from the entity's TransformComponent.
+// Returns LGE_INVALID_ID if entity has no TransformComponent.
+BodyID LGE_Physics_CreateBody(EntityID entity, const PhysicsBodyDef& def);
+
+// Destroy a physics body. The entity remains; only the body is removed from Jolt.
+void LGE_Physics_DestroyBody(BodyID id);
+
+// Set the gravity vector for the entire physics world (default: 0, -9.81, 0).
+void LGE_Physics_SetGravity(float x, float y, float z);
+
+// Apply a continuous force to a body (Newtons — mass-dependent).
+void LGE_Physics_AddForce(BodyID id, float fx, float fy, float fz);
+
+// Apply an instant velocity change (mass-independent impulse).
+void LGE_Physics_AddImpulse(BodyID id, float ix, float iy, float iz);
+
+// Directly set body velocity. Useful for kinematic bodies.
+void LGE_Physics_SetVelocity(BodyID id, float vx, float vy, float vz);
+
+// Set body mass, friction, and restitution after creation.
+void LGE_Physics_SetBodyProperties(BodyID id, float mass, float friction, float restitution);
+
+// Cast a ray into the physics world. Returns true if something was hit.
+// Populates out_hit with the closest hit.
+bool LGE_Physics_Raycast(
+    float origin[3], float direction[3], float max_dist,
+    RaycastHit* out_hit
+);
+
+// Cast a ray from the editor camera through a screen-space position.
+// Used by the inspector for click-to-select. pos is in [0,1] NDC.
+EntityID LGE_Physics_RaycastFromCamera(float screen_x, float screen_y);
+
+// Register a callback for collision events. Fired by Jolt's contact listener
+// on the physics thread — do not modify ECS data directly inside the callback;
+// post a command instead.
+void LGE_Physics_SetContactCallback(
+    void (*on_contact)(EntityID a, EntityID b, float contact_point[3])
+);
+```
+
+### Lucid-side (`api.physics`)
+
+```lucid
+-- Create a dynamic rigidbody
+let body BodyID = api.physics:create_body(entity, {
+    motion_type = MotionType.Dynamic,
+    shape       = ColliderShape.Box,
+    half_extents = Vec3(0.5, 0.5, 0.5),
+    mass        = 10.0,
+    friction    = 0.6,
+    restitution = 0.2,
+})
+
+-- Apply forces and impulses
+api.physics:add_force(body, Vec3(0, 500, 0))
+api.physics:add_impulse(body, Vec3(0, 10, 0))
+
+-- Raycast from camera (editor click-to-select)
+let entity_id EntityID = api.physics:raycast_from_camera(screen_pos)
+api.editor:set_selection(entity_id)
+
+-- Collision callback
+api.physics:on_contact((a EntityID, b EntityID, point Vec3) = {
+    api.console:log("Collision: " + string(a) + " hit " + string(b))
+})
+
+-- Change world gravity
+api.physics:set_gravity(Vec3(0, -9.81, 0))
+```
+
+### Notes
+- Physics runs **before** rendering every frame. `TransformComponent` always contains this frame's positions by the time `RenderSystem` runs.
+- The contact callback fires on the Jolt physics thread. Never write to ECS directly inside it — queue a command and process it at the start of the next frame.
+- `LGE_COLLIDER_MESH` is expensive and should only be used for static geometry. Dynamic bodies should use primitive shapes (Box, Sphere, Capsule).
+
+---
+
+## 5. Input (`lge_input.h`)
+
+**Lucid namespace:** `api.input` / `io` (standard library alias)
+
+Normalized keyboard, mouse, and gamepad input. GLFW handles the OS side on desktop; an `IInputProvider` interface allows the backend to be swapped for Android NDK, iOS UIKit, or console SDKs. All state is snapshotted once per frame — safe to poll from any system.
+
+### Types
+
+```cpp
+enum KeyCode {
+    LGE_KEY_A, LGE_KEY_B, /* ... */ LGE_KEY_Z,
+    LGE_KEY_0, /* ... */ LGE_KEY_9,
+    LGE_KEY_SPACE, LGE_KEY_ENTER, LGE_KEY_ESCAPE, LGE_KEY_TAB,
+    LGE_KEY_LEFT_SHIFT, LGE_KEY_LEFT_CTRL, LGE_KEY_LEFT_ALT,
+    LGE_KEY_UP, LGE_KEY_DOWN, LGE_KEY_LEFT, LGE_KEY_RIGHT,
+    LGE_KEY_F1, /* ... */ LGE_KEY_F12,
+    // ... full list in lge_input.h
+};
+
+enum MouseButton {
+    LGE_MOUSE_LEFT,
+    LGE_MOUSE_RIGHT,
+    LGE_MOUSE_MIDDLE,
+};
+
+enum GamepadButton {
+    LGE_GAMEPAD_A, LGE_GAMEPAD_B, LGE_GAMEPAD_X, LGE_GAMEPAD_Y,
+    LGE_GAMEPAD_LB, LGE_GAMEPAD_RB, LGE_GAMEPAD_START, LGE_GAMEPAD_SELECT,
+    // ... full list in lge_input.h
+};
+```
+
+### Functions
+
+```cpp
+// --- Keyboard ---
+
+// true every frame the key is physically held down
+bool  LGE_Input_IsKeyHeld(KeyCode key);
+
+// true only on the first frame the key goes down
+bool  LGE_Input_IsKeyPressed(KeyCode key);
+
+// true only on the first frame the key is released
+bool  LGE_Input_IsKeyReleased(KeyCode key);
+
+// Callback versions — registered once, fired each matching event
+void  LGE_Input_OnKeyPressed(KeyCode key, void (*callback)());
+void  LGE_Input_OnKeyReleased(KeyCode key, void (*callback)());
+void  LGE_Input_OnKeyHeld(KeyCode key, void (*callback)());
+
+// --- Mouse ---
+
+// Current cursor position in pixels from top-left of the window
+float LGE_Input_MouseX();
+float LGE_Input_MouseY();
+
+// How much the cursor moved since last frame (pixels)
+float LGE_Input_MouseDeltaX();
+float LGE_Input_MouseDeltaY();
+
+// Scroll wheel delta this frame (positive = scroll up)
+float LGE_Input_MouseScrollDelta();
+
+bool  LGE_Input_IsMouseButtonHeld(MouseButton btn);
+bool  LGE_Input_IsMouseButtonPressed(MouseButton btn);
+bool  LGE_Input_IsMouseButtonReleased(MouseButton btn);
+
+void  LGE_Input_OnMouseButton(
+          MouseButton btn,
+          void (*on_press)(),
+          void (*on_release)()
+      );
+
+// Lock/unlock the cursor (for first-person camera control)
+void  LGE_Input_SetCursorLocked(bool locked);
+bool  LGE_Input_IsCursorLocked();
+
+// --- Gamepad ---
+
+// Returns true if a gamepad is connected at the given slot (0-3)
+bool  LGE_Input_IsGamepadConnected(uint32_t slot);
+
+bool  LGE_Input_IsGamepadButtonHeld(uint32_t slot, GamepadButton btn);
+bool  LGE_Input_IsGamepadButtonPressed(uint32_t slot, GamepadButton btn);
+
+// Axis value in [-1.0, 1.0]: left stick X/Y, right stick X/Y, triggers
+float LGE_Input_GetGamepadAxis(uint32_t slot, uint32_t axis_index);
+```
+
+### Lucid-side (`io` standard library)
+
+```lucid
+-- Keyboard — callback style
+io.key.W:on_held(() = { player:move_forward() })
+io.key.Space:on_pressed(() = { player:jump() })
+
+-- Mouse
+io.mouse.left:on_pressed(() = {
+    let pos Vec2 = Vec2(io.mouse.x(), io.mouse.y())
+    world:spawn_bullet_at(pos)
+})
+
+-- Polling style (inside an update system)
+if io.key.is_held(KeyCode.LeftShift) {
+    player.speed = player.speed * 2.0
+}
+
+-- Gamepad
+let stick_x float = io.gamepad(0):axis(GamepadAxis.LeftX)
+```
+
+### Notes
+- Input state is snapshotted at the **start** of each frame. Polling the same key twice in one frame always returns the same value.
+- `LGE_Input_IsKeyPressed` returns `true` for exactly one frame when a key goes down — use `IsKeyHeld` for continuous movement.
+- Callbacks registered with `OnKey*` / `OnMouseButton` fire at the start of the following frame (after the snapshot), not on the OS event thread.
+
+---
+
+## 6. UI — Shell (`lge_imgui.h`)
+
+**Lucid namespace:** N/A — engine-internal C++ only
+
+ImGui is the engine shell's UI backend. It is not exposed to Lucid code or game extensions — shell panels (inspector, hierarchy, console, asset browser) are written in C++ by the engine team. This header is not included in `lge_api.h` and is invisible to `LGE_GetAPI()` callers.
+
+### Functions
+
+```cpp
+// Called once at boot after RHI is ready.
+void ImGuiShell_Init(void* vulkan_swapchain);
+
+// Called at start of each frame, before any panel code runs.
+void ImGuiShell_BeginFrame();
+
+// Called after all panel code, before RHI_EndFrame.
+// Flushes all ImGui draw calls into the RHI command buffer.
+void ImGuiShell_EndFrame();
+
+// Shutdown — frees ImGui font atlas and GPU resources.
+void ImGuiShell_Shutdown();
+```
+
+### Style Constants (set once in `editor_theme.cpp`)
+
+```cpp
+// Applied globally at boot via ImGui::GetStyle() and ImGui::GetIO()
+// Colors
+ImGuiStyle.Colors[ImGuiCol_WindowBg]   = ImVec4(0.12, 0.12, 0.12, 1.0);
+ImGuiStyle.Colors[ImGuiCol_FrameBg]    = ImVec4(0.18, 0.18, 0.18, 1.0);
+ImGuiStyle.Colors[ImGuiCol_Button]     = ImVec4(0.22, 0.22, 0.22, 1.0);
+ImGuiStyle.Colors[ImGuiCol_Border]     = ImVec4(0.30, 0.30, 0.30, 1.0);
+// Rounding
+ImGuiStyle.WindowRounding  = 6.0f;
+ImGuiStyle.FrameRounding   = 4.0f;
+ImGuiStyle.GrabRounding    = 4.0f;
+// Borders
+ImGuiStyle.WindowBorderSize = 1.0f;
+ImGuiStyle.FrameBorderSize  = 0.0f;
+```
+
+### Notes
+- Any engine developer adding a new shell panel writes a C++ function that calls standard ImGui widgets (`ImGui::Text`, `ImGui::Button`, `ImGui::InputFloat`, etc.) between `BeginFrame` and `EndFrame`.
+- Alpha transparency is set per-window via `ImGui::SetNextWindowBgAlpha()` or globally via `ImGuiCol_WindowBg`'s alpha channel — no extra render pass needed.
+- For PNG icons and thumbnails: load via `stb_image`, upload with `LGE_UploadTexture()`, pass the `TextureID` cast to `ImTextureID` to `ImGui::Image()`.
+
+---
+
+## 7. UI — In-Game (`lge_ui.h`)
+
+**Lucid namespace:** `api.ui`
+
+RmlUI backend for in-game HUDs, menus, and UI attached to world entities via `UIComponent`. Game developers interact with this through the Lucid UI Bridge (the `ui:` call syntax) rather than raw function calls. The bridge translates Lucid's declarative `ui:div`, `ui:button` etc. into calls below.
+
+### Types
+
+```cpp
+using RmlContextID = uint32_t;   // one context per UIComponent / per screen document
+using ElementID    = uint32_t;   // handle to a specific element inside a context
+
+#define LGE_INVALID_CONTEXT ((RmlContextID)0)
+```
+
+### Functions
+
+```cpp
+// --- Context lifecycle ---
+
+// Create a new RmlUI context at the given resolution.
+// width/height — pixel dimensions; can differ from screen size (world-space UI)
+// Returns LGE_INVALID_CONTEXT on failure.
+RmlContextID LGE_UI_CreateContext(uint32_t width, uint32_t height);
+
+// Destroy a context and all its documents/elements.
+void LGE_UI_DestroyContext(RmlContextID ctx);
+
+// --- Document management ---
+
+// Load an .rml file into a context. The document is shown immediately.
+// Returns false if the file cannot be found in the VFS.
+bool LGE_UI_LoadDocument(RmlContextID ctx, const char* rml_path);
+
+// Unload all documents from a context (clears the screen).
+void LGE_UI_ClearDocuments(RmlContextID ctx);
+
+// --- Element property binding (the Reactive Bridge) ---
+
+// Set a CSS property on a named element (e.g. "color", "width", "display").
+// Changes only the named property — does not trigger a full re-layout.
+void LGE_UI_SetProperty(
+    RmlContextID ctx,
+    const char*  element_id,
+    const char*  property,
+    const char*  value       // CSS value string: "red", "100px", "none", etc.
+);
+
+// Set the inner text of a named element.
+void LGE_UI_SetText(RmlContextID ctx, const char* element_id, const char* text);
+
+// Show or hide an element without removing it from the DOM.
+void LGE_UI_SetVisible(RmlContextID ctx, const char* element_id, bool visible);
+
+// --- Events ---
+
+// Register a click callback for a named element.
+void LGE_UI_OnClick(
+    RmlContextID ctx,
+    const char*  element_id,
+    void (*callback)(const char* element_id)
+);
+
+// --- Per-frame update (called by UISystem for each active UIComponent) ---
+
+// Pump RmlUI's internal event queue and submit draw calls to the RHI.
+void LGE_UI_UpdateAndRender(RmlContextID ctx);
+```
+
+### Lucid-side (`api.ui` / `ui:` bridge)
+
+```lucid
+-- Declarative UI (the normal way — Lucid UI Bridge)
+export const on_render_hud (ui &Ui) = {
+    ui:div("hud-root", () = {
+        ui:progress_bar("health-bar", &this.health)
+        ui:text("ammo-counter", string(this.ammo) + " / " + string(this.max_ammo))
+
+        ui:div("buff-list", () = {
+            for buff in this.active_buffs {
+                ui:icon("buff-icon", buff.icon_path)
+            }
+        })
+    })
+}
+
+-- Direct property binding (reactive — updates only the changed property)
+ui:progress_bar("health-bar", &health)   -- binds health variable; updates on change
+
+-- Register activity bar panel (editor extension)
+api.ui:register_activity_bar("My Tool", "resources/icon.svg", open_panel)
+
+-- Register a file icon for a custom file type
+api.ui:register_file_icon(".lanim", "resources/anim_icon.svg")
+
+-- Create a raw Vulkan canvas for custom drawing
+let canvas &Canvas = api.ui:create_canvas(tab)
+```
+
+### Notes
+- `LGE_UI_SetProperty` and `LGE_UI_SetText` are the primary update calls — they mutate in place without rebuilding the DOM tree. Avoid calling `LGE_UI_LoadDocument` every frame; load once, update via property bindings.
+- Each `UIComponent` entity owns exactly one `RmlContextID`. The `UISystem` iterates all active `UIComponent` entities and calls `LGE_UI_UpdateAndRender` on each every frame.
+- `.rcss` stylesheets are loaded automatically when an `.rml` document references them. They can also be injected at runtime for theming via `LGE_UI_InjectStylesheet()` (see extended API).
+
+---
+
+## 8. Audio (`lge_audio.h`)
+
+**Lucid namespace:** `api.audio`
+
+2D and 3D spatialized audio. Short sound effects (`.lsfx`) are fully loaded into RAM; long streams (`.lstream`) are decoded progressively. A dedicated mixing thread ensures audio never stutters under main thread load.
+
+### Types
+
+```cpp
+using AudioSourceID = uint32_t;
+#define LGE_INVALID_AUDIO_SOURCE ((AudioSourceID)0)
+```
+
+### Functions
+
+```cpp
+// --- Asset loading ---
+
+// Load a short sound effect (.lsfx) fully into RAM.
+// Returns LGE_INVALID_AUDIO_SOURCE on failure.
+AudioSourceID LGE_Audio_LoadSFX(const char* lsfx_vfs_path);
+
+// Load a long audio stream (.lstream) for progressive decoding.
+// Does not read the full file at load time — only opens and buffers.
+AudioSourceID LGE_Audio_LoadStream(const char* lstream_vfs_path);
+
+// Unload an audio source and free its RAM/buffers.
+void LGE_Audio_Unload(AudioSourceID id);
+
+// --- Playback ---
+
+// Begin playback. loop=true restarts automatically when the clip ends.
+void LGE_Audio_Play(AudioSourceID id, bool loop);
+
+// Pause playback. Resumable with LGE_Audio_Play.
+void LGE_Audio_Pause(AudioSourceID id);
+
+// Stop and reset to the beginning.
+void LGE_Audio_Stop(AudioSourceID id);
+
+bool LGE_Audio_IsPlaying(AudioSourceID id);
+
+// --- Volume & mix ---
+
+// Volume in [0.0, 1.0]. Applied multiplicatively with the global master volume.
+void  LGE_Audio_SetVolume(AudioSourceID id, float volume);
+float LGE_Audio_GetVolume(AudioSourceID id);
+
+// Pitch multiplier. 1.0 = normal, 2.0 = one octave up, 0.5 = one octave down.
+void  LGE_Audio_SetPitch(AudioSourceID id, float pitch);
+
+// Global master volume across all sources. Default 1.0.
+void  LGE_Audio_SetMasterVolume(float volume);
+
+// --- 3D Spatialization ---
+
+// Set the world-space position of a sound source.
+// Only affects sources with spatialization enabled (the default for lsfx with a position).
+void LGE_Audio_SetPosition(AudioSourceID id, float world_pos[3]);
+
+// Set where the listener is. Call once per frame from the active camera's transform.
+// forward — normalized direction vector the listener is facing
+void LGE_Audio_SetListenerTransform(float pos[3], float forward[3]);
+
+// Set the falloff radius: full volume inside inner, silent outside outer.
+void LGE_Audio_SetFalloff(AudioSourceID id, float inner_radius, float outer_radius);
+```
+
+### Lucid-side (`api.audio`)
+
+```lucid
+-- Load and play a sound effect
+let gunshot AudioSourceID = api.audio:load_sfx("audio/sfx/gunshot.lsfx")
+api.audio:play(gunshot, false)
+
+-- Load and loop background music
+let music AudioSourceID = api.audio:load_stream("audio/music/theme.lstream")
+api.audio:set_volume(music, 0.6)
+api.audio:play(music, true)
+
+-- 3D spatialized footstep (attached to a moving entity)
+let step AudioSourceID = api.audio:load_sfx("audio/sfx/footstep.lsfx")
+api.audio:set_position(step, entity:get_world_position())
+api.audio:set_falloff(step, 3.0, 20.0)
+api.audio:play(step, false)
+
+-- Update listener each frame from camera
+api.audio:set_listener_transform(camera.position, camera.forward)
+```
+
+### Notes
+- `LGE_Audio_Play` posts a command to a lock-free queue — it returns immediately, and the mixing thread picks it up within the next mixing interval (~10ms).
+- `AudioComponent` on an entity wraps an `AudioSourceID` and automatically calls `LGE_Audio_SetPosition` each frame from the entity's `TransformComponent`.
+- Streams buffer the next chunk ahead of time; avoid `LGE_Audio_Stop` + `LGE_Audio_Play` in rapid succession on a stream (causes re-buffering stutter).
+
+---
+
+## 9. Virtual File System (`lge_vfs.h`)
+
+**Lucid namespace:** `api.fs`
+
+Unified file access. In development, reads loose files from a directory. In a shipped game, reads from an AES-256 encrypted `.pck` bundle — same API, same call sites, different backend. Raw OS file paths are never used outside this module.
+
+### Types
+
+```cpp
+using VFSFile = uint32_t;
+#define LGE_INVALID_FILE ((VFSFile)0)
+```
+
+### Functions
+
+```cpp
+// --- Mounting ---
+
+// Mount a root. In dev: pass a directory path. In production: pass a .pck path.
+// Multiple mounts are allowed — searched in LIFO order (last mounted = first searched).
+void LGE_VFS_Mount(const char* bundle_path_or_dir);
+
+// Unmount a previously mounted root.
+void LGE_VFS_Unmount(const char* bundle_path_or_dir);
+
+// --- File access ---
+
+// Open a file for reading by its virtual path (e.g. "textures/hero_albedo.png").
+// Returns LGE_INVALID_FILE if not found.
+VFSFile LGE_VFS_Open(const char* virtual_path);
+
+// Read up to 'bytes' bytes into out_buf. Returns how many bytes were actually read.
+size_t LGE_VFS_Read(VFSFile file, void* out_buf, size_t bytes);
+
+// Returns the total byte size of an open file.
+size_t LGE_VFS_Size(VFSFile file);
+
+// Returns the current read cursor position.
+size_t LGE_VFS_Tell(VFSFile file);
+
+// Move the read cursor. whence: 0=start, 1=current, 2=end (SEEK_SET/CUR/END)
+void LGE_VFS_Seek(VFSFile file, int64_t offset, int whence);
+
+// Close a file handle. Always close open files — handles are a limited resource.
+void LGE_VFS_Close(VFSFile file);
+
+// Check existence without opening.
+bool LGE_VFS_Exists(const char* virtual_path);
+
+// --- Write (development / editor only — unavailable in shipped builds) ---
+
+// Write data to a virtual path. Creates the file if it does not exist.
+// Returns false in shipped (read-only) builds.
+bool LGE_VFS_Write(const char* virtual_path, const void* data, size_t bytes);
+
+// Create a directory at a virtual path.
+bool LGE_VFS_MakeDir(const char* virtual_path);
+
+// Delete a file. Returns false in shipped builds.
+bool LGE_VFS_Delete(const char* virtual_path);
+
+// List files in a virtual directory. Calls callback once per entry.
+void LGE_VFS_ListDir(
+    const char* virtual_dir,
+    void (*callback)(const char* entry_name, bool is_directory)
+);
+```
+
+### Lucid-side (`api.fs`)
+
+```lucid
+-- Read a file
+let data [byte] = api.fs:read_file("config/settings.json")
+
+-- Write a file (editor/dev only)
+api.fs:write_file("exports/level_01.lmap", level_bytes)
+
+-- Check existence
+if api.fs:exists("saves/slot_1.sav") {
+    load_save("saves/slot_1.sav")
+}
+
+-- List a directory
+api.fs:list_dir("textures/", (name string, is_dir bool) = {
+    if !is_dir {
+        api.console:log("Found texture: " + name)
+    }
+})
+
+-- File save dialog (editor only — opens OS native dialog)
+let path string = api.fs:show_save_dialog("Save Level", ".lmap")
+```
+
+### Notes
+- `LGE_VFS_Write`, `LGE_VFS_MakeDir`, `LGE_VFS_Delete`, and `LGE_VFS_ListDir` are only available in development builds. They silently fail (return false / no-op) in shipped games.
+- All paths are forward-slash separated regardless of OS: `"audio/sfx/shot.lsfx"`, not `"audio\\sfx\\shot.lsfx"`.
+- `.pck` files are decrypted in RAM only — decrypted content is never written to disk.
+
+---
+
+## 10. Script Manager (`lge_script.h`)
+
+**Lucid namespace:** `api.script` (restricted — extension-facing only)
+
+Loads, unloads, and hot-reloads compiled Lucid modules (`.lmod` / `.dll`). The file watcher and compiler subprocess are managed internally. External callers load and unload modules by path.
+
+### Types
+
+```cpp
+using ModuleHandle = uint32_t;
+#define LGE_INVALID_MODULE ((ModuleHandle)0)
+
+struct LGE_ModuleInfo {
+    const char* name;            // module display name (from extension.json or filename)
+    const char* path;            // path the module was loaded from
+    uint32_t    api_version;     // kernel API version it was compiled against
+    bool        hot_reload_enabled;
+};
+```
+
+### Functions
+
+```cpp
+// Load a module from path. Calls its on_load() hook if it has one.
+// Returns LGE_INVALID_MODULE if the file is missing or fails version check.
+ModuleHandle LGE_Script_Load(const char* module_path);
+
+// Unload a module. Calls its on_unload() hook, then frees the library.
+void LGE_Script_Unload(ModuleHandle handle);
+
+// Manually trigger a recompile of a source file, then hot-swap it.
+// compile_path — path to the .Lucid source file
+// Internally runs luc_compiler.exe, waits, then SwapModule on success.
+void LGE_Script_Recompile(const char* lucid_source_path);
+
+// Enable or disable the file watcher for hot-reload (default: enabled in dev builds).
+void LGE_Script_SetHotReloadEnabled(bool enabled);
+
+// Get info about a loaded module.
+LGE_ModuleInfo LGE_Script_GetInfo(ModuleHandle handle);
+
+// Iterate all currently loaded modules.
+void LGE_Script_ForEach(void (*callback)(ModuleHandle handle, const LGE_ModuleInfo* info));
+```
+
+### Notes
+- Hot-reload is automatic when file watcher is enabled: save a `.Lucid` file → kernel recompiles → swaps the module between frames. No manual call needed from game code.
+- The swap waits for the current frame to complete before replacing the live module — never interrupts mid-frame execution.
+- `on_load(api)` and `on_unload()` are conventional Lucid function names. The script manager looks for them by symbol name after loading — they are optional.
+
+---
+
+## 11. Extension System (`lge_ext.h`)
+
+**Lucid namespace:** `api.ext` (engine and editor facing)
+
+Loads and manages extensions — separately distributed `.dll` / `.lmod` packages that register new components, systems, commands, or UI panels. Extensions declare their requirements in an `extension.json` manifest.
+
+### Types
+
+```cpp
+using ExtensionID = uint32_t;
+#define LGE_INVALID_EXTENSION ((ExtensionID)0)
+```
+
+### Functions
+
+```cpp
+// Load an extension from a directory (must contain extension.json + the module).
+// Reads extension.json, verifies the Ed25519 signature, version-checks against the
+// kernel, then calls on_load(api) on the module.
+// Returns LGE_INVALID_EXTENSION on any failure.
+ExtensionID LGE_Ext_Load(const char* extension_dir);
+
+// Unload an extension. Calls on_unload(), unregisters all commands/components
+// registered by this extension, then frees the library.
+void LGE_Ext_Unload(ExtensionID id);
+
+// Returns true if an extension with the given ID string is currently loaded.
+// id_string — the "id" field from extension.json (e.g. "com.studio.my-tool")
+bool LGE_Ext_IsLoaded(const char* id_string);
+
+// Iterate all currently loaded extensions.
+void LGE_Ext_ForEach(void (*callback)(ExtensionID id, const char* name, const char* version));
+```
+
+### The `extension.json` Manifest
+
+```json
+{
+  "id":           "com.studio.animation-tools",
+  "name":         "Animation Tools",
+  "version":      "1.2.0",
+  "api_version":  "1.0.0",
+  "entry_point":  "animation_tools.lmod",
+  "permissions":  ["fs.read", "fs.write", "ecs.register", "ui.panel"],
+  "signature":    "<Ed25519 signature of the bundle contents>"
+}
+```
+
+### Lucid-side (extension `on_load` hook)
+
+```lucid
+-- Every extension entry point receives the api object at load time
+on_load (api) = {
+    -- Register a menu item and a command
+    api.menu:register("View/Animation Tools", open_anim_panel)
+    api.commands:register("animation.open", open_anim_panel)
+
+    -- Register an activity bar panel
+    api.ui:register_activity_bar("Animation", "resources/anim_icon.svg", open_anim_panel)
+
+    -- Register a custom file icon
+    api.ui:register_file_icon(".lanim", "resources/anim_file_icon.svg")
+}
+
+on_unload = {
+    -- Clean up any persistent state here
+}
+```
+
+### Notes
+- Extensions are loaded from `extensions/` inside the active project, plus a global `engine_extensions/` directory.
+- The kernel verifies the `extension.json` Ed25519 signature against the trusted publisher list before loading. Unsigned extensions are rejected in production builds.
+- Permissions declared in `extension.json` are enforced at the ABI level — calling `LGE_VFS_Write` from an extension without `"fs.write"` permission returns false and logs a warning.
+
+---
+
+## 12. Console & Commands (`lge_console.h`)
+
+**Lucid namespace:** `api.console` / `api.commands`
+
+A live function-table command system. Every registered command is a named C++ or Lucid callback. Typing a command in the editor console or calling `LGE_Console_Exec` calls it directly — no text parsing, no eval, no intermediate layer.
+
+### Functions
+
+```cpp
+// Register a command. name must be unique — re-registering overwrites the old callback.
+// description — shown in the console autocomplete and help output
+void LGE_Console_Register(
+    const char* name,
+    const char* description,
+    void (*callback)(const char* args)
+);
+
+// Unregister a command by name. Safe to call if the command doesn't exist (no-op).
+void LGE_Console_Unregister(const char* name);
+
+// Execute a command string (e.g. "physics.set_gravity 0 -20 0").
+// Parses the first word as the command name; the rest is passed as args.
+// Thread-safe — safe to call from any system.
+void LGE_Console_Exec(const char* command_string);
+
+// Print a line to the console output.
+void LGE_Console_Log(const char* message);
+void LGE_Console_Warn(const char* message);
+void LGE_Console_Error(const char* message);
+
+// --- IPC: out-of-process execution (editor → running game .exe) ---
+
+// Start listening for console commands from an editor connection (game-side).
+void LGE_Console_StartIPCServer(uint16_t port);
+
+// Connect to a running game's IPC server (editor-side).
+void LGE_Console_ConnectIPC(const char* host, uint16_t port);
+
+// Disconnect and stop the IPC session.
+void LGE_Console_StopIPC();
+```
+
+### Lucid-side (`api.console` / `api.commands`)
+
+```lucid
+-- Log to the console
+api.console:log("Player spawned at " + string(spawn_pos))
+api.console:warn("Health below 10%")
+api.console:error("Failed to load asset: " + path)
+
+-- Register a custom command
+api.commands:register("scene.reload", "Reload the active scene", (args string) = {
+    scene:reload()
+})
+
+-- Execute a command programmatically
+api.console:exec("physics.set_gravity 0 -20 0")
+```
+
+### Notes
+- Commands registered by extensions are automatically unregistered when the extension is unloaded via `LGE_Ext_Unload`.
+- The `args` string passed to callbacks is the raw text after the command name, unsplit. Each command is responsible for parsing its own arguments.
+- IPC uses a local named pipe (Windows) or Unix domain socket (Linux) — not a real network socket. The port parameter is a logical identifier, not a TCP port.
+
+---
+
+## 13. Network (`lge_network.h`)
+
+**Lucid namespace:** `api.network` / `api.net`
+
+A provider-pattern network system. The kernel ships two built-in providers (raw TCP and UDP). Game developers can swap in a third-party provider (Steam, Epic Online Services, etc.) by implementing `INetworkProvider` as an extension.
+
+### Types
+
+```cpp
+using ConnHandle = uint32_t;
+#define LGE_INVALID_CONN ((ConnHandle)0)
+
+enum SendFlags : uint32_t {
+    LGE_SEND_RELIABLE   = 1 << 0,  // guaranteed delivery + ordering (TCP-style)
+    LGE_SEND_UNRELIABLE = 1 << 1,  // best-effort, low-latency (UDP-style)
+    LGE_SEND_ENCRYPTED  = 1 << 2,  // provider handles its own encryption
+};
+
+enum NetworkEventType {
+    LGE_NET_CONNECTED,
+    LGE_NET_DISCONNECTED,
+    LGE_NET_DATA_RECEIVED,
+    LGE_NET_ERROR,
+};
+
+struct NetworkEvent {
+    NetworkEventType type;
+    ConnHandle       conn;
+    const uint8_t*   data;        // valid only for DATA_RECEIVED; null otherwise
+    uint32_t         data_size;
+};
+
+// The interface a network extension implements
+class INetworkProvider {
+public:
+    virtual bool         Initialize(const NetworkConfig& config) = 0;
+    virtual void         Shutdown() = 0;
+    virtual ConnHandle   Connect(const char* address, uint16_t port) = 0;
+    virtual void         Disconnect(ConnHandle conn) = 0;
+    virtual bool         Listen(uint16_t port) = 0;
+    virtual void         Send(ConnHandle conn, const uint8_t* data,
+                               uint32_t size, SendFlags flags) = 0;
+    virtual int32_t      Receive(ConnHandle conn, uint8_t* buffer, uint32_t size) = 0;
+    virtual NetworkEvent PollEvent() = 0;
+    virtual ~INetworkProvider() = default;
+};
+```
+
+### Functions
+
+```cpp
+// Set the active network provider (called once, usually in on_load).
+// Built-in options: LGE_GetTCPProvider(), LGE_GetUDPProvider()
+// Extensions pass their own INetworkProvider implementation.
+void LGE_Network_SetProvider(INetworkProvider* provider);
+
+// Connect to a remote host (client mode).
+ConnHandle LGE_Network_Connect(const char* address, uint16_t port);
+
+// Start listening for incoming connections (server mode).
+bool LGE_Network_Listen(uint16_t port);
+
+// Disconnect a connection.
+void LGE_Network_Disconnect(ConnHandle conn);
+
+// Send data on a connection.
+void LGE_Network_Send(ConnHandle conn, const uint8_t* data, uint32_t size, SendFlags flags);
+
+// Poll for the next event. Returns an event with type=0 if the queue is empty.
+// Call every frame to drain the event queue.
+NetworkEvent LGE_Network_PollEvent();
+```
+
+### Lucid-side (`api.network`)
+
+```lucid
+-- Use the built-in UDP provider
+api.network:set_provider(api.network.udp_provider)
+
+-- Connect to a server
+let conn ConnHandle = api.network:connect("192.168.1.10", 7777)
+
+-- Send a packet
+let packet [byte] = serialize_player_state(player)
+api.network:send(conn, packet, SendFlags.Reliable)
+
+-- Poll events each frame
+let event NetworkEvent = api.network:poll_event()
+if event.type == NetworkEventType.DataReceived {
+    apply_remote_state(event.data)
+}
+
+-- Swap to Steam provider (from a Steam network extension)
+api.network:set_provider(SteamNetworkProvider)
+```
+
+### Notes
+- `LGE_Network_PollEvent()` must be called every frame to drain the queue — unread events are not buffered indefinitely.
+- The kernel provides only raw TCP and UDP; reliable UDP, NAT traversal, lobbies, and matchmaking are the responsibility of third-party provider extensions.
+- Permission `"network.client"` is required in `extension.json` to call `LGE_Network_Connect`; `"network.server"` is required to call `LGE_Network_Listen`.
+
+---
+
+## 14. Security (`lge_security.h`)
+
+**Lucid namespace:** N/A — engine-internal only. Not exposed to extensions or game scripts.
+
+Handles boot integrity checking, license validation, and VFS key derivation. Called once at boot — not a per-frame API.
+
+### Types
+
+```cpp
+// Swappable license verification backend (see MasterPlan Decision 4)
+struct ILicenseVerifier {
+    virtual bool Verify(const char* license_path) = 0;
+    virtual ~ILicenseVerifier() = default;
+};
+```
+
+### Functions
+
+```cpp
+// Swap the license backend. Default is OfflineLicenseVerifier.
+// Call before LGE_Security_VerifyBoot() to change the verification strategy.
+void LGE_Security_SetVerifier(ILicenseVerifier* verifier);
+
+// SHA-256 self-check: hash luc_kernel.dll and compare against the baked-in value.
+// Returns false (and logs) if tampered. Called first in LGE_Boot().
+bool LGE_Security_VerifyBoot();
+
+// Verify the license file. Delegates to the active ILicenseVerifier.
+// license_path — path to the .lic file on disk
+bool LGE_Security_VerifyLicense(const char* license_path);
+
+// Derive the 32-byte AES-256 key used to decrypt the .pck bundle.
+// publisher_key — the encrypted master key from the .lic file
+// machine_uuid  — hardware fingerprint (CPU ID, motherboard serial, etc.)
+// out_aes_key   — caller-allocated 32-byte buffer; filled on success
+bool LGE_Security_DeriveVFSKey(
+    const uint8_t* publisher_key, size_t key_len,
+    const char*    machine_uuid,
+    uint8_t*       out_aes_key
+);
+```
+
+### Notes
+- The SHA-256 boot checksum (`VerifyBoot`) covers the `luc_kernel.dll` binary itself. An unexpected checksum aborts boot — this catches binary tampering without requiring a network call.
+- `DeriveVFSKey` uses PBKDF2 + HKDF so the derived key is unique per publisher+machine combination. A license file copied to another machine produces a different key and fails to decrypt the bundle.
+- `ILicenseVerifier` exists so online verification can be added later as a swappable backend without touching any other kernel code (see MasterPlan Decision 4).
+
+---
+
+## 15. Math (`lge_math.h`)
+
+**Lucid namespace:** `api.math` / built-in Lucid types
+
+Shared math types used across every subsystem. Based on GLM. All types are POD and safe to pass across the ABI.
+
+### Types
+
+```cpp
+struct Vec2  { float x, y; };
+struct Vec3  { float x, y, z; };
+struct Vec4  { float x, y, z, w; };
+struct Mat4  { float m[16]; };     // column-major, matching Vulkan/GLSL convention
+struct Quat  { float x, y, z, w; };
+struct AABB  { Vec3 min; Vec3 max; };
+struct Ray   { Vec3 origin; Vec3 direction; };
+```
+
+### Functions
+
+```cpp
+// --- Vec3 ---
+Vec3  LGE_Math_Vec3Add(Vec3 a, Vec3 b);
+Vec3  LGE_Math_Vec3Sub(Vec3 a, Vec3 b);
+Vec3  LGE_Math_Vec3Scale(Vec3 v, float s);
+float LGE_Math_Vec3Dot(Vec3 a, Vec3 b);
+Vec3  LGE_Math_Vec3Cross(Vec3 a, Vec3 b);
+float LGE_Math_Vec3Length(Vec3 v);
+Vec3  LGE_Math_Vec3Normalize(Vec3 v);
+float LGE_Math_Vec3Distance(Vec3 a, Vec3 b);
+Vec3  LGE_Math_Vec3Lerp(Vec3 a, Vec3 b, float t);
+
+// --- Mat4 ---
+Mat4  LGE_Math_Mat4Identity();
+Mat4  LGE_Math_Mat4Multiply(Mat4 a, Mat4 b);
+Mat4  LGE_Math_Mat4Translate(Vec3 translation);
+Mat4  LGE_Math_Mat4Rotate(Quat rotation);
+Mat4  LGE_Math_Mat4Scale(Vec3 scale);
+Mat4  LGE_Math_Mat4TRS(Vec3 t, Quat r, Vec3 s);      // combine in one call
+Mat4  LGE_Math_Mat4Perspective(float fov_y, float aspect, float near, float far);
+Mat4  LGE_Math_Mat4LookAt(Vec3 eye, Vec3 target, Vec3 up);
+Mat4  LGE_Math_Mat4Inverse(Mat4 m);
+
+// --- Quaternion ---
+Quat  LGE_Math_QuatIdentity();
+Quat  LGE_Math_QuatFromEuler(float pitch, float yaw, float roll);  // radians
+Quat  LGE_Math_QuatFromAxisAngle(Vec3 axis, float angle);           // radians
+Quat  LGE_Math_QuatMultiply(Quat a, Quat b);
+Quat  LGE_Math_QuatNormalize(Quat q);
+Quat  LGE_Math_QuatSlerp(Quat a, Quat b, float t);
+Vec3  LGE_Math_QuatRotateVec3(Quat q, Vec3 v);
+
+// --- Scalar utilities ---
+float LGE_Math_Lerp(float a, float b, float t);
+float LGE_Math_Clamp(float v, float min, float max);
+float LGE_Math_Remap(float v, float in_min, float in_max, float out_min, float out_max);
+float LGE_Math_ToRadians(float degrees);
+float LGE_Math_ToDegrees(float radians);
+```
+
+### Lucid-side (built-in types)
+
+```lucid
+-- Vec2, Vec3, Vec4, Mat4, Quat are built-in Lucid types — no import needed
+let pos Vec3 = Vec3(1.0, 0.0, 0.0)
+let dir Vec3 = Vec3(0.0, 0.0, -1.0)
+
+let dot   float = api.math:vec3_dot(pos, dir)
+let cross Vec3  = api.math:vec3_cross(pos, dir)
+let lerp  Vec3  = api.math:vec3_lerp(pos, dir, 0.5)
+
+-- TRS matrix for transforms
+let transform Mat4 = api.math:mat4_trs(
+    Vec3(0, 1, 0),           -- position
+    api.math:quat_identity(), -- rotation
+    Vec3(1, 1, 1)            -- scale
+)
+```
+
+### Notes
+- Math types use `float` (32-bit) throughout — `double` is not used anywhere in the engine's ABI surface.
+- `Mat4` is column-major to match Vulkan and GLSL conventions. Pass directly to shader push constants without transposing.
+
+---
+
+## 16. Platform (`lge_platform.h`)
+
+**Lucid namespace:** N/A — engine-internal only. Not exposed to extensions.
+
+Isolates all OS-specific code. The rest of the kernel only calls these functions — it never calls `LoadLibrary`, `dlopen`, `ReadDirectoryChangesW`, or `inotify` directly.
+
+### Functions
+
+```cpp
+using ModuleHandle = void*;
+using ThreadHandle = void*;
+
+// --- Window ---
+void  Platform_Init(const char* title, uint32_t w, uint32_t h);
+void  Platform_PollEvents();      // pump OS message queue; called once per frame
+void* Platform_GetNativeWindow(); // HWND on Windows, Window on X11/Wayland
+bool  Platform_ShouldClose();     // true when the user clicks X or calls Shutdown
+
+// --- Dynamic library loading ---
+ModuleHandle Platform_LoadModule(const char* path);
+void*        Platform_GetSymbol(ModuleHandle mod, const char* symbol_name);
+void         Platform_UnloadModule(ModuleHandle mod);
+
+// --- Threading ---
+ThreadHandle Platform_SpawnThread(void (*fn)(void*), void* user_data);
+void         Platform_JoinThread(ThreadHandle t);
+void         Platform_DetachThread(ThreadHandle t); // fire and forget
+
+// --- File watching (used by Script Manager for hot-reload) ---
+using FileChangedCallback = void (*)(const char* path);
+void  Platform_WatchDir(const char* dir_path, FileChangedCallback on_change);
+void  Platform_StopWatch(const char* dir_path);
+```
+
+### Notes
+- On Windows: `Platform_LoadModule` wraps `LoadLibraryA`, `Platform_GetSymbol` wraps `GetProcAddress`, and `Platform_WatchDir` wraps `ReadDirectoryChangesW`.
+- On Linux: `Platform_LoadModule` wraps `dlopen`, `Platform_GetSymbol` wraps `dlsym`, and `Platform_WatchDir` wraps `inotify_add_watch`.
+- Adding a new platform (e.g. console) means implementing this file only — no other kernel files change.
+
+---
+
+## 17. The Extension API Table (`lge_api.h`)
+
+The master header. This is the only kernel header extensions and Lucid code ever see. It defines `LGE_ExtensionAPI` — a flat struct of function pointers to every subsystem listed above — and the single exported symbol `LGE_GetAPI()`.
+
+```cpp
+// kernel/include/lge_api.h
+
+#define LGE_VERSION_MAJOR 1
+#define LGE_VERSION_MINOR 0
+#define LGE_VERSION_PATCH 0
+#define LGE_VERSION ((LGE_VERSION_MAJOR << 16) | (LGE_VERSION_MINOR << 8) | LGE_VERSION_PATCH)
+
+struct LGE_ExtensionAPI {
+    uint32_t version;   // the kernel version this table was built from
+
+    // ECS
+    EntityID      (*ecs_create_entity)();
+    void          (*ecs_destroy_entity)(EntityID);
+    void*         (*ecs_add_component)(EntityID, ComponentType);
+    void*         (*ecs_get_component)(EntityID, ComponentType);
+    void          (*ecs_remove_component)(EntityID, ComponentType);
+    bool          (*ecs_has_component)(EntityID, ComponentType);
+    ComponentType (*ecs_register_component)(const char* name, size_t size, size_t align);
+    void          (*ecs_for_each)(ComponentType*, uint32_t, LGE_ForEachCallback);
+
+    // Rendering
+    TextureID  (*render_upload_texture)(const void*, uint32_t w, uint32_t h, PixelFormat);
+    void       (*render_free_texture)(TextureID);
+    BufferID   (*render_upload_mesh)(const Vertex*, uint32_t, const uint32_t*, uint32_t);
+    void       (*render_free_mesh)(BufferID);
+    void       (*render_draw_mesh)(BufferID, TextureID, const float transform[16]);
+    uint32_t   (*render_get_width)();
+    uint32_t   (*render_get_height)();
+
+    // Physics
+    BodyID  (*physics_create_body)(EntityID, const PhysicsBodyDef*);
+    void    (*physics_destroy_body)(BodyID);
+    void    (*physics_add_force)(BodyID, float, float, float);
+    void    (*physics_add_impulse)(BodyID, float, float, float);
+    void    (*physics_set_velocity)(BodyID, float, float, float);
+    bool    (*physics_raycast)(float[3], float[3], float, RaycastHit*);
+    EntityID(*physics_raycast_from_camera)(float sx, float sy);
+    void    (*physics_set_gravity)(float, float, float);
+    void    (*physics_set_contact_callback)(void (*)(EntityID, EntityID, float[3]));
+
+    // Input
+    bool  (*input_is_key_held)(KeyCode);
+    bool  (*input_is_key_pressed)(KeyCode);
+    bool  (*input_is_key_released)(KeyCode);
+    float (*input_mouse_x)();
+    float (*input_mouse_y)();
+    float (*input_mouse_delta_x)();
+    float (*input_mouse_delta_y)();
+    float (*input_scroll_delta)();
+    bool  (*input_is_mouse_held)(MouseButton);
+    bool  (*input_is_mouse_pressed)(MouseButton);
+    void  (*input_on_key_pressed)(KeyCode, void (*)());
+    void  (*input_on_mouse_button)(MouseButton, void (*)(), void (*)());
+    void  (*input_set_cursor_locked)(bool);
+
+    // UI (in-game / RmlUI)
+    RmlContextID (*ui_create_context)(uint32_t w, uint32_t h);
+    void         (*ui_destroy_context)(RmlContextID);
+    bool         (*ui_load_document)(RmlContextID, const char*);
+    void         (*ui_set_property)(RmlContextID, const char* id, const char* prop, const char* val);
+    void         (*ui_set_text)(RmlContextID, const char* id, const char* text);
+    void         (*ui_set_visible)(RmlContextID, const char* id, bool);
+    void         (*ui_on_click)(RmlContextID, const char* id, void (*)(const char*));
+
+    // Audio
+    AudioSourceID (*audio_load_sfx)(const char*);
+    AudioSourceID (*audio_load_stream)(const char*);
+    void          (*audio_play)(AudioSourceID, bool loop);
+    void          (*audio_stop)(AudioSourceID);
+    void          (*audio_set_volume)(AudioSourceID, float);
+    void          (*audio_set_position)(AudioSourceID, float[3]);
+    void          (*audio_set_listener)(float pos[3], float forward[3]);
+
+    // VFS
+    VFSFile (*vfs_open)(const char*);
+    size_t  (*vfs_read)(VFSFile, void*, size_t);
+    size_t  (*vfs_size)(VFSFile);
+    void    (*vfs_close)(VFSFile);
+    bool    (*vfs_exists)(const char*);
+    bool    (*vfs_write)(const char*, const void*, size_t);   // dev builds only
+    void    (*vfs_list_dir)(const char*, void (*)(const char*, bool));
+
+    // Console
+    void (*console_register)(const char* name, const char* desc, void (*)(const char*));
+    void (*console_exec)(const char*);
+    void (*console_log)(const char*);
+    void (*console_warn)(const char*);
+    void (*console_error)(const char*);
+
+    // Network
+    void         (*network_set_provider)(INetworkProvider*);
+    ConnHandle   (*network_connect)(const char*, uint16_t);
+    bool         (*network_listen)(uint16_t);
+    void         (*network_send)(ConnHandle, const uint8_t*, uint32_t, SendFlags);
+    NetworkEvent (*network_poll_event)();
+
+    // Math
+    Vec3  (*math_vec3_cross)(Vec3, Vec3);
+    float (*math_vec3_dot)(Vec3, Vec3);
+    Vec3  (*math_vec3_normalize)(Vec3);
+    Vec3  (*math_vec3_lerp)(Vec3, Vec3, float);
+    Mat4  (*math_mat4_trs)(Vec3, Quat, Vec3);
+    Mat4  (*math_mat4_perspective)(float, float, float, float);
+    Quat  (*math_quat_slerp)(Quat, Quat, float);
+    float (*math_lerp)(float, float, float);
+    float (*math_clamp)(float, float, float);
+};
+
+// The one stable symbol exported by luc_kernel.dll
+// Returns nullptr if requested_version is incompatible with the current kernel.
+LGE_API const LGE_ExtensionAPI* LGE_GetAPI(uint32_t requested_version);
+```
+
+### Version Compatibility
+
+| requested_version major | Kernel major | Result |
+|-------------------------|--------------|--------|
+| Equal | Equal | ✅ Returns full API table |
+| Lower | Higher | ✅ Returns compatible subset (backward compat) |
+| Higher | Lower | ❌ Returns `nullptr` — extension is too new |
+
+### Notes
+- Extensions include only `lge_api.h` — never individual subsystem headers. The full API is in one struct.
+- Lucid extensions never call `LGE_GetAPI` directly — the kernel passes a pre-validated `api` object to their `on_load(api)` hook. The function table is the same data; the Lucid runtime just presents it via named namespaces (`api.ecs`, `api.fs`, etc.) instead of raw function pointers.
+- New functions are appended to the end of `LGE_ExtensionAPI`. Old functions are never removed or reordered — only a major version bump can break backward compatibility.
+
+---
+
+*— End of initial API reference. Functions will be expanded with full parameter constraints, error codes, and threading guarantees as each subsystem is implemented.*

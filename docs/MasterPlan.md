@@ -86,7 +86,7 @@
 - **All extensions are custom** — no ambiguity with OS-registered formats.
 - **Source formats are plain JSON or text** — human-readable, Git-diff-friendly.
 - **Cooked formats are pure binary memory dumps** — designed for `memcpy` into GPU/RAM.
-- **Distribution formats are signed or encrypted** — `.lucpkg` (Ed25519), `.lucid` (AES-256).
+- **Distribution formats are signed or encrypted** — `.lucpkg` (Ed25519), `.luc` (AES-256).
 
 #### Gap Status
 
@@ -282,7 +282,7 @@ When you're ready to add online enforcement:
 1. Write `OnlineLicenseVerifier` as a new `.cpp` — same interface, new implementation.
 2. Switch `g_license_verifier` assignment in `kernel.cpp` based on `engine_settings.json`:
 ```json
-{ "license_mode": "online", "license_server": "https://license.lucidengine.com" }
+{ "license_mode": "online", "license_server": "https://license.lucengine.com" }
 ```
 3. The rest of the kernel is untouched. The abstraction did its job.
 
@@ -293,7 +293,7 @@ When you're ready to add online enforcement:
 
 ### Decision 5 — Logic Hot-Reload ✅
 
-Hot-reload means: the developer saves a `.Lucid` file → the engine recompiles it → the running game reflects the change **without restarting**.
+Hot-reload means: the developer saves a `.luc` file → the engine recompiles it → the running game reflects the change **without restarting**.
 
 #### The System: Watch → Compile → Swap
 
@@ -416,14 +416,14 @@ The hardest part of hot-reload is keeping game state (player position, health, e
 **Full hot-reload flow diagram:**
 
 ```
-User saves player.Lucid
+User saves player.luc
 	│
 	▼
 FileWatcher detects change
 	│
 	▼
 ScriptManager::RecompileModule("player")
-→ spawns: luc_compiler.exe --input player.Lucid --output player_next.dll
+→ spawns: luc_compiler.exe --input player.luc --output player_next.dll
 	│
 	├── Compile FAILED → show errors in IDE log, keep old module running
 	│
@@ -454,14 +454,14 @@ The engine needs code completion, go-to-definition, and error squiggles inside t
 The IDE (written in Lucid) cannot call C++ analysis code directly — that would create a circular dependency. A separate process communicates via stdin/stdout JSON, keeping the boundary clean.
 
 ```
-IDE (engine/src/editor/script_editor.Lucid)
+IDE (engine/src/editor/script_editor.luc)
 │
 │  JSON over stdin/stdout (LSP-style protocol)
 ▼
 luc_langserver.exe (C++ process, always running in background)
 │
 ├── Reuses compiler's Lexer + Parser + Symbol Table (no code-gen)
-├── Maintains an in-memory AST index of all open .Lucid files
+├── Maintains an in-memory AST index of all open .luc files
 └── Responds to requests:
 		textDocument/completion   → list of symbols, keywords, types
 		textDocument/hover        → type info, docstring
@@ -485,7 +485,7 @@ This means the language server's completions and errors are **always in sync** w
 #### IDE integration (Lucid side)
 
 ```lucid
--- engine/src/editor/script_editor.Lucid
+-- engine/src/editor/script_editor.luc
 -- The editor starts the langserver as a child process on engine boot
 
 const lang_server &Process = Process:spawn("./compiler/luc_langserver.exe")
@@ -504,7 +504,7 @@ let on_keystroke (file string, cursor_pos Vec2) = {
 ```
 
 > [!NOTE]
-> The langserver runs **one instance per engine session**, not per file. It indexes all `.Lucid` files in the active project on startup and updates incrementally as files change.
+> The langserver runs **one instance per engine session**, not per file. It indexes all `.luc` files in the active project on startup and updates incrementally as files change.
 
 ---
 
@@ -526,8 +526,8 @@ This distinction is critical and must be enforced by the engine:
 | Lifecycle hooks (`on_load`, `on_unload`) | ✅ Yes — called by kernel | ❌ No |
 | Runs during development | ✅ Yes (always active while engine is open) | ❌ Only when imported |
 | Adds UI, menus, commands | ✅ Yes | ❌ No |
-| How it's used | Engine loads it automatically | Other `.Lucid` files do `import "my_lib.Lucid"` |
-| Example | Visual Debugger, Theme Manager, Git Integration | `math_utils.Lucid`, `enemy_ai.Lucid`, `pathfinding.Lucid` |
+| How it's used | Engine loads it automatically | Other `.luc` files do `import "my_lib.luc"` |
+| Example | Visual Debugger, Theme Manager, Git Integration | `math_utils.luc`, `enemy_ai.luc`, `pathfinding.luc` |
 
 **Rule:** If it modifies the engine's behavior or UI, it's an **Extension**. If it's just reusable code called by game scripts, it's a **Library** — keep it in the project's `src/libs/` folder.
 
@@ -630,7 +630,7 @@ When a developer first sets up their publisher profile, the engine generates the
 └─────────────────────────────────────────────────────┘
 ```
 
-The engine stores the private key in `%APPDATA%\LucidEngine\` (or `~/.lucid_engine/` on Linux). This is **not** inside the engine install folder — it survives engine updates.
+The engine stores the private key in `%APPDATA%\LucidEngine\` (or `~/.luc_engine/` on Linux). This is **not** inside the engine install folder — it survives engine updates.
 
 ---
 
@@ -734,11 +734,11 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIe3n...
 "author": "Your Name",                // Auto-filled from user_settings.json
 "publisher": "yourname",              // Auto-filled from user_settings.json
 "description": "What this extension does",
-"entry_point": "main.Lucid",            // File with on_load / on_update / on_unload
+"entry_point": "main.luc",            // File with on_load / on_update / on_unload
 "type": "extension",                  // extension | theme | tool | network-provider
 "permissions": ["ui.menu", "ecs.read", "ecs.write", "filesystem.project"],
 
-// LAZY LOADING (When should the engine run main.Lucid?)
+// LAZY LOADING (When should the engine run main.luc?)
 "activationEvents": [
 	"onCommand:my-extension.run",
 	"onView:my-extension-panel"
@@ -755,7 +755,7 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIe3n...
 
 "signature": "base64-encoded-sig",    // Ed25519 sig over the rest of this JSON
 "dependencies": [
-	{ "id": "com.lucid.core", "version": ">=1.0.0" }
+	{ "id": "com.luc.core", "version": ">=1.0.0" }
 ]
 }
 ```
@@ -763,14 +763,14 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQIe3n...
 #### Why `contributes` and `activationEvents` are critical
 Just like VS Code's `package.json`, this declarative approach solves two massive problems:
 1. **Zero-Cost Startup:** The engine reads all `extension.json` files on boot and builds the UI menus, activity bar, and command palette *without executing a single line of Lucid code*. 
-2. **Lazy Loading:** `main.Lucid` is strictly ignored until the user clicks the button defined in `contributes`. This keeps the engine's memory footprint incredibly small, no matter how many extensions are installed.
+2. **Lazy Loading:** `main.luc` is strictly ignored until the user clicks the button defined in `contributes`. This keeps the engine's memory footprint incredibly small, no matter how many extensions are installed.
 
 #### How Permissions are Resolved and Enforced
 Permissions are not just a warning; they are enforced at the C++ Kernel boundary.
 
 1. **Installation (User Consent):** When a user downloads an extension, the IDE parses the `permissions` array in `extension.json`. If it contains `network.server` or `filesystem.global`, a large warning prompts the user for consent. If they decline, the installation aborts.
 2. **Runtime Enforcement (The Kernel Gatekeeper):** 
-When an extension's `main.Lucid` is eventually loaded, the engine assigns it an **Execution Context ID**. This ID maps to the approved permissions.
+When an extension's `main.luc` is eventually loaded, the engine assigns it an **Execution Context ID**. This ID maps to the approved permissions.
 If the script tries to call a sensitive FFI function (e.g., `api.network.listen(8080)`), the C++ Kernel intercepts the call:
 ```cpp
 // Inside luc_kernel.dll
@@ -805,7 +805,7 @@ Because the enforcement happens in C++, a malicious Lucid script cannot bypass i
 #### Extension Entry Point (Lucid side)
 
 ```lucid
--- my-extension/main.Lucid — the required lifecycle contract
+-- my-extension/main.luc — the required lifecycle contract
 
 export const on_load (api &Api) = {
     -- Called when the extension is activated
@@ -856,7 +856,7 @@ The Extensions panel is divided into two sections as you described:
 ```
 user_extensions/my-extension/
 ├── extension.json     ← auto-generated with all fields filled in
-└── main.Lucid           ← starter template with on_load/on_unload stubs
+└── main.luc           ← starter template with on_load/on_unload stubs
 ```
 4. Extension immediately appears in "My Extensions" and is ready to edit.
 
@@ -872,7 +872,7 @@ user_extensions/my-extension/
 **Do not use a database.** Everything lives as local files:
 
 ```
-%APPDATA%\LucidEngine\                  ← or ~/.lucid_engine/ on Linux
+%APPDATA%\LucidEngine\                  ← or ~/.luc_engine/ on Linux
 ├── user_settings.json                  ← developer profile (author, publisher, theme prefs)
 └── extension_registry.json             ← list of installed extension IDs and their folder paths
 ```
@@ -893,7 +893,7 @@ user_extensions/my-extension/
 {
 "installed": [
 	{ "id": "com.taiax.visual-debugger", "path": "./user_extensions/visual-debugger/", "active": true },
-	{ "id": "com.lucid.theme-manager",   "path": "./core_extensions/theme-manager/",   "active": true }
+	{ "id": "com.luc.theme-manager",   "path": "./core_extensions/theme-manager/",   "active": true }
 ]
 }
 ```
@@ -990,7 +990,7 @@ Step 3 — Verify registration
 Step 4 — Write your extension
 user_extensions/my-extension/
 ├── extension.json   ← id, uuid, permissions declared
-└── main.Lucid      ← on_load / on_update / on_unload
+└── main.luc      ← on_load / on_update / on_unload
 
 Step 5 — Sign the extension
 scripts/sign_extension.py --extension ./user_extensions/my-extension/ --key publisher_private.pem
@@ -999,7 +999,7 @@ What the script does internally:
 	a. Reads extension.json (without the "signature" field)
 	b. SHA-256 hashes every file in the extension folder
 	c. Builds a payload:
-		{ "manifest": {...extension.json...}, "file_hashes": { "main.Lucid": "sha256:abc..." } }
+		{ "manifest": {...extension.json...}, "file_hashes": { "main.luc": "sha256:abc..." } }
 	d. Signs the payload with Ed25519 private key
 	e. Base64-encodes the signature
 	f. Writes it into extension.json → "signature": "base64:..."
@@ -1090,8 +1090,8 @@ When the project grows, migration is **four changes only**. Nothing in the kerne
 
 | What changes | How |
 |:---|:---|
-| `engine_settings.json` → `trusted_publishers_url` | Point from GitHub Gist URL to `https://api.lucidengine.com/publishers` |
-| `engine_settings.json` → `extension_repository_url` | Add `https://extensions.lucidengine.com` for browse/search |
+| `engine_settings.json` → `trusted_publishers_url` | Point from GitHub Gist URL to `https://api.lucengine.com/publishers` |
+| `engine_settings.json` → `extension_repository_url` | Add `https://extensions.lucengine.com` for browse/search |
 | `scripts/sign_extension.py` | Stays identical — signing process doesn't change |
 | Engine Extensions panel | Add a "Browse" tab that fetches from the new extension API |
 
@@ -1103,8 +1103,8 @@ Everything else — the key format, the signature algorithm, the manifest schema
 "trusted_publishers_url": "https://gist.githubusercontent.com/.../trusted_publishers.json",
 // ↑ Phase 1: GitHub Gist
 // ↓ Phase 2: just change this one line
-"trusted_publishers_url": "https://api.lucidengine.com/v1/publishers",
-"extension_repository_url": "https://extensions.lucidengine.com"
+"trusted_publishers_url": "https://api.lucengine.com/v1/publishers",
+"extension_repository_url": "https://extensions.lucengine.com"
 }
 ```
 
@@ -1179,14 +1179,14 @@ A developer writes their own `INetworkProvider` implementation as an extension:
 "id": "com.taiax.steam-network",
 "type": "network-provider",
 "permissions": ["network.client", "network.server"],
-"entry_point": "steam_provider.Lucid"
+"entry_point": "steam_provider.luc"
 }
 ```
 
 ```lucid
-// steam_provider.Lucid — Lucid wraps the Steamworks C++ SDK via FFI
+// steam_provider.luc — Lucid wraps the Steamworks C++ SDK via FFI
 
-import "steam_sdk.Lucid"   // FFI bindings to Steamworks
+import "steam_sdk.luc"   // FFI bindings to Steamworks
 
 on_load(api) {
 	// Register this as the active network provider
@@ -1265,14 +1265,14 @@ The "Engine Console" is not a text parser; it is a live memory bridge.
 
 1.  **The Interpreter (`luc_console.cpp`):** Core kernel logic. Receives string → Tokenizes → Finds memory via Symbols → Executes.
 2.  **The Metadata (`symbols.json`):** Generated by the Lucid compiler. Maps human names (e.g., `player.health`) to binary offsets (e.g., `0xAC + 8`).
-3.  **The Shortcuts (`debug_commands.Lucid`):** User-defined Lucid functions for complex testing (e.g., `spawn_boss()`).
+3.  **The Shortcuts (`debug_commands.luc`):** User-defined Lucid functions for complex testing (e.g., `spawn_boss()`).
 
 ---
 
 ### Decision 10 — AES Key Hardening (Two-Step DRM) ✅
 
 **Architecture: The "Console-Style" Decoupled Key Model.**
-Instead of hiding a single master key in the C++ DLL, the engine uses a two-step derivation process to protect game assets (`.lucid` bundles) while allowing hardware-locked distribution.
+Instead of hiding a single master key in the C++ DLL, the engine uses a two-step derivation process to protect game assets (`.luc` bundles) while allowing hardware-locked distribution.
 
 | Component | Protection | Distribution |
 |:---|:---|:---|
@@ -1371,7 +1371,7 @@ export const on_load (api &Api) = {
 ### Decision 12 — The Extension API Surface (The `api` object) ✅
 
 **Architecture: The "God Object" passed via FFI.**
-To achieve "infinite scale for infinite demands," the C++ Kernel exposes a massive, modular API surface to `main.Lucid`. When the engine loads an extension, it passes an `api` object into the `on_load(api)` function.
+To achieve "infinite scale for infinite demands," the C++ Kernel exposes a massive, modular API surface to `main.luc`. When the engine loads an extension, it passes an `api` object into the `on_load(api)` function.
 
 The features available inside the `api` object are **strictly determined by the permissions** requested in `extension.json`.
 
@@ -1387,10 +1387,10 @@ If an extension requests all permissions, the `api` object contains:
 *   **`api.compiler`**: Hook into the LSP (Language Server). Register custom **Autocomplete Providers**, linting rules, or code-generation tools.
 
 #### Example: Building a Custom Drawing Tool
-Here is exactly how `main.Lucid` would look for an extension that lets the user open `.ldraw` files, draws pixels in a custom workspace tab, handles drag-and-drop folders, and saves the file.
+Here is exactly how `main.luc` would look for an extension that lets the user open `.ldraw` files, draws pixels in a custom workspace tab, handles drag-and-drop folders, and saves the file.
 
 ```lucid
--- main.Lucid (The Drawing Extension)
+-- main.luc (The Drawing Extension)
 package drawing_tool
 
 use engine.api
@@ -1558,7 +1558,7 @@ ImGui and RmlUI render through the same Vulkan pipeline (each emits its own vert
 
 To ensure extensions and game developers can build modern in-game UIs without fighting raw RmlUI pointers, the engine provides a high-level **Reactive Bridge**. The Kernel manages the RmlUI element tree, while Lucid interacts with it via safe, handle-based references.
 
-#### 1. The UI Bridge API (`ui.Lucid`)
+#### 1. The UI Bridge API (`ui.luc`)
 The bridge maps the C++ DOM to a set of scoped Lucid functions. This allows developers to build UIs using a structure that mirrors the visual hierarchy.
 
 ```lucid
@@ -1573,7 +1573,7 @@ pub const ToolCard (title string, desc string, on_click () -> void) = {
 ```
 
 #### 2. The Core UI Library (Standard Components)
-The engine ships with `core_lib/ui_std.Lucid`, a library of "Lucid-Styled" components that ensure all in-game/RmlUI-rendered UI looks consistent across extensions.
+The engine ships with `core_lib/ui_std.luc`, a library of "Lucid-Styled" components that ensure all in-game/RmlUI-rendered UI looks consistent across extensions.
 *   **Containers:** `panel`, `grid`, `flex_row`, `scroll_view`.
 *   **Controls:** `button`, `toggle`, `slider`, `input_field`, `dropdown`.
 *   **Feedback:** `progress_bar`, `spinner`, `tooltip`, `toast`.
@@ -1608,11 +1608,11 @@ The Kernel uses GLM for all transformations, projection matrices, and physics ca
 *   **Zero Overhead:** GLM is header-only and SIMD-accelerated.
 *   **Vulkan-Native:** Memory layouts of `glm::vec3` and `glm::mat4` match Vulkan/GLSL expectations exactly.
 
-#### 2. The Lucid Projection (`math.Lucid`)
+#### 2. The Lucid Projection (`math.luc`)
 The engine exposes these types to Lucid as primitive structs. Heavy math operations are projected via FFI to GLM's optimized C++ implementation.
 
 ```lucid
--- core_lib/math.Lucid
+-- core_lib/math.luc
 package math
 
 -- @packed ensures Lucid memory matches GLM memory exactly
@@ -1686,7 +1686,7 @@ on_scene_click (pos Vec2) = {
 The Inspector uses the **Reactive Bridge (Decision 15)** to bind UI elements directly to the ECS memory. 
 
 ```lucid
--- engine/src/editor/inspector_panel.Lucid
+-- engine/src/editor/inspector_panel.luc
 export const render_inspector (entity &Entity) = {
     ui:panel("inspector", () = {
         -- Physics Component
@@ -1832,7 +1832,7 @@ Because Lucid treats functions as types, the graph's arrows map directly to code
 *   **Recursive UI:** The UI handles nested data (e.g., Arrays containing Structs that contain Arrays) using collapsible accordion sections inside the node to prevent screen clutter.
 
 #### 4. File Structure: Paging & Imports (draw.io style)
-*   **Paging:** A single `.lgraph` file can contain multiple "Pages" (tabs at the bottom) to organize logic (e.g., "Movement", "Combat"). The compiler flattens all pages into a single `.Lucid` package.
+*   **Paging:** A single `.lgraph` file can contain multiple "Pages" (tabs at the bottom) to organize logic (e.g., "Movement", "Combat"). The compiler flattens all pages into a single `.luc` package.
 *   **Import/Export UI:** The editor includes a visual manager for `use` (imports) and `export` to manage dependencies between visual graphs and raw code without manual typing.
 
 ---
@@ -1909,7 +1909,7 @@ Instead of manually moving binaries, the C++ build system (CMake) is configured 
 For public distribution, a dedicated packaging tool (`tools/package_sdk.py`) gathers the following components into a single installer:
 *   Pre-compiled Kernel and Compiler binaries.
 *   The standard `core_lib` and official extensions.
-*   **Environment Setup:** The installer registers the `.Lucid` file association, adds the compiler to the system `%PATH%`, and initializes the `%APPDATA%/LucidEngine` directory.
+*   **Environment Setup:** The installer registers the `.luc` file association, adds the compiler to the system `%PATH%`, and initializes the `%APPDATA%/LucidEngine` directory.
 
 #### 3. Testing Strategy
 *   **Kernel Tests (`tests/kernel/`)**: C++ unit tests for RHI, ECS, and VFS cores (GoogleTest/Catch2).
@@ -1927,7 +1927,7 @@ This is the repository that the engine developers (you) work in. It is compiled 
 
 ```text
 Lucid-Game-Engine/
-├── kernel/                             ← C++ → luc_kernel.dll
+├── kernel/                             ← C++ → lucid_kernel.dll
 │   ├── include/                        ← Public C-ABI (FFI contract)
 │   │   ├── lge_api.h                   ← LGE_ExtensionAPI struct, LGE_GetAPI()
 │   │   ├── lge_render.h
@@ -1961,7 +1961,7 @@ Lucid-Game-Engine/
 │       │   └── input_bridge.cpp
 │       ├── vfs/
 │       │   ├── vfs_reader.cpp          ← RAM-only AES-256 decrypt
-│       │   └── vfs_packer.cpp          ← Pack raw assets → .lucid bundle
+│       │   └── vfs_packer.cpp          ← Pack raw assets → .luc bundle
 │       ├── security/
 │       │   ├── license_verifier.cpp    ← Offline RSA/Ed25519 license check
 │       │   ├── key_derivation.cpp      ← PBKDF2/HKDF(AppID + machine UUID)
@@ -1969,23 +1969,20 @@ Lucid-Game-Engine/
 │       └── platform/
 │           ├── win32_loader.cpp        ← LoadLibrary, GetProcAddress
 │           └── linux_loader.cpp        ← dlopen, dlsym
-│       ├── platform/
-│           ├── win32_loader.cpp        ← LoadLibrary, GetProcAddress
-│           └── linux_loader.cpp        ← dlopen, dlsym
 ├── engine/                             ← The IDE Editor (Written in Lucid)
 │   └── src/                            
-│       ├── main.Lucid
+│       ├── main.luc
 │       ├── ui/
-│       │   └── workspace_manager.Lucid
+│       │   └── workspace_manager.luc
 │       ├── editor/
-│       │   ├── scene_view.Lucid
-│       │   ├── inspector_panel.Lucid
-│       │   └── console_manager.Lucid
+│       │   ├── scene_view.luc
+│       │   ├── inspector_panel.luc
+│       │   └── console_manager.luc
 │       └── visual_programming/
-│           └── node_graph.Lucid
-├── core_lib/                           ← Standard library (math.Lucid, io.Lucid)
-├── externals/                          ← Jolt, GLFW, Vulkan, ImGui, RmlUI, GLM
-│   └── luc_compiler/                   ← Submodule: https://github.com/Axo-1206/Lucid-Compiler.git
+│           └── node_graph.luc
+├── core_lib/                           ← Standard library (math.luc, io.luc)
+├── externals/                          ← Jolt, GLFW, Vulkan, ImGui, RmlUI, ImGui, GLM
+│   └── lucidlang/                   	← Submodule: https://github.com/Axo-1206/Lucid-Lang.git aka the language processor
 └── CMakeLists.txt                      ← Builds both Kernel and Compiler
 ```
 
@@ -1999,12 +1996,12 @@ Lucid-SDK/
 │   ├── luc_compiler.exe                ← The LLVM-based compiler
 │   ├── luc_langserver.exe              ← For IntelliSense in VS Code/Editor
 │   └── LucidEditor.exe                 ← The Bootstrap launcher for the IDE
-├── core_lib/                           ← math.Lucid, io.Lucid, etc.
+├── core_lib/                           ← math.luc, io.luc, etc.
 └── core_extensions/                    ← Official plugins (UI tools, etc.)
 ```
 
 ### C. The Shipped Game (What Players Download)
-When a game developer clicks "Export," the compiler packages their `.Lucid` code into a native `.lmod` and bundles it with the Kernel.
+When a game developer clicks "Export," the compiler packages their `.luc` code into a native `.lmod` and bundles it with the Kernel.
 
 ```text
 MyAwesomeGame/
