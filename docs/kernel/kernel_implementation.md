@@ -22,6 +22,9 @@
 12. [Console & Command Pipeline](#12-console--command-pipeline)
 13. [Security Layer](#13-security-layer)
 14. [Platform Layer](#14-platform-layer)
+15. [Lucid Execution Model (Interpreter → Compiler)](#15-lucid-execution-model-interpreter--compiler)
+16. [FFI Foreign Symbol Resolution](#16-ffi-foreign-symbol-resolution)
+17. [Arena Memory & the Shared `ArenaDescriptor`](#17-arena-memory--the-shared-arenadescriptor)
 
 ---
 
@@ -604,6 +607,322 @@ void         Platform::UnloadModule(ModuleHandle mod);
 ThreadHandle Platform::SpawnThread(void (*fn)(void*), void* arg);
 void         Platform::JoinThread(ThreadHandle t);
 ```
+
+---
+
+## 15. Lucid Execution Model (Interpreter → Compiler)
+
+### Introduction
+Lucid has two execution modes that share a single frontend and a single intermediate representation. The **interpreter** (`lucid run`) uses LLVM's ORC JIT to compile Lucid source to native code in memory and execute it immediately. The **compiler** (`lucid build`) uses LLVM AOT to emit object files and invoke the system linker. Both modes are built on LLVM — the frontend is written exactly once and produces LLVM IR; what happens to that IR is the only difference between the two modes.
+
+This is a deliberate architectural decision documented in the Lucid grammar:
+
+> *"Both the interpreter and the future compiler are built on LLVM. The Lucid frontend — parser, type checker, and code lowering — produces LLVM IR. What happens to that IR is the only difference between the two modes."*
+
+### How It Works
+
+The pipeline has one shared path and two separate exits, both at the LLVM level:
+
+```
+Lucid Source (.Lucid / .lfi)
+         │
+       Parser
+         │
+         AST
+         │
+  Semantic Analysis
+  + Type Checking
+         │
+  LLVM IR Lowering       ← single shared representation
+         │
+┌────────┴────────┐
+│                 │
+▼                 ▼
+LLVM ORC JIT    LLVM AOT
+(lucid run)     (lucid build)
+compile to      emit object file
+memory,         system linker
+execute         resolves symbols,
+immediately     produces binary
+│                 │
+└────────┬────────┘
+         │
+   luc_kernel.dll
+   (C functions via @[foreign("C")])
+```
+
+**Stage 1 — Parser:** Reads `.Lucid` source and produces an AST. Identical for both modes.
+
+**Stage 2 — Semantic Analysis:** Resolves names, checks types, validates `@[foreign("C")]` declarations against the known symbol table from `lge_ffi.lfi`. Errors are reported before any code generation begins. Identical for both modes.
+
+**Stage 3 — LLVM IR Lowering:** Translates the validated AST to LLVM IR. Every Lucid intrinsic (`#sqrt`, `#memcpy`, `#atomic_add`, etc.) maps directly to an LLVM intrinsic or IR instruction — written once, shared by both modes. Foreign calls (`@[foreign("C")]`) lower to LLVM `declare` + `call` instructions referencing the external C symbol by name. Identical for both modes.
+
+**Stage 4a — ORC JIT (interpreter mode):** LLVM's ORC JIT receives the IR, compiles it to native machine code in memory, and executes it immediately. Foreign symbols named in `@[link(...)]` are resolved by the JIT's built-in dynamic linker — it calls `dlopen` (Linux/macOS) or `LoadLibrary` (Windows) on the named library and registers its symbols with the JIT's symbol table. When the JIT emits a `call` to a foreign function, the address is resolved from the registered table. No separate marshaling layer (libffi) is needed — LLVM's own codegen handles calling conventions.
+
+**Stage 4b — LLVM AOT (compiler mode):** LLVM emits an object file from the same IR. `@[link(...)]` names are passed directly to the system linker (`ld`, `lld`, `link.exe`) as `-lname` flags. Foreign symbols are unresolved references in the object file; the linker patches their addresses. The output is a native binary with zero runtime overhead on foreign calls.
+
+### Foreign Symbol Resolution — The Key Difference
+
+The `@[foreign("C")]` declaration in `lge_ffi.lfi` produces the same LLVM IR in both modes — a `declare` statement naming the external symbol. What differs is only *when* and *how* that symbol's address is filled in:
+
+| | ORC JIT (interpreter) | LLVM AOT (compiler) |
+|---|---|---|
+| When resolved | At JIT startup, via `dlopen` | At link time, by the system linker |
+| How resolved | JIT dynamic linker registers the `.dll`/`.so` symbols | Linker patches the object file's relocation entries |
+| Calling convention | LLVM codegen handles it | LLVM codegen handles it |
+| libffi needed | No | No |
+| Runtime overhead | Zero (native call instruction) | Zero (native call instruction) |
+
+Both modes produce native `call` instructions. The JIT just does the linker's job in memory at startup instead of on disk at build time.
+
+### What This Means for the Source File Requirement
+
+The grammar documents one important asymmetry (lines 156–161): in compiler mode, a C source file path in `@[link("wrapper.c")]` can be compiled inline as part of the build. In interpreter mode, source files cannot be compiled on the fly — they must be pre-compiled to a `.so`/`.dylib`/`.dll` first. For `luc_kernel.dll` this is always pre-built, so it applies equally in both modes.
+
+### Intrinsics
+
+Every Lucid intrinsic maps directly to an LLVM IR node, lowered once in the frontend, shared by both modes:
+
+```
+Lucid intrinsic    LLVM IR node
+─────────────────────────────────────────────
+#sqrt(x)       →   call @llvm.sqrt.f32(float %x)
+#memcpy(d,s,n) →   call @llvm.memcpy(ptr %d, ptr %s, i64 %n)
+#atomic_add    →   atomicrmw add <ptr>, <val> <ordering>
+#simd_add      →   add <N x T> %a, %b
+#sizeof(T)     →   DataLayout::getTypeAllocSize (compile-time constant)
+#toRef(ptr)    →   non-null assertion + bitcast
+#toPtr(ref)    →   bitcast to pointer type
+```
+
+### Code Structure
+
+```
+luc_frontend/
+├── src/
+│   ├── parser.cpp          -- Lucid source → AST
+│   ├── sema.cpp            -- semantic analysis and type checking
+│   ├── ir_lowering.cpp     -- AST → LLVM IR (shared by both modes)
+│   ├── intrinsics.cpp      -- Lucid intrinsic → LLVM IR node mappings
+│   └── foreign.cpp         -- @[foreign("C")] → LLVM declare + call
+│
+luc_interpreter/
+├── src/
+│   ├── jit.cpp             -- LLVM ORC JIT session setup and execution
+│   └── dynlink.cpp         -- dlopen/LoadLibrary wrapper for @[link(...)]
+│
+luc_compiler/
+├── src/
+│   ├── aot.cpp             -- LLVM AOT object file emission
+│   └── linker.cpp          -- invokes system linker with @[link(...)] flags
+```
+
+---
+
+## 16. FFI Foreign Symbol Resolution
+
+### Introduction
+Foreign symbol resolution is the mechanism by which `@[foreign("C")]` declarations in Lucid code find the actual C function addresses in `luc_kernel.dll`. The process is completely different in each mode — but because both are built on LLVM, neither requires a separate marshaling library or a runtime symbol table. LLVM handles calling conventions in both cases.
+
+### Interpreter Mode (ORC JIT)
+
+The ORC JIT has a built-in dynamic linker. At startup, for every `@[link("luc_kernel")]` annotation the JIT encounters, it:
+
+1. Calls `dlopen("luc_kernel.dll")` / `LoadLibrary("luc_kernel.dll")` to load the library
+2. Registers all of its exported symbols with the JIT's symbol table
+3. When JIT-compiled code calls a foreign function, the JIT resolves the address from the registered table — the same resolution a system linker would perform at compile time, done in memory at runtime
+
+The foreign call in the JIT-compiled native code is a direct `call` instruction to the resolved address. There is no wrapper, no marshaling layer, no overhead beyond the call itself. LLVM's codegen handles the platform calling convention (System V AMD64 on Linux, Microsoft x64 on Windows) from the `declare` statement's parameter types.
+
+```
+lge_ffi.lfi declares:
+  @[foreign("C"), link("luc_kernel")]
+  const LGE_Physics_CreateBody (entity uint64, def *uint8) -> uint32 = {}
+
+ORC JIT at startup:
+  dlopen("luc_kernel.dll")               → module handle
+  register all exported symbols           → JIT symbol table entry:
+                                            "LGE_Physics_CreateBody" → 0x7ff8a3c2...
+
+JIT-compiled Lucid call:
+  LGE_Physics_CreateBody(entity, def)    → native CALL 0x7ff8a3c2...
+                                            (direct address, zero overhead)
+```
+
+### Compiler Mode (AOT)
+
+The AOT compiler emits an object file. The `declare` for a foreign function becomes an undefined external symbol reference in the object file. `@[link("luc_kernel")]` is passed to the system linker as `-lluc_kernel`. The linker finds the symbol in `luc_kernel.dll`'s export table and patches the address into the object file's relocation entries.
+
+```
+lge_ffi.lfi declares:
+  @[foreign("C"), link("luc_kernel")]
+  const LGE_Physics_CreateBody (entity uint64, def *uint8) -> uint32 = {}
+
+LLVM AOT emits in object file:
+  declare i32 @LGE_Physics_CreateBody(i64 %entity, ptr %def)
+  ...
+  call i32 @LGE_Physics_CreateBody(...)    ← unresolved reference
+
+System linker:
+  -lluc_kernel                             → finds LGE_Physics_CreateBody
+                                             in luc_kernel.dll export table
+                                           → patches CALL address in binary
+
+Shipped binary:
+  CALL 0x7ff8a3c2...                       ← direct address, zero overhead
+```
+
+### Why No libffi
+
+libffi exists to call C functions dynamically when you don't know their signature at compile time — interpreters like CPython use it because Python has no static type information about C function signatures. Lucid does not have this problem. Every `@[foreign("C")]` declaration carries full, explicit type information — parameter types and return type are written in the `.lfi` file. LLVM receives that type information as part of the `declare` statement and generates a correct calling-convention-aware `call` instruction from it. There is nothing left for libffi to do.
+
+### Code Structure
+
+```
+luc_interpreter/
+├── src/
+│   ├── jit.cpp          -- ORC JIT session: ThreadSafeContext, LLJIT setup,
+│   │                       IR compilation, module addition
+│   └── dynlink.cpp      -- loads @[link(...)] libraries via dlopen/LoadLibrary,
+│                           registers symbols with JIT's DynamicLibrarySearchGenerator
+
+luc_compiler/
+├── src/
+│   ├── aot.cpp          -- TargetMachine setup, object file emission via
+│   │                       PassManager + raw_fd_ostream
+│   └── linker.cpp       -- assembles linker invocation from @[link(...)] annotations,
+│                           calls lld or system ld/link.exe
+
+-- Note: no ffi_dispatch.cpp, no type_marshal.cpp, no libffi dependency.
+-- LLVM IR lowering (luc_frontend/src/ir_lowering.cpp) handles everything.
+```
+
+### Notes
+- `luc_kernel.dll` is always pre-built before either mode runs. Neither the JIT nor the AOT compiler builds it on the fly.
+- The JIT's dynamic linker holds module handles open for the entire session — `dlclose` is only called on interpreter shutdown.
+- In interpreter mode, a C source file path in `@[link("wrapper.c")]` cannot be compiled on the fly — it must be pre-compiled to a `.so`/`.dll` first. `luc_kernel.dll` is always pre-compiled, so this restriction doesn't affect the engine's FFI layer.
+- Both modes resolve symbols by exact name — the C symbol name in `lge_*.h` must match the name in the `@[foreign("C")]` declaration in `lge_ffi.lfi` exactly.
+
+---
+
+## 17. Arena Memory & the Shared `ArenaDescriptor`
+
+### Introduction
+The Lucid language has three memory regions — scope arena (stack), `#alloc` heap, and named arenas. Only named arenas can be safely shared with C because they are the only region whose lifetime and boundaries are unambiguous to both sides. The mechanism that makes this sharing safe without per-pointer tagging or runtime overhead is the `ArenaDescriptor` struct — a plain POD value that both Lucid and C read with identical layout.
+
+This section covers how `ArenaDescriptor` is defined, how it flows through the kernel's C API layer, and the ownership check pattern both the kernel's C++ internals and external C code use to verify arena membership.
+
+### Why `ArenaDescriptor` Instead of Per-Pointer Tags
+
+The alternative — tagging each `*T` pointer with which allocator produced it — would require the type system to track allocator provenance through every assignment, function call, and return value. That is significant compiler complexity and either a hidden tag byte per pointer (runtime overhead) or a fully parameterized pointer type (language complexity). Neither is justified when the problem can be solved at the arena level instead of the pointer level.
+
+An `ArenaDescriptor` puts the identity information on the region, not on individual pointers. A single range check — `is ptr inside [base, base+size)?` — answers the ownership question for every pointer into that arena simultaneously, with no per-pointer cost and no type system extension.
+
+### The Struct — Lucid Side
+
+`ArenaDescriptor` is a built-in POD struct defined by the language. It is not user-defined and not importable — it exists as a primitive the same way `uint32` or `bool` does:
+
+```lucid
+-- built-in — not written by the user
+const ArenaDescriptor = struct {
+    base *uint8   -- start address of the arena region (immutable after create)
+    size uint64   -- total byte capacity      (immutable after create)
+}
+```
+
+Two fields only. `base` and `size` are set once by `#arena_create` and never change for the lifetime of the arena. The allocation cursor (`used`) is tracked internally by the language processor and is intentionally absent from the descriptor — C has no legitimate reason to read or write it.
+
+```lucid
+-- create and use
+let physics_arena ArenaDescriptor = #arena_create(2 * 1024 * 1024)   -- 2 MB
+const bodies  *uint8 = #arena_alloc(physics_arena, uint8, 65536)
+const shapes  *uint8 = #arena_alloc(physics_arena, uint8, 32768)
+
+-- pass to C — descriptor travels with the data
+LGE_Physics_LoadBodies(bodies, shapes, #addrof(physics_arena))
+
+-- Lucid owns the lifetime
+#arena_free(physics_arena)
+```
+
+### The Struct — C Side
+
+The kernel's C header defines `LGE_ArenaDescriptor` with identical field order, types, and alignment. No padding is inserted between fields on any supported 64-bit platform — `*uint8` (8 bytes) followed by `uint64_t` (8-byte aligned) is naturally packed:
+
+```c
+// kernel/include/lge_arena.h
+#pragma once
+#include <stdint.h>
+
+// Plain POD struct — identical layout to Lucid's ArenaDescriptor.
+// base and size are immutable after LGE_Arena_Create().
+// The allocation cursor is managed by the Lucid runtime — never touch it from C.
+typedef struct {
+    uint8_t* base;   // start address of the arena region
+    uint64_t size;   // total byte capacity in bytes
+} LGE_ArenaDescriptor;
+
+// Ownership check — two comparisons, no hash lookup, no lock.
+// Returns 1 if ptr falls within the arena region, 0 otherwise.
+static inline int LGE_Arena_Contains(
+    const LGE_ArenaDescriptor* arena,
+    const void* ptr)
+{
+    return (uint8_t*)ptr >= arena->base &&
+           (uint8_t*)ptr <  arena->base + arena->size;
+}
+```
+
+### How Kernel Subsystems Use It
+
+Each kernel subsystem that accepts arena-allocated memory from Lucid follows the same pattern: receive the data pointer(s) and the descriptor, assert ownership in debug builds, proceed safely:
+
+```cpp
+// physics_bridge.cpp — loading physics bodies from Lucid arena memory
+
+void LGE_Physics_LoadBodies(
+    const uint8_t*             bodies_data,
+    const uint8_t*             shapes_data,
+    const LGE_ArenaDescriptor* arena)
+{
+    // Debug: verify both pointers belong to the declared arena.
+    // Compiles away under NDEBUG — zero cost in release builds.
+    assert(LGE_Arena_Contains(arena, bodies_data) &&
+           "bodies_data does not belong to the provided arena");
+    assert(LGE_Arena_Contains(arena, shapes_data) &&
+           "shapes_data does not belong to the provided arena");
+
+    // Safe to proceed — memory is arena-owned, must not call free() on it.
+    // The arena outlives this call; Lucid holds the descriptor.
+}
+```
+
+### Lifetime Contract
+
+```
+ArenaDescriptor must outlive every C call that receives #addrof(arena).
+The arena must not be #arena_free'd while C still holds pointers into it.
+```
+
+In practice:
+- Declare `ArenaDescriptor` at the scope that owns the C interaction, never inside a loop
+- Call `#arena_free` only after all C calls (and anything they spawn) have returned
+- Arenas that span multiple frames (e.g. a physics world that lives for a whole scene) should be allocated at scene load and freed at scene unload
+
+### Code Structure
+
+```
+kernel/
+├── include/
+│   └── lge_arena.h      -- LGE_ArenaDescriptor typedef + LGE_Arena_Contains inline
+
+luc_runtime/
+├── src/
+│   └── arena.cpp        -- #arena_create / #arena_alloc / #arena_reset / #arena_free
+│                           manages internal bump-pointer cursor (not in descriptor)
+```
+
+`lge_arena.h` is included by every kernel subsystem that accepts Lucid arena memory. `LGE_ArenaDescriptor` in C maps to `ArenaDescriptor` in Lucid with identical field layout — no marshaling needed when passing the descriptor across the FFI boundary.
 
 ---
 
