@@ -1982,7 +1982,7 @@ Lucid-Game-Engine/
 │           └── node_graph.luc
 ├── core_lib/                           ← Standard library (math.luc, io.luc)
 ├── externals/                          ← Jolt, GLFW, Vulkan, ImGui, RmlUI, ImGui, GLM
-│   └── lucidlang/                   	← Submodule: https://github.com/Axo-1206/Lucid-Lang.git aka the language processor
+│   └── lucidlang/                   	← Submodule: https://github.com/Axo-1206/Lucid-Lang.git aka the language compiler
 └── CMakeLists.txt                      ← Builds both Kernel and Compiler
 ```
 
