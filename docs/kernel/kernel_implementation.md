@@ -43,7 +43,7 @@ The Kernel is not a monolith. It does not contain editor logic, game scripts, or
 ```
 ┌──────────────────────────────────────────────┐
 │               Lucid Layer                    │
-│  editor/*.Lucid   game/*.Lucid   extensions  │
+│  editor/*.luc   game/*.luc   extensions  │
 │              (lmod / dll files)              │
 ├──────────────────────────────────────────────┤
 │           C ABI Surface (lge_api.h)          │
@@ -108,8 +108,8 @@ A reference for every acronym, term, and file format used throughout this docume
 
 | Extension | Name | Description |
 |-----------|------|-------------|
-| `.Lucid` | Lucid Source File | Human-readable source code written in the Lucid language. This is what developers author. The compiler turns these into `.lmod` or native `.dll` files. Equivalent to `.cs` for C# or `.py` for Python. |
-| `.lmod` | Lucid Module | A compiled, native-code binary produced by `luc_compiler.exe` from one or more `.Lucid` source files. Loaded by the kernel's Script Manager at runtime. Equivalent to a `.so` or `.dll` but scoped to the Lucid runtime. |
+| `.luc` | Lucid Source File | Human-readable source code written in the Lucid language. This is what developers author. The compiler turns these into `.lmod` or native `.dll` files. Equivalent to `.cs` for C# or `.py` for Python. |
+| `.lmod` | Lucid Module | A compiled, native-code binary produced by `luc_compiler.exe` from one or more `.luc` source files. Loaded by the kernel's Script Manager at runtime. Equivalent to a `.so` or `.dll` but scoped to the Lucid runtime. |
 | `.dll` | Dynamic-Link Library | A Windows shared library. The kernel itself (`luc_kernel.dll`) is a `.dll`. C++ extensions also ship as `.dll` files. On Linux the equivalent is `.so` (shared object) — the engine's platform layer abstracts the difference. |
 | `.exe` | Executable | A Windows application binary. `luc_compiler.exe`, `luc_langserver.exe`, `LucidEditor.exe`, and the shipped game's launcher are all `.exe` files. |
 | `.h` | C/C++ Header | A C or C++ header file declaring types, structs, and function signatures. The kernel's public ABI is defined entirely in `.h` files under `kernel/include/` (e.g. `lge_api.h`, `lge_render.h`). |
@@ -438,12 +438,12 @@ bool    LGE_VFS_Exists(const char* virtual_path);
 ## 10. Script Manager & Hot-Reload
 
 ### Introduction
-The Script Manager is responsible for loading compiled Lucid modules (`.lmod` / `.dll` files), calling their lifecycle hooks (`on_load`, `on_unload`), and swapping them at runtime when source files change — what the engine calls "hot-reload." This is what makes saving a `.Lucid` file in the editor instantly reflect changes in the running game without restarting.
+The Script Manager is responsible for loading compiled Lucid modules (`.lmod` / `.dll` files), calling their lifecycle hooks (`on_load`, `on_unload`), and swapping them at runtime when source files change — what the engine calls "hot-reload." This is what makes saving a `.luc` file in the editor instantly reflect changes in the running game without restarting.
 
 ### How It Works
 Three components work in sequence:
 
-**FileWatcher** — a background thread watches the active project's `src/` directory using native OS APIs (`ReadDirectoryChangesW` on Windows, `inotify` on Linux). When a `.Lucid` file is saved, it fires an event with the changed file's path.
+**FileWatcher** — a background thread watches the active project's `src/` directory using native OS APIs (`ReadDirectoryChangesW` on Windows, `inotify` on Linux). When a `.luc` file is saved, it fires an event with the changed file's path.
 
 **Compiler Subprocess** — the Kernel spawns `luc_compiler.exe` as a child process, targeting the changed file. Output goes to a `_next.dll` temp file, never overwriting the live module. If compilation fails, the live module is untouched and errors are piped to the editor console.
 
@@ -624,7 +624,7 @@ This is a deliberate architectural decision documented in the Lucid grammar:
 The pipeline has one shared path and two separate exits, both at the LLVM level:
 
 ```
-Lucid Source (.Lucid / .lfi)
+Lucid Source (.luc / .lfi)
          │
        Parser
          │
@@ -651,7 +651,7 @@ immediately     produces binary
    (C functions via @[foreign("C")])
 ```
 
-**Stage 1 — Parser:** Reads `.Lucid` source and produces an AST. Identical for both modes.
+**Stage 1 — Parser:** Reads `.luc` source and produces an AST. Identical for both modes.
 
 **Stage 2 — Semantic Analysis:** Resolves names, checks types, validates `@[foreign("C")]` declarations against the known symbol table from `lge_ffi.lfi`. Errors are reported before any code generation begins. Identical for both modes.
 
