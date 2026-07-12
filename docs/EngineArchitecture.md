@@ -1,8 +1,410 @@
 # Engine Architecture
 
-This document describes how Lucid Game Engine is organized on disk, how responsibility is split between the C++ kernel and the Lucid-authored layers above it, and what a project looks like as it moves from source repository → downloadable SDK → shipped game.
+This document describes how Lucid Game Engine is organized on disk, how responsibility is split between the C++ kernel/engine layer and the Lucid scripting layer above it, and what a project looks like as it moves from source repository → downloadable SDK → shipped game.
 
-Some entries below correct and extend the original tree to match decisions locked in `MasterPlan.md` and the implementation detail in `docs/kernel/kernel_implementation.md` (notably the network subsystem, the arena allocator, and several kernel headers that existed in code samples but were missing from this listing).
+Some entries correct and extend the original tree to match decisions locked in `MasterPlan.md` and the implementation detail in `docs/kernel/kernel_implementation.md`.
+
+---
+
+## Two-Layer Architecture
+
+The engine is built on a strict two-layer model. The boundary between them is the kernel's C ABI — the flat function table exported by `LGE_GetAPI()`. Nothing crosses this boundary in the wrong direction.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   LAYER 2 — User / Scripting                    │
+│                                                                 │
+│   User game logic written in Lucid (.luc files)                 │
+│   Imports from bindings/ to access engine features              │
+│   Never touches kernel headers or C++ directly                  │
+│                                                                 │
+│   bindings/          ← Lucid wrappers over lge_*.h headers      │
+│   core_lib/          ← Standard library (io, math, array...)    │
+│   (user project)/    ← Developer's own game logic               │
+├─────────────────────────────────────────────────────────────────┤
+│              C ABI boundary  —  LGE_GetAPI()                    │
+│              lge_*.h headers  —  POD structs, C types only      │
+├─────────────────────────────────────────────────────────────────┤
+│                   LAYER 1 — Internal Engine (C++)               │
+│                                                                 │
+│   kernel/    ← Microkernel: rendering, physics, ECS, audio,     │
+│               VFS, input, network, security, platform           │
+│               Talks to third-party libs directly in C++         │
+│                                                                 │
+│   engine/    ← Editor shell: ImGui panels, docking, toolbar,    │
+│               scene view, inspector, asset browser              │
+│               Written in C++, uses ImGui and kernel APIs        │
+│                                                                 │
+│   externals/ ← Jolt, GLFW, ImGui, RmlUI, VMA, etc.              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 1 — Internal Engine (C++)
+
+The kernel and the editor shell are written entirely in C++. They talk to third-party libraries (Jolt, GLFW, Vulkan, ImGui, RmlUI, miniaudio) directly via their C++ APIs. No Lucid code exists at this layer. The kernel exposes its functionality upward through `lge_*.h` headers — C types only, no C++ classes at the boundary.
+
+The editor shell (`engine/`) is built on ImGui. Every panel you see — the scene hierarchy, the inspector, the console, the asset browser — is a C++ ImGui panel calling the kernel's C API. This is the same decision Godot made: the editor is engine code, not user code.
+
+### Layer 2 — User / Scripting (Lucid)
+
+Game logic, extensions, and any user-authored behavior are written in Lucid. Users never write C++ and never import `lge_*.h` directly. Instead they import from `bindings/` — a set of `.luc` files that wrap each kernel header in idiomatic Lucid APIs. The bindings are what ships in the SDK alongside `core_lib/`.
+
+```lucid
+-- A user's game script imports from bindings, not from kernel headers
+import "bindings/physics"
+import "bindings/ecs"
+import "core_lib/math"
+
+const on_update (dt float) = {
+    let hit Result<RaycastHit, bool> = physics:raycast(origin, direction, 100.0)
+    if hit.flag {
+        ecs:destroy_entity(hit.value.entity)
+    }
+}
+```
+
+The bindings layer is analogous to Godot's GDScript built-in class bindings, Unity's `UnityEngine.dll`, or Unreal's Blueprint function library — a curated, ergonomic API that sits between raw engine internals and user code.
+
+---
+
+## File Structure
+
+```
+Lucid-Game-Engine/
+├── README.md
+├── LICENSE
+├── CMakeLists.txt
+├── .gitignore
+├── .gitmodules
+│
+├── bindings/                         -- Lucid wrappers over kernel C headers (ships in SDK)
+│   │                                 -- Users import these instead of touching lge_*.h directly
+│   ├── ecs.luc                     -- Entity/component API: create_entity, add_component, for_each
+│   ├── physics.luc                 -- Physics API: create_body, raycast, set_velocity, on_contact
+│   ├── render.luc                  -- Render API: upload_texture, draw_mesh, get_render_size
+│   ├── audio.luc                   -- Audio API: load_sfx, play, set_volume, set_position
+│   ├── input.luc                   -- Input API: is_key_held, mouse_pos, gamepad_axis
+│   ├── vfs.luc                     -- VFS API: open, read, write, list_dir
+│   ├── network.luc                 -- Network API: connect, listen, send, poll_event
+│   ├── console.luc                 -- Console API: log, warn, error, register command
+│   └── ui.luc                      -- In-game UI API: Lucid bridge over RmlUI contexts
+│
+├── core_lib/                         -- Lucid standard library (ships in SDK, not engine-specific)
+│   ├── io.luc                      -- I/O: print, read_line, file helpers
+│   ├── math.luc                    -- Vec2/3/4, Mat4, Quat, lerp, clamp, trig
+│   ├── array.luc                   -- map, filter, reduce, sort, zip
+│   └── string.luc                  -- split, trim, find, format
+│
+├── docs/                             -- Engine documentation and specifications
+│   ├── MasterPlan.md                 -- Engine roadmap and design decisions
+│   ├── EngineArchitecture.md         -- This document
+│   ├── LUCID_GRAMMAR.md              -- The Lucid language specification
+│   │
+│   ├── designs/                      -- Detailed design reference papers
+│   │   ├── AssetPipeline.md
+│   │   ├── BuildSystem.md
+│   │   ├── ControlPanelDesign.md
+│   │   ├── EcsSerialization.md
+│   │   ├── ExecutionPlan.md
+│   │   ├── LucidEngineOverview.md
+│   │   ├── LucidEngineSecurity.md
+│   │   ├── LucidFileFormats.md
+│   │   ├── LucidVersionControll.md
+│   │   └── SecurityKeyGuide.md
+│   │
+│   └── kernel/
+│       ├── kernel_implementation.md  -- Microkernel implementation details
+│       └── kernel_api_reference.md  -- Full lge_*.h C API reference
+│
+├── engine/                           -- Editor shell (C++, ImGui-based)
+│   │                                 -- Written in C++, not Lucid
+│   │                                 -- Calls kernel C API and ImGui directly
+│   └── src/
+│       ├── main.cpp                  -- Editor entry point: LGE_Boot + ImGui shell init
+│       │
+│       ├── shell/                    -- Top-level editor chrome
+│       │   ├── ActivityBar.hpp/cpp   -- Left sidebar icon rail
+│       │   ├── StatusBar.hpp/cpp     -- Bottom status line (play state, frame time)
+│       │   └── TabManager.hpp/cpp    -- Dockable tab container management
+│       │
+│       ├── editor/                   -- Editor tool panels (all ImGui)
+│       │   ├── SceneView.hpp/cpp     -- 3D viewport: camera control, gizmos, entity picking
+│       │   ├── InspectorPanel.hpp/cpp -- Property inspector: reflects ECS components
+│       │   ├── HierarchyPanel.hpp/cpp -- Scene entity tree
+│       │   ├── AssetBrowser.hpp/cpp  -- VFS-backed file/asset browser
+│       │   ├── ConsolePanel.hpp/cpp  -- Live console output + command input
+│       │   └── ProfilerPanel.hpp/cpp -- Frame time, draw calls, memory stats
+│       │
+│       └── ui/                       -- Editor UI infrastructure (ImGui helpers)
+│           ├── WorkspaceManager.hpp/cpp -- Docking layout save/load
+│           ├── Theme.hpp/cpp            -- ImGui style tokens (colors, rounding, fonts)
+│           └── Widgets.hpp/cpp          -- Shared custom ImGui widgets (drag-vec3, color picker, etc.)
+│
+├── externals/                        -- 3rd-party dependencies and submodules
+│   ├── cgltf/                        -- Single-header GLTF loader
+│   ├── glfw/                         -- Windowing and input
+│   ├── glm/                          -- Math library for graphics matrices
+│   ├── imgui/                        -- Immediate-mode GUI (editor shell only)
+│   ├── jolt/                         -- 3D physics simulation
+│   ├── lucidlang/                    -- Lucid language processor (lexer, parser, JIT/AOT)
+│   ├── miniaudio/                    -- Single-header audio mixer
+│   ├── nlohmann/                     -- JSON parser
+│   ├── rmlui/                        -- Retained HTML/CSS engine for in-game UI
+│   └── vma/                          -- Vulkan memory allocator
+│
+├── kernel/                           -- C++ microkernel (the engine bedrock)
+│   ├── include/                      -- Public C-ABI headers (no C++ types)
+│   │   ├── lge_api.h                 -- Stable function table: LGE_GetAPI()
+│   │   ├── lge_arena.h               -- LGE_ArenaDescriptor + LGE_Arena_Contains
+│   │   ├── lge_audio.h               -- SFX/stream audio API
+│   │   ├── lge_console.h             -- Console command dispatch
+│   │   ├── lge_ecs.h                 -- Entity/component/archetype API
+│   │   ├── lge_input.h               -- Input polling and callbacks
+│   │   ├── lge_network.h             -- Network provider interface
+│   │   ├── lge_physics.h             -- Jolt physics bridge API
+│   │   ├── lge_platform.h            -- OS abstraction (internal only)
+│   │   ├── lge_render.h              -- Vulkan RHI submission API
+│   │   ├── lge_security.h            -- License + signature verification
+│   │   └── lge_vfs.h                 -- Encrypted virtual file system API
+│   │
+│   ├── ffi/                          -- Generated FFI artifacts (do not edit manually)
+│   │   └── lge_ffi.lfi               -- Auto-generated: @[foreign("C")] declarations
+│   │                                 -- Consumed by Lucid compiler + JIT for symbol resolution
+│   │                                 -- Generated from lge_*.h by lge_header_parser tool
+│   │
+│   └── src/                          -- Microkernel subsystem implementations
+│       ├── core/
+│       │   ├── checksum.cpp          -- SHA-256 self-integrity checks
+│       │   ├── clock.cpp             -- Frame delta-time clocks
+│       │   ├── console_interpreter.cpp -- Console command reflection runner
+│       │   ├── file_watcher.cpp      -- ReadDirectoryChangesW / inotify watcher
+│       │   ├── kernel.cpp            -- LGE_Boot: ordered subsystem initialization
+│       │   └── script_manager.cpp    -- Lucid module hot-reload via DLL swap
+│       ├── ecs/
+│       │   ├── components/           -- POD component structs
+│       │   │   ├── audio_source.cpp
+│       │   │   ├── physics_body.cpp
+│       │   │   ├── sprite_renderer.cpp
+│       │   │   └── transform.cpp
+│       │   ├── component_store.cpp   -- Archetype sequential array storage
+│       │   ├── system_scheduler.cpp  -- Multithreaded system execution
+│       │   └── world.cpp             -- Entity lifecycle management
+│       ├── input/
+│       │   └── input_bridge.cpp      -- GLFW polling → lge_input.h surface
+│       ├── network/
+│       │   └── network_manager.cpp   -- TCP/UDP providers, INetworkProvider host
+│       ├── physics/
+│       │   ├── debug_renderer.cpp    -- Jolt debug wireframe visualization
+│       │   └── physics_bridge.cpp    -- Jolt integration and contact callbacks
+│       ├── platform/
+│       │   ├── linux_loader.cpp      -- dlopen/dlsym
+│       │   └── win32_loader.cpp      -- LoadLibrary/GetProcAddress
+│       ├── render/
+│       │   ├── sdf_font.cpp          -- Multi-channel SDF font rendering
+│       │   └── vulkan_rhi.cpp        -- Vulkan device, swapchain, pipelines
+│       ├── security/
+│       │   ├── extension_verifier.cpp -- Ed25519 extension package verification
+│       │   ├── key_derivation.cpp    -- PBKDF2/HKDF key derivation
+│       │   └── license_verifier.cpp  -- Offline Ed25519 license validation
+│       ├── ui/
+│       │   ├── imgui_shell.cpp       -- ImGui frame lifecycle (BeginFrame/EndFrame)
+│       │   └── rmlui_backend.cpp     -- RmlUI Vulkan backend for in-game UI
+│       ├── audio/
+│       │   └── audio_system.cpp      -- Miniaudio SFX/stream mixer
+│       └── vfs/
+│           ├── vfs_packer.cpp        -- Encrypted .pck asset bundler
+│           └── vfs_reader.cpp        -- Memory-resident AES-256 decrypter
+│
+├── luc_runtime/                      -- Lucid language runtime (sibling of kernel/)
+│   └── src/
+│       └── arena.cpp                 -- #arena_create/alloc/reset/free, bump-pointer cursor
+│
+├── tools/                            -- Development utility scripts
+│   ├── lge_header_parser/            -- Generates lge_ffi.lfi from lge_*.h via libclang
+│   │   ├── main.cpp
+│   │   └── CMakeLists.txt
+│   ├── bootstrap_main.cpp            -- MSBuild boot for LucidEditor
+│   ├── download_externals.ps1        -- Submodule initialization
+│   └── package_sdk.py                -- Packages binaries + core_lib + bindings → LucidSetup.exe
+│
+└── tests/
+    ├── kernel/                       -- C++ unit/system tests (GoogleTest)
+    └── logic/                        -- Lucid integration test scripts
+```
+
+---
+
+## The Kernel (C++ Bedrock)
+
+`kernel/` is the only part of the engine written in C++, and it is the only part that touches hardware, memory, or the OS directly. It owns rendering, physics, input, audio, file I/O, and thread scheduling. Nothing above it — not the editor shell, not user scripts, not extensions — is allowed to reach past the kernel's public headers.
+
+### Boundary Rules
+
+- **One-directional ABI.** The kernel exports a single flat C function table via `LGE_GetAPI()`. Lucid modules call into it; the kernel never calls back into Lucid or links against it directly.
+- **C types only at the boundary.** Every header under `kernel/include/` uses raw pointers and POD structs — no STL, no C++ classes cross the ABI. This keeps the surface stable across compilers and language runtimes.
+- **POD components.** All ECS component structs are plain data with no constructors or virtual methods — `memcpy`-safe and reflection-friendly.
+- **Systems never call each other.** `PhysicsSystem` writes to `TransformComponent`; `RenderSystem` reads from it. Communication happens only through shared component data.
+
+### Subsystem Map
+
+| Folder (`kernel/src/`) | Public header | Responsibility |
+|:---|:---|:---|
+| `core/` | `lge_api.h`, `lge_console.h` | Boot sequence, frame clock, hot-reload file watching, console command dispatch |
+| `ecs/` | `lge_ecs.h` | Entity registry, archetype/component storage, multithreaded system scheduling |
+| `render/` | `lge_render.h` | Vulkan RHI — device, swapchain, pipelines, SDF font rendering |
+| `physics/` | `lge_physics.h` | Jolt integration, contact callbacks, debug wireframe rendering |
+| `input/` | `lge_input.h` | GLFW polling mapped to swappable `IInputProvider` interface |
+| `network/` | `lge_network.h` | Core TCP/UDP `INetworkProvider`; extensions register alternatives (Steam, WebSockets) |
+| `vfs/` | `lge_vfs.h` | Encrypted virtual file system — identical API for loose dev files and packed `.pck` bundles |
+| `security/` | `lge_security.h` | Offline Ed25519 license verification, PBKDF2/HKDF key derivation |
+| `platform/` | `lge_platform.h` | The only place `#ifdef _WIN32` is allowed — `LoadLibrary`/`dlopen` abstraction |
+| `ui/` | — (internal) | ImGui frame lifecycle hook; RmlUI in-game HUD Vulkan backend |
+| `audio/` | `lge_audio.h` | Miniaudio-backed SFX and streaming mixer |
+
+`luc_runtime/` sits beside `kernel/` rather than inside it: it owns the Lucid language's arena allocator (`ArenaDescriptor`), which the kernel consumes (via `lge_arena.h`) but does not own the lifetime of.
+
+---
+
+## The Editor Shell (C++, engine/)
+
+`engine/` is the Lucid IDE — the window you see when you open the engine. It is written entirely in C++ using ImGui. It is **not** a Lucid program; it does not use the scripting layer at all.
+
+Every panel in the editor is an ImGui C++ panel that calls into the kernel's C API:
+- **SceneView** — 3D viewport with camera orbit, entity picking via `LGE_Physics_RaycastFromCamera`, and gizmo overlays
+- **InspectorPanel** — reads ECS component data via `LGE_GetComponent`, renders editable fields with ImGui widgets, writes changes back via the same API
+- **HierarchyPanel** — queries all live entities via `LGE_ForEach`, displays them in a tree
+- **AssetBrowser** — lists files via `LGE_VFS_ListDir`, loads previews with `LGE_UploadTexture`
+- **ConsolePanel** — displays diagnostics, accepts command input via `LGE_Console_Exec`
+
+The editor shell does not contain game logic. It is a tool that inspects and controls the kernel's state at edit time.
+
+---
+
+## The Bindings Layer (bindings/)
+
+`bindings/` is the bridge between the kernel's raw C API and Lucid user code. Each `.luc` file in this folder wraps one or more `lge_*.h` headers, providing idiomatic Lucid function and type names instead of raw C symbols.
+
+Users import from `bindings/` rather than writing `@[foreign("C")]` declarations themselves. The bindings are what Godot's built-in GDScript class library is, or what Unity's `UnityEngine` namespace is — the engine's public API as seen by the person writing game logic.
+
+### Example — `bindings/physics.luc`
+
+```lucid
+-- bindings/physics.luc
+-- Lucid-idiomatic wrapper over lge_physics.h
+-- Users import this file; they never see the @[foreign("C")] declarations
+
+import "kernel/ffi/lge_ffi.lfi"    -- raw FFI declarations (generated)
+
+-- Re-export with Lucid-idiomatic names and types
+const create_body (entity EntityID, def *PhysicsBodyDef) -> BodyID = {
+    return LGE_Physics_CreateBody(entity, def)
+}
+
+const raycast (origin Vec3, dir Vec3, max_dist float) -> Result<RaycastHit, bool> = {
+    let hit RaycastHit = RaycastHit{}
+    let found bool = LGE_Physics_Raycast(
+        #addrof(origin.x), #addrof(dir.x), max_dist, #addrof(hit)
+    )
+    return Result<RaycastHit, bool>{ value = hit, flag = found }
+}
+
+const add_force (id BodyID, force Vec3) = {
+    LGE_Physics_AddForce(id, force.x, force.y, force.z)
+}
+```
+
+### Example — user game script
+
+```lucid
+-- A user's game script — clean, no raw C visible
+import "bindings/physics"
+import "bindings/ecs"
+import "bindings/input"
+import "core_lib/math"
+
+const on_update (dt float) = {
+    if input:is_key_pressed(KeyCode.Space) {
+        let hit Result<RaycastHit, bool> = physics:raycast(
+            camera_pos, camera_forward, 100.0
+        )
+        if hit.flag {
+            ecs:destroy_entity(hit.value.entity)
+        }
+    }
+}
+```
+
+### Relationship to `lge_ffi.lfi`
+
+`kernel/ffi/lge_ffi.lfi` is the **machine-level** FFI file — a generated file containing raw `@[foreign("C")]` declarations for every symbol in the kernel's C headers. It is consumed by the Lucid JIT and AOT compiler to resolve foreign symbols. It is not user-facing.
+
+`bindings/*.luc` are the **human-facing** layer — hand-authored Lucid files that import from `lge_ffi.lfi` internally and expose clean, documented, type-safe Lucid APIs to game developers.
+
+| File | Written by | Used by | Purpose |
+|------|-----------|---------|---------|
+| `kernel/include/lge_*.h` | Engine team (C) | C++ kernel internally + `lge_header_parser` | Raw C ABI definition |
+| `kernel/ffi/lge_ffi.lfi` | `lge_header_parser` tool (generated) | Lucid compiler + JIT | Raw FFI symbol resolution |
+| `bindings/*.luc` | Engine team (Lucid) | Game developers | User-facing Lucid API |
+
+---
+
+## Distribution Structures
+
+### B. The Engine SDK (What Game Developers Download)
+
+```text
+Lucid-SDK/
+├── bin/
+│   ├── luc_kernel.dll          ← Pre-compiled C++ bedrock
+│   ├── luc_compiler.exe        ← LLVM-based AOT compiler
+│   ├── luc_langserver.exe      ← LSP server for IDE autocomplete
+│   └── LucidEditor.exe         ← Editor shell bootstrap
+├── bindings/                   ← Lucid API wrappers over kernel headers
+│   ├── ecs.luc
+│   ├── physics.luc
+│   ├── render.luc
+│   ├── audio.luc
+│   ├── input.luc
+│   ├── vfs.luc
+│   ├── network.luc
+│   ├── console.luc
+│   └── ui.luc
+├── core_lib/                   ← Standard library
+│   ├── io.luc
+│   ├── math.luc
+│   ├── array.luc
+│   └── string.luc
+└── core_extensions/            ← Official plugins
+```
+
+`bindings/` now ships alongside `core_lib/` in the SDK. Game developers have both immediately available after installing. The `lge_ffi.lfi` file does not ship separately — it is bundled inside `luc_kernel.dll`'s companion data or embedded in the compiler. Game developers never need to see it.
+
+### C. The Shipped Game (What Players Download)
+
+```text
+MyAwesomeGame/
+├── MyAwesomeGame.exe           ← Tiny C++ bootstrap (generated)
+├── luc_kernel.dll              ← Copied from Engine SDK
+├── content/
+│   ├── game.lmod               ← AOT-compiled game logic
+│   ├── assets.pck              ← Encrypted VFS bundle
+│   └── settings.json
+```
+
+No source `.luc` files, no `bindings/`, no `core_lib/`, no compiler — everything is AOT-compiled into `game.lmod` and the runtime `luc_kernel.dll`. The player's download is bounded by the kernel size plus the developer's own `assets.pck`.
+
+> **SDK vs. shipped-game size:** The SDK is dominated by developer tooling — LLVM-bundled compiler, language server, editor executable, and editor assets. None of that ships to a player. The player download carries only `luc_kernel.dll` + `game.lmod` + `assets.pck`.
+
+---
+
+## Development Workflow
+
+Between the source repo and the SDK sits `dev_build/`: CMake writes `luc_kernel.dll` and `luc_compiler.exe` here on every successful C++ build. `core_lib/`, `bindings/`, and `engine/` assets are symlinked in (not copied) so Lucid-only changes appear instantly without a C++ recompile. Tests in `tests/kernel/` (C++ unit tests) and `tests/logic/` (Lucid integration scripts) both run against this workspace before anything reaches `package_sdk.py`.
+
+### The `lge_header_parser` Tool
+
+`tools/lge_header_parser/` is a build-time tool (not shipped) that reads `kernel/include/lge_*.h` via libclang and regenerates `kernel/ffi/lge_ffi.lfi`. It runs automatically as a CMake pre-build step whenever a kernel header is modified. The updated `lge_ffi.lfi` is committed to the repository alongside the header change so both the JIT and AOT compiler always have a current symbol table.
+
 
 ## File Structure
 
