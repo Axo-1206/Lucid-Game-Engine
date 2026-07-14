@@ -116,29 +116,32 @@ Lucid-Game-Engine/
 │       ├── kernel_implementation.md  -- Microkernel implementation details
 │       └── kernel_api_reference.md  -- Full lge_*.h C API reference
 │
-├── engine/                           -- Editor shell (C++, ImGui-based)
-│   │                                 -- Written in C++, not Lucid
-│   │                                 -- Calls kernel C API and ImGui directly
+engine/                           -- Editor shell (Lucid-based)
+│   │                             -- Written entirely in Lucid
+│   │                             -- Calls kernel C API via bindings/
 │   └── src/
-│       ├── main.cpp                  -- Editor entry point: LGE_Boot + ImGui shell init
+│       ├── main.luc              -- Editor entry point
 │       │
-│       ├── shell/                    -- Top-level editor chrome
-│       │   ├── ActivityBar.hpp/cpp   -- Left sidebar icon rail
-│       │   ├── StatusBar.hpp/cpp     -- Bottom status line (play state, frame time)
-│       │   └── TabManager.hpp/cpp    -- Dockable tab container management
+│       ├── shell/                -- Top-level editor chrome
+│       │   ├── activity_bar.luc  -- Left sidebar icon rail
+│       │   ├── status_bar.luc    -- Bottom status line (play state, frame time)
+│       │   └── tab_manager.luc   -- Dockable tab container management
 │       │
-│       ├── editor/                   -- Editor tool panels (all ImGui)
-│       │   ├── SceneView.hpp/cpp     -- 3D viewport: camera control, gizmos, entity picking
-│       │   ├── InspectorPanel.hpp/cpp -- Property inspector: reflects ECS components
-│       │   ├── HierarchyPanel.hpp/cpp -- Scene entity tree
-│       │   ├── AssetBrowser.hpp/cpp  -- VFS-backed file/asset browser
-│       │   ├── ConsolePanel.hpp/cpp  -- Live console output + command input
-│       │   └── ProfilerPanel.hpp/cpp -- Frame time, draw calls, memory stats
+│       ├── editor/               -- Editor tool panels (all Lucid UI)
+│       │   ├── scene_view.luc    -- 3D viewport: camera control, gizmos, entity picking
+│       │   ├── inspector_panel.luc -- Property inspector: reflects ECS components
+│       │   ├── hierarchy_panel.luc -- Scene entity tree
+│       │   ├── asset_browser.luc -- VFS-backed file/asset browser
+│       │   ├── console_panel.luc -- Live console output + command input
+│       │   └── profiler_panel.luc -- Frame time, draw calls, memory stats
 │       │
-│       └── ui/                       -- Editor UI infrastructure (ImGui helpers)
-│           ├── WorkspaceManager.hpp/cpp -- Docking layout save/load
-│           ├── Theme.hpp/cpp            -- ImGui style tokens (colors, rounding, fonts)
-│           └── Widgets.hpp/cpp          -- Shared custom ImGui widgets (drag-vec3, color picker, etc.)
+│       ├── ui/                   -- Editor UI infrastructure
+│       │   ├── workspace_manager.luc -- Docking layout save/load
+│       │   ├── theme.luc         -- UI style tokens (colors, rounding, fonts)
+│       │   └── widgets.luc       -- Shared custom UI widgets (drag-vec3, color picker, etc.)
+│       │
+│       └── visual_programming/   -- Visual scripting canvas
+│           └── node_graph.luc    -- Node-based visual scripting logic
 │
 ├── externals/                        -- 3rd-party dependencies and submodules
 │   ├── cgltf/                        -- Single-header GLTF loader
@@ -247,19 +250,19 @@ Lucid-Game-Engine/
 
 ### Subsystem Map
 
-| Folder (`kernel/src/`) | Public header | Responsibility |
-|:---|:---|:---|
-| `core/` | `lge_api.h`, `lge_console.h` | Boot sequence, frame clock, hot-reload file watching, console command dispatch |
-| `ecs/` | `lge_ecs.h` | Entity registry, archetype/component storage, multithreaded system scheduling |
-| `render/` | `lge_render.h` | Vulkan RHI — device, swapchain, pipelines, SDF font rendering |
-| `physics/` | `lge_physics.h` | Jolt integration, contact callbacks, debug wireframe rendering |
-| `input/` | `lge_input.h` | GLFW polling mapped to swappable `IInputProvider` interface |
-| `network/` | `lge_network.h` | Core TCP/UDP `INetworkProvider`; extensions register alternatives (Steam, WebSockets) |
-| `vfs/` | `lge_vfs.h` | Encrypted virtual file system — identical API for loose dev files and packed `.pck` bundles |
-| `security/` | `lge_security.h` | Offline Ed25519 license verification, PBKDF2/HKDF key derivation |
-| `platform/` | `lge_platform.h` | The only place `#ifdef _WIN32` is allowed — `LoadLibrary`/`dlopen` abstraction |
-| `ui/` | — (internal) | ImGui frame lifecycle hook; RmlUI in-game HUD Vulkan backend |
-| `audio/` | `lge_audio.h` | Miniaudio-backed SFX and streaming mixer |
+| Folder (`kernel/src/`) | Public header                | Responsibility                                                                              |
+| :--------------------- | :--------------------------- | :------------------------------------------------------------------------------------------ |
+| `core/`                | `lge_api.h`, `lge_console.h` | Boot sequence, frame clock, hot-reload file watching, console command dispatch              |
+| `ecs/`                 | `lge_ecs.h`                  | Entity registry, archetype/component storage, multithreaded system scheduling               |
+| `render/`              | `lge_render.h`               | Vulkan RHI — device, swapchain, pipelines, SDF font rendering                               |
+| `physics/`             | `lge_physics.h`              | Jolt integration, contact callbacks, debug wireframe rendering                              |
+| `input/`               | `lge_input.h`                | GLFW polling mapped to swappable `IInputProvider` interface                                 |
+| `network/`             | `lge_network.h`              | Core TCP/UDP `INetworkProvider`; extensions register alternatives (Steam, WebSockets)       |
+| `vfs/`                 | `lge_vfs.h`                  | Encrypted virtual file system — identical API for loose dev files and packed `.pck` bundles |
+| `security/`            | `lge_security.h`             | Offline Ed25519 license verification, PBKDF2/HKDF key derivation                            |
+| `platform/`            | `lge_platform.h`             | The only place `#ifdef _WIN32` is allowed — `LoadLibrary`/`dlopen` abstraction              |
+| `ui/`                  | — (internal)                 | ImGui frame lifecycle hook; RmlUI in-game HUD Vulkan backend                                |
+| `audio/`               | `lge_audio.h`                | Miniaudio-backed SFX and streaming mixer                                                    |
 
 `luc_runtime/` sits beside `kernel/` rather than inside it: it owns the Lucid language's arena allocator (`ArenaDescriptor`), which the kernel consumes (via `lge_arena.h`) but does not own the lifetime of.
 
@@ -340,11 +343,11 @@ const on_update (dt float) = {
 
 `bindings/*.luc` are the **human-facing** layer — hand-authored Lucid files that import from `lge_ffi.lfi` internally and expose clean, documented, type-safe Lucid APIs to game developers.
 
-| File | Written by | Used by | Purpose |
-|------|-----------|---------|---------|
-| `kernel/include/lge_*.h` | Engine team (C) | C++ kernel internally + `lge_header_parser` | Raw C ABI definition |
-| `kernel/ffi/lge_ffi.lfi` | `lge_header_parser` tool (generated) | Lucid compiler + JIT | Raw FFI symbol resolution |
-| `bindings/*.luc` | Engine team (Lucid) | Game developers | User-facing Lucid API |
+| File                     | Written by                           | Used by                                     | Purpose                   |
+| ------------------------ | ------------------------------------ | ------------------------------------------- | ------------------------- |
+| `kernel/include/lge_*.h` | Engine team (C)                      | C++ kernel internally + `lge_header_parser` | Raw C ABI definition      |
+| `kernel/ffi/lge_ffi.lfi` | `lge_header_parser` tool (generated) | Lucid compiler + JIT                        | Raw FFI symbol resolution |
+| `bindings/*.luc`         | Engine team (Lucid)                  | Game developers                             | User-facing Lucid API     |
 
 ---
 
@@ -554,19 +557,19 @@ Lucid-Game-Engine/
 
 ### Subsystem map
 
-| Folder (`kernel/src/`) | Public header | Responsibility |
-|:---|:---|:---|
-| `core/` | `lge_api.h`, `lge_console.h` | Boot sequence (`LGE_Boot`), frame clock, hot-reload file watching, console command dispatch |
-| `ecs/` | `lge_ecs.h` | Entity registry, archetype/component storage, multithreaded system scheduling |
-| `render/` | `lge_render.h` | Vulkan RHI — device, swapchain, pipelines, SDF font rendering |
-| `physics/` | `lge_physics.h` | Jolt integration, contact callbacks, debug wireframe rendering |
-| `input/` | `lge_input.h` | GLFW polling, mapped to the swappable `IInputProvider` interface |
-| `network/` | `lge_network.h` | Core TCP/UDP `INetworkProvider` implementations; extensions can register their own (e.g. Steam, WebSockets) |
-| `vfs/` | `lge_vfs.h` | Encrypted virtual file system — identical API for loose dev files and packed `.pck` bundles |
-| `security/` | `lge_security.h` | Offline Ed25519 license verification, PBKDF2/HKDF key derivation, extension signature checks |
-| `platform/` | `lge_platform.h` | The only place `#ifdef _WIN32` is allowed to live — `LoadLibrary`/`dlopen` abstraction |
-| `ui/` | — (internal) | ImGui editor-shell panels and the RmlUI in-game HUD backend |
-| `audio/` *(planned)* | `lge_audio.h` | Miniaudio-backed SFX and streaming mixer |
+| Folder (`kernel/src/`) | Public header                | Responsibility                                                                                              |
+| :--------------------- | :--------------------------- | :---------------------------------------------------------------------------------------------------------- |
+| `core/`                | `lge_api.h`, `lge_console.h` | Boot sequence (`LGE_Boot`), frame clock, hot-reload file watching, console command dispatch                 |
+| `ecs/`                 | `lge_ecs.h`                  | Entity registry, archetype/component storage, multithreaded system scheduling                               |
+| `render/`              | `lge_render.h`               | Vulkan RHI — device, swapchain, pipelines, SDF font rendering                                               |
+| `physics/`             | `lge_physics.h`              | Jolt integration, contact callbacks, debug wireframe rendering                                              |
+| `input/`               | `lge_input.h`                | GLFW polling, mapped to the swappable `IInputProvider` interface                                            |
+| `network/`             | `lge_network.h`              | Core TCP/UDP `INetworkProvider` implementations; extensions can register their own (e.g. Steam, WebSockets) |
+| `vfs/`                 | `lge_vfs.h`                  | Encrypted virtual file system — identical API for loose dev files and packed `.pck` bundles                 |
+| `security/`            | `lge_security.h`             | Offline Ed25519 license verification, PBKDF2/HKDF key derivation, extension signature checks                |
+| `platform/`            | `lge_platform.h`             | The only place `#ifdef _WIN32` is allowed to live — `LoadLibrary`/`dlopen` abstraction                      |
+| `ui/`                  | — (internal)                 | ImGui editor-shell panels and the RmlUI in-game HUD backend                                                 |
+| `audio/` *(planned)*   | `lge_audio.h`                | Miniaudio-backed SFX and streaming mixer                                                                    |
 
 `luc_runtime/` sits beside `kernel/` rather than inside it: it owns the Lucid language's arena allocator (`ArenaDescriptor`), which the kernel *consumes* (via `lge_arena.h`) but does not own the lifetime of. Keeping it separate reflects that boundary — Lucid creates and frees arenas; C++ subsystems only borrow pointers into them for the duration of a call.
 
@@ -576,12 +579,12 @@ Lucid-Game-Engine/
 
 Everything above the kernel's ABI line is written in Lucid, not C++, and is loaded at runtime as compiled `.lmod` modules or platform `.dll`/`.so` files rather than linked at build time.
 
-| Folder | What lives here | Loaded as |
-|:---|:---|:---|
-| `core_lib/` | Standard library — `io.luc` (logging/I/O), `math.luc` (vectors, matrices) | Compiled alongside every project |
-| `engine/src/` | The IDE itself: `main.luc` entry point, `editor/` panels (scene view, inspector, console manager), `ui/workspace_manager.luc` (docking/layout), `visual_programming/node_graph.luc` (the node-graph scripting canvas) | `.lmod`, hot-reloaded by `script_manager.cpp` on save |
-| *(a developer's own project)* | Game logic and content — not part of this repository at all. A game developer builds against the compiled SDK (below), not against this source tree | AOT `.lmod` for shipping, JIT for in-editor play |
-| *extensions* | Third-party or first-party plugins declaring an `extension.json` manifest with a permissions list (`network.client`, `filesystem.global`, etc.) | `.lmod`/`.dll`, sandboxed — the kernel checks permissions before honoring FFI calls like `LGE_Network_Listen` |
+| Folder                        | What lives here                                                                                                                                                                                                       | Loaded as                                                                                                     |
+| :---------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ |
+| `core_lib/`                   | Standard library — `io.luc` (logging/I/O), `math.luc` (vectors, matrices)                                                                                                                                             | Compiled alongside every project                                                                              |
+| `engine/src/`                 | The IDE itself: `main.luc` entry point, `editor/` panels (scene view, inspector, console manager), `ui/workspace_manager.luc` (docking/layout), `visual_programming/node_graph.luc` (the node-graph scripting canvas) | `.lmod`, hot-reloaded by `script_manager.cpp` on save                                                         |
+| *(a developer's own project)* | Game logic and content — not part of this repository at all. A game developer builds against the compiled SDK (below), not against this source tree                                                                   | AOT `.lmod` for shipping, JIT for in-editor play                                                              |
+| *extensions*                  | Third-party or first-party plugins declaring an `extension.json` manifest with a permissions list (`network.client`, `filesystem.global`, etc.)                                                                       | `.lmod`/`.dll`, sandboxed — the kernel checks permissions before honoring FFI calls like `LGE_Network_Listen` |
 
 The distinction that matters: **the kernel never imports Lucid, and Lucid never bypasses the kernel's ABI.** The editor you see when you open Lucid-Game-Engine is not special-cased C++ — it's a Lucid program like any other, calling `LGE_GetAPI()` the same way a shipped game's compiled logic does. Delete `engine/` entirely and the kernel still boots, still renders, still runs a game — it just has no IDE skin on top of it.
 
