@@ -174,11 +174,11 @@ The `lge_ffi.lfi` is checked into source control alongside the C headers. When a
 
 ### Summary Table
 
-| File | Written by | Read by | Mode |
-|------|-----------|---------|------|
-| `kernel/include/lge_*.h` | Engine team, manually | `lge_header_parser` (build step) | Both (source of truth) |
-| `kernel/ffi/lge_ffi.lfi` | `lge_header_parser` (generated) | `luc_interpreter` (ORC JIT) + `luc_compiler` (AOT) | **Both** |
-| `luc_kernel.dll` | C++ compiler (built) | Both at runtime | Both |
+| File                     | Written by                      | Read by                                            | Mode                   |
+| ------------------------ | ------------------------------- | -------------------------------------------------- | ---------------------- |
+| `kernel/include/lge_*.h` | Engine team, manually           | `lge_header_parser` (build step)                   | Both (source of truth) |
+| `kernel/ffi/lge_ffi.lfi` | `lge_header_parser` (generated) | `luc_interpreter` (ORC JIT) + `luc_compiler` (AOT) | **Both**               |
+| `luc_kernel.dll`         | C++ compiler (built)            | Both at runtime                                    | Both                   |
 
 **Adding a new function to the API:**
 1. Add it to the appropriate `lge_*.h` header manually
@@ -1176,7 +1176,7 @@ ModuleHandle LGE_Script_Load(const char* module_path);
 void LGE_Script_Unload(ModuleHandle handle);
 
 // Manually trigger a recompile of a source file, then hot-swap it.
-// compile_path — path to the .Lucid source file
+// compile_path — path to the .luc source file
 // Internally runs luc_compiler.exe, waits, then SwapModule on success.
 void LGE_Script_Recompile(const char* lucid_source_path);
 
@@ -1191,7 +1191,7 @@ void LGE_Script_ForEach(void (*callback)(ModuleHandle handle, const LGE_ModuleIn
 ```
 
 ### Notes
-- Hot-reload is automatic when file watcher is enabled: save a `.Lucid` file → kernel recompiles → swaps the module between frames. No manual call needed from game code.
+- Hot-reload is automatic when file watcher is enabled: save a `.luc` file → kernel recompiles → swaps the module between frames. No manual call needed from game code.
 - The swap waits for the current frame to complete before replacing the live module — never interrupts mid-frame execution.
 - `on_load(api)` and `on_unload()` are conventional Lucid function names. The script manager looks for them by symbol name after loading — they are optional.
 
@@ -1751,11 +1751,11 @@ LGE_API const LGE_ExtensionAPI* LGE_GetAPI(uint32_t requested_version);
 
 ### Version Compatibility
 
-| requested_version major | Kernel major | Result |
-|-------------------------|--------------|--------|
-| Equal | Equal | ✅ Returns full API table |
-| Lower | Higher | ✅ Returns compatible subset (backward compat) |
-| Higher | Lower | ❌ Returns `nullptr` — extension is too new |
+| requested_version major | Kernel major | Result                                        |
+| ----------------------- | ------------ | --------------------------------------------- |
+| Equal                   | Equal        | ✅ Returns full API table                      |
+| Lower                   | Higher       | ✅ Returns compatible subset (backward compat) |
+| Higher                  | Lower        | ❌ Returns `nullptr` — extension is too new    |
 
 ### Notes
 - Extensions include only `lge_api.h` — never individual subsystem headers. The full API is in one struct.
