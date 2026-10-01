@@ -13,12 +13,15 @@ target_include_directories(luc_engine
         $<INSTALL_INTERFACE:include>
 )
 
+find_package(OpenGL REQUIRED)
+
 target_link_libraries(luc_engine
     PUBLIC
         lucid::runtime
     PRIVATE
         lucid::glfw
         lucid::glm
+        OpenGL::GL
 )
 
 target_compile_features(luc_engine PUBLIC cxx_std_17)
