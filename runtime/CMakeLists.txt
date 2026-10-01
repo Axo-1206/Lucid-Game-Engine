@@ -1,7 +1,11 @@
-# The Lucid runtime: table storage, references, values.
-# For Phase 0, it's an empty placeholder. Step 1 fills it in.
-
 add_library(luc_runtime STATIC
+    src/types.cpp
+    src/cellvalue.cpp
+    src/row_ref.cpp
+    src/function.cpp
+    src/column.cpp
+    src/table.cpp
+    src/runtime.cpp
     src/version.cpp
 )
 
