@@ -10,8 +10,10 @@ EditorApp::EditorApp()
 EditorApp::~EditorApp() = default;
 
 bool EditorApp::init(int width, int height, const std::string& title) {
-    // Phase 0: the Window is constructed in the initializer list.
-    // For now, we just check that it succeeded.
+    (void)width;
+    (void)height;
+    (void)title;
+
     if (!window_.native_handle()) {
         engine::log_error("EditorApp: window creation failed");
         return false;
@@ -32,12 +34,8 @@ int EditorApp::run() {
 
     while (!window_.should_close()) {
         clock_.start_frame();
-
         window_.poll_events();
-
         // Step 3 will draw the editor UI here.
-        // For now, nothing is drawn.
-
         window_.swap_buffers();
     }
 

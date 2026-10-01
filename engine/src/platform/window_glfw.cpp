@@ -9,7 +9,7 @@ namespace {
 bool g_glfw_initialized = false;
 
 void glfw_error_callback(int code, const char* description) {
-    log_error_f("GLFW error %d: %s", code, description);
+    log_error("GLFW error %d: %s", code, description);
 }
 
 bool ensure_glfw_initialized() {
@@ -42,10 +42,8 @@ Window::Window(int width, int height, const std::string& title)
 {
     if (!ensure_glfw_initialized()) return;
 
-    // Create OpenGL context
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // Phase 0: no graphics API context yet. Just a window.
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     impl_ = new Impl();
     impl_->handle = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
@@ -57,16 +55,10 @@ Window::Window(int width, int height, const std::string& title)
         return;
     }
 
-    glfwMakeContextCurrent(impl_->handle);
     glfwSetWindowUserPointer(impl_->handle, this);
     glfwSetKeyCallback(impl_->handle, key_callback);
 
-    const char* gl_version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
-    const char* gl_renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
-
-    log_info_f("Window created: %dx%d \"%s\"", width, height, title.c_str());
-    log_info_f("OpenGL Version: %s", gl_version ? gl_version : "Unknown");
-    log_info_f("GPU Renderer:   %s", gl_renderer ? gl_renderer : "Unknown");
+    log_info("Window created: %dx%d \"%s\"", width, height, title.c_str());
 }
 
 Window::~Window() {
