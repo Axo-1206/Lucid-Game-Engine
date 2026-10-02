@@ -11,6 +11,10 @@ add_library(luc_engine STATIC
     src/scene/scene.cpp
     src/scene/scene_loader.cpp
     src/scene/scene_saver.cpp
+    src/system/render_list.cpp
+    src/system/hierarchy_system.cpp
+    src/system/movement_system.cpp
+    src/system/render_system.cpp
     src/platform/window_glfw.cpp
 )
 

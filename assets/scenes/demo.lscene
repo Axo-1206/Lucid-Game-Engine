@@ -49,6 +49,7 @@
             "parent": 0,
             "components": {
                 "Transform": { "x": 500, "y": 300 },
+                "Velocity": { "dx": 100, "dy": 0, "dz": 0 },
                 "Sprite": {
                     "texture_path": "",
                     "w": 80, "h": 80,

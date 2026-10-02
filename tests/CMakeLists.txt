@@ -21,6 +21,7 @@ add_executable(lucid_tests
     engine/test_input.cpp
     engine/test_entity.cpp
     engine/test_scene.cpp
+    engine/test_systems.cpp
 )
 
 target_link_libraries(lucid_tests

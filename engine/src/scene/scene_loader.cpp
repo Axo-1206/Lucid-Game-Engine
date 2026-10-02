@@ -49,6 +49,18 @@ namespace engine
                 tbl->set_float32(c, "rot_z", j["rot_z"].get<float>());
         }
 
+        void load_velocity(lucid::Runtime &rt, EntityRef e, const json &j)
+        {
+            auto c = add_component<VelocityTag>(rt, e);
+            auto *tbl = rt.get_table(VelocityTag::name);
+            if (j.contains("dx"))
+                tbl->set_float32(c, "dx", j["dx"].get<float>());
+            if (j.contains("dy"))
+                tbl->set_float32(c, "dy", j["dy"].get<float>());
+            if (j.contains("dz"))
+                tbl->set_float32(c, "dz", j["dz"].get<float>());
+        }
+
         void load_sprite(lucid::Runtime &rt, EntityRef e, const json &j)
         {
             auto c = add_component<SpriteTag>(rt, e);
@@ -86,6 +98,8 @@ namespace engine
                 load_transform(rt, e, j);
             else if (name == "WorldTransform")
                 load_world_transform(rt, e, j);
+            else if (name == "Velocity")
+                load_velocity(rt, e, j);
             else if (name == "Sprite")
                 load_sprite(rt, e, j);
             else if (name == "Script")
