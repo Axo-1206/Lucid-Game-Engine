@@ -56,4 +56,4 @@ add_library(lucid::glm  ALIAS glm)
 add_library(lucid::glad ALIAS glad)
 add_library(lucid::stb  ALIAS stb)
 
-message(STATUS "Externals: GLFW 3.4, GLM 1.0.1, GLAD 1.0.36, stb (header-only)")
+message(STATUS "Externals: GLFW 3.4 (fetch), GLM 1.0.1 (fetch), GLAD (vendored), stb (vendored)")
