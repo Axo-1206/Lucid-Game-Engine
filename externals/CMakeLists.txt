@@ -26,21 +26,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
-# ---- GLAD ----
-set(GLAD_PROFILE "core" CACHE STRING "" FORCE)
-set(GLAD_API "gl=3.3" CACHE STRING "" FORCE)
-set(GLAD_GENERATOR "c" CACHE STRING "" FORCE)
-set(GLAD_REPRODUCIBLE OFF CACHE BOOL "" FORCE)
-
-FetchContent_Declare(
-    glad
-    GIT_REPOSITORY https://github.com/Dav1dde/glad.git
-    GIT_TAG        v0.1.36
-    GIT_SHALLOW    TRUE
+# ---- GLAD (vendored, generated for OpenGL 3.3 core) ----
+add_library(glad STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/glad.c
 )
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-FetchContent_MakeAvailable(glad)
-unset(CMAKE_POLICY_VERSION_MINIMUM)
+target_include_directories(glad PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 # ---- stb (header-only) ----
 add_library(stb INTERFACE)
