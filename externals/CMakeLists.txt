@@ -1,8 +1,3 @@
-# Third-party dependencies.
-#
-# For Phase 0, we fetch GLFW and GLM via FetchContent.
-# Later, this will be replaced with vendored submodules.
-
 include(FetchContent)
 
 # ---- GLFW ----
@@ -31,9 +26,32 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
+# ---- GLAD ----
+set(GLAD_PROFILE "core" CACHE STRING "" FORCE)
+set(GLAD_API "gl=3.3" CACHE STRING "" FORCE)
+set(GLAD_GENERATOR "c" CACHE STRING "" FORCE)
+set(GLAD_REPRODUCIBLE OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    glad
+    GIT_REPOSITORY https://github.com/Dav1dde/glad.git
+    GIT_TAG        v0.1.36
+    GIT_SHALLOW    TRUE
+)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+FetchContent_MakeAvailable(glad)
+unset(CMAKE_POLICY_VERSION_MINIMUM)
+
+# ---- stb (header-only) ----
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stb
+)
+
 # ---- Aliases ----
-# So other CMakeLists can `target_link_libraries(... lucid::glfw)`
 add_library(lucid::glfw ALIAS glfw)
 add_library(lucid::glm  ALIAS glm)
+add_library(lucid::glad ALIAS glad)
+add_library(lucid::stb  ALIAS stb)
 
-message(STATUS "Externals: GLFW ${GLFW_VERSION}, GLM fetched")
+message(STATUS "Externals: GLFW 3.4, GLM 1.0.1, GLAD 1.0.36, stb (header-only)")

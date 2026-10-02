@@ -42,8 +42,13 @@ Window::Window(int width, int height, const std::string& title)
 {
     if (!ensure_glfw_initialized()) return;
 
-    // Phase 0: no graphics API context yet. Just a window.
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    // Request OpenGL 3.3 core profile.
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);  // required on macOS
+#endif
 
     impl_ = new Impl();
     impl_->handle = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
@@ -57,6 +62,7 @@ Window::Window(int width, int height, const std::string& title)
 
     glfwSetWindowUserPointer(impl_->handle, this);
     glfwSetKeyCallback(impl_->handle, key_callback);
+    glfwMakeContextCurrent(impl_->handle);
 
     log_info("Window created: %dx%d \"%s\"", width, height, title.c_str());
 }

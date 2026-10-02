@@ -3,13 +3,14 @@ cmake_minimum_required(VERSION 3.20...4.3)
 project(LucidEngine
     VERSION 0.1.0
     DESCRIPTION "A game engine with an embedded data-oriented scripting language"
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 # ---- Global settings ----
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Default build type
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
