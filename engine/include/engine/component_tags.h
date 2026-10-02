@@ -16,5 +16,6 @@ struct TransformTag      { static constexpr const char* name = "Transform"; };
 struct WorldTransformTag { static constexpr const char* name = "WorldTransform"; };
 struct SpriteTag         { static constexpr const char* name = "Sprite"; };
 struct ScriptTag         { static constexpr const char* name = "Script"; };
+struct CameraTag         { static constexpr const char* name = "Camera"; };  // not an entity component
 
 } // namespace engine

@@ -27,6 +27,10 @@ std::size_t Table::column_index(const std::string& name) const {
     return it->second;
 }
 
+bool Table::has_column(const std::string& name) const {
+    return column_index_.count(name) > 0;
+}
+
 Column& Table::add_column(std::string name, ColumnType type, bool primary) {
     if (live_count_ > 0) throw std::runtime_error("Cannot add column '" + name + "' after rows exist");
     if (column_index_.count(name)) throw std::runtime_error("Duplicate column name: " + name);

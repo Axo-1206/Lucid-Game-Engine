@@ -4,9 +4,9 @@
 #include "engine/renderer.h"
 #include "engine/input.h"
 #include "engine/entity.h"
+#include "engine/scene.h"
 
 #include <memory>
-#include <vector>
 
 int main() {
     engine::install_default_log_sink();
@@ -27,48 +27,24 @@ int main() {
     std::unique_ptr<engine::Input> input(
         engine::create_input_glfw(window.native_handle()));
 
-    engine::Camera2D camera;
-    camera.x = 640.0f;
-    camera.y = 360.0f;
-    camera.zoom = 1.0f;
-    camera.viewport_w = 1280.0f;
-    camera.viewport_h = 720.0f;
-    renderer->set_camera_2d(camera);
-
-    // Runtime + core tables.
     lucid::Runtime rt;
     engine::setup_core_tables(rt);
 
-    // Spawn a few entities with Transform + Sprite.
-    struct SpawnSpec { float x, y, w, h; engine::Color c; };
-    const SpawnSpec specs[] = {
-        {100.0f, 100.0f, 120.0f,  80.0f, engine::Color::red()},
-        {400.0f, 200.0f, 150.0f, 150.0f, engine::Color::green()},
-        {600.0f, 300.0f, 100.0f, 100.0f, engine::Color::blue()},
-        {800.0f, 400.0f, 200.0f,  50.0f, engine::Color::yellow()},
-    };
-
-    std::vector<engine::EntityRef> entities;
-    for (const auto& spec : specs) {
-        engine::EntityRef e = engine::create_entity(rt, engine::allocate_entity_id(rt), "");
-        auto t = engine::add_component<engine::TransformTag>(rt, e);
-        rt.get_table("Transform")->set_float32(t, "x", spec.x);
-        rt.get_table("Transform")->set_float32(t, "y", spec.y);
-
-        auto s = engine::add_component<engine::SpriteTag>(rt, e);
-        rt.get_table("Sprite")->set_string(s, "texture_path", "");
-        rt.get_table("Sprite")->set_float32(s, "w", spec.w);
-        rt.get_table("Sprite")->set_float32(s, "h", spec.h);
-        rt.get_table("Sprite")->set_float32(s, "tint_r", spec.c.r);
-        rt.get_table("Sprite")->set_float32(s, "tint_g", spec.c.g);
-        rt.get_table("Sprite")->set_float32(s, "tint_b", spec.c.b);
-        rt.get_table("Sprite")->set_float32(s, "tint_a", spec.c.a);
-        rt.get_table("Sprite")->set_int32(s, "layer", 0);
-
-        entities.push_back(e);
+    engine::Scene scene(rt);
+    if (!scene.load_from_file("assets/scenes/demo.lscene")) {
+        engine::log_error("Failed to load scene");
+        return 1;
     }
 
-    engine::log_info("Spawned %zu entities", entities.size());
+    // Set up the 2D camera from the active camera.
+    engine::CameraData cam_data = scene.get_active_camera_data();
+    engine::Camera2D camera;
+    camera.x = cam_data.pos_x;
+    camera.y = cam_data.pos_y;
+    camera.zoom = 1.0f / cam_data.ortho_size;
+    camera.viewport_w = 1280.0f;
+    camera.viewport_h = 720.0f;
+    renderer->set_camera_2d(camera);
 
     while (!window.should_close()) {
         clock.start_frame();
@@ -78,31 +54,13 @@ int main() {
         input->poll();
 
         const auto& in = input->state();
-
         if (in.key_pressed(engine::Key::Escape)) {
             window.request_close();
         }
 
-        // Move entity 0 with arrow keys.
-        if (!entities.empty()) {
-            auto t = engine::get_component<engine::TransformTag>(rt, entities[0]);
-            if (!t.is_nil()) {
-                auto* tbl = rt.get_table("Transform");
-                float x = tbl->get_float32(t, "x");
-                float y = tbl->get_float32(t, "y");
-                const float speed = 400.0f * dt;
-                if (in.key_down(engine::Key::Left))  x -= speed;
-                if (in.key_down(engine::Key::Right)) x += speed;
-                if (in.key_down(engine::Key::Up))    y -= speed;
-                if (in.key_down(engine::Key::Down))  y += speed;
-                tbl->set_float32(t, "x", x);
-                tbl->set_float32(t, "y", y);
-            }
-        }
+        renderer->begin_frame(cam_data.clear_color);
 
-        // Render.
-        renderer->begin_frame(engine::Color::black());
-
+        // Iterate entities with Transform + Sprite, draw them.
         rt.get_table("Transform")->each([&](lucid::RowRef t_ref) {
             auto* ttbl = rt.get_table("Transform");
             lucid::RowRef e = ttbl->get_row_ref(t_ref, "entity");

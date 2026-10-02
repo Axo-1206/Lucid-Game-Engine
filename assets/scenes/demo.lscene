@@ -1,0 +1,64 @@
+{
+    "version": 1,
+    "name": "demo",
+    "cameras": [
+        {
+            "name": "main",
+            "pos": [640, 360, 0],
+            "target": [640, 360, 0],
+            "fov": 60,
+            "near": 0.1,
+            "far": 1000,
+            "is_orthographic": true,
+            "ortho_size": 1.0,
+            "clear_color": [0.1, 0.1, 0.15, 1.0]
+        }
+    ],
+    "entities": [
+        {
+            "id": 1,
+            "name": "Player",
+            "parent": 0,
+            "components": {
+                "Transform": { "x": 100, "y": 100 },
+                "Sprite": {
+                    "texture_path": "",
+                    "w": 120, "h": 80,
+                    "tint_r": 1, "tint_g": 0.2, "tint_b": 0.2, "tint_a": 1,
+                    "layer": 0
+                }
+            }
+        },
+        {
+            "id": 2,
+            "name": "Sword",
+            "parent": 1,
+            "components": {
+                "Transform": { "x": 60, "y": 30 },
+                "Sprite": {
+                    "texture_path": "",
+                    "w": 40, "h": 40,
+                    "tint_r": 0.9, "tint_g": 0.9, "tint_b": 0.2, "tint_a": 1,
+                    "layer": 1
+                }
+            }
+        },
+        {
+            "id": 3,
+            "name": "Rock",
+            "parent": 0,
+            "components": {
+                "Transform": { "x": 500, "y": 300 },
+                "Sprite": {
+                    "texture_path": "",
+                    "w": 80, "h": 80,
+                    "tint_r": 0.6, "tint_g": 0.6, "tint_b": 0.6, "tint_a": 1,
+                    "layer": 0
+                }
+            }
+        }
+    ],
+    "engine_state": {
+        "next_entity_id": 4
+    }
+}

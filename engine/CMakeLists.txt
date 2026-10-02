@@ -8,6 +8,9 @@ add_library(luc_engine STATIC
     src/render/backend_gl/shader_gl.cpp
     src/render/backend_gl/sprite_batch_gl.cpp
     src/render/backend_gl/renderer_gl.cpp
+    src/scene/scene.cpp
+    src/scene/scene_loader.cpp
+    src/scene/scene_saver.cpp
     src/platform/window_glfw.cpp
 )
 
@@ -27,6 +30,7 @@ target_link_libraries(luc_engine
         lucid::glm
         lucid::glad
         lucid::stb
+        lucid::nlohmann
 )
 
 target_compile_features(luc_engine PUBLIC cxx_std_17)

@@ -30,7 +30,8 @@ public:
     const Column* find_column(const std::string& name) const;
     Column* find_column(const std::string& name);
     std::size_t column_index(const std::string& name) const;
-
+    // Returns true if a column with this name exists.
+    bool has_column(const std::string& name) const;
     Column& add_column(std::string name, ColumnType type, bool primary = false);
     RowRef add(const std::vector<CellValue>& values);
     RowRef add_partial(const std::string& column, const CellValue& value);

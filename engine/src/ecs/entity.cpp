@@ -195,6 +195,27 @@ void setup_core_tables(lucid::Runtime& rt) {
         t->add_column("module_path", lucid::ColumnType::String);
     }
 
+    // Camera
+    {
+        auto* t = rt.create_table(CameraTag::name);
+        t->add_column("name",            lucid::ColumnType::String, /*primary=*/true);
+        t->add_column("pos_x",           lucid::ColumnType::Float32);
+        t->add_column("pos_y",           lucid::ColumnType::Float32);
+        t->add_column("pos_z",           lucid::ColumnType::Float32);
+        t->add_column("target_x",        lucid::ColumnType::Float32);
+        t->add_column("target_y",        lucid::ColumnType::Float32);
+        t->add_column("target_z",        lucid::ColumnType::Float32);
+        t->add_column("fov",             lucid::ColumnType::Float32);
+        t->add_column("near",            lucid::ColumnType::Float32);
+        t->add_column("far",             lucid::ColumnType::Float32);
+        t->add_column("is_orthographic", lucid::ColumnType::Bool);
+        t->add_column("ortho_size",      lucid::ColumnType::Float32);
+        t->add_column("clear_r",         lucid::ColumnType::Float32);
+        t->add_column("clear_g",         lucid::ColumnType::Float32);
+        t->add_column("clear_b",         lucid::ColumnType::Float32);
+        t->add_column("clear_a",         lucid::ColumnType::Float32);
+    }
+
     log_info("Core tables created");
 }
 

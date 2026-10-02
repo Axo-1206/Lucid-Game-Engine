@@ -50,10 +50,17 @@ target_include_directories(stb INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/stb
 )
 
+# ---- nlohmann/json (vendored single-header) ----
+add_library(nlohmann_json INTERFACE)
+target_include_directories(nlohmann_json INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 # ---- Aliases ----
 add_library(lucid::glfw ALIAS glfw)
 add_library(lucid::glm  ALIAS glm)
 add_library(lucid::glad ALIAS glad)
 add_library(lucid::stb  ALIAS stb)
+add_library(lucid::nlohmann ALIAS nlohmann_json)
 
-message(STATUS "Externals: GLFW 3.4 (fetch), GLM 1.0.1 (fetch), GLAD (vendored), stb (vendored)")
+message(STATUS "Externals: GLFW 3.4 (fetch), GLM 1.0.1 (fetch), GLAD (vendored), stb (vendored), nlohmann/json (vendored)")
