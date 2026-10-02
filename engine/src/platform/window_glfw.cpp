@@ -25,12 +25,6 @@ bool ensure_glfw_initialized() {
     g_glfw_initialized = true;
     return true;
 }
-
-void key_callback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
-}
 } // namespace
 
 struct Window::Impl {
@@ -46,9 +40,7 @@ Window::Window(int width, int height, const std::string& title)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);  // required on macOS
-#endif
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
     impl_ = new Impl();
     impl_->handle = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
@@ -60,9 +52,7 @@ Window::Window(int width, int height, const std::string& title)
         return;
     }
 
-    glfwSetWindowUserPointer(impl_->handle, this);
-    glfwSetKeyCallback(impl_->handle, key_callback);
-    glfwMakeContextCurrent(impl_->handle);
+    // Note: no callbacks are registered here. The input backend owns them.
 
     log_info("Window created: %dx%d \"%s\"", width, height, title.c_str());
 }
@@ -88,6 +78,8 @@ void Window::request_close() {
 }
 
 void Window::poll_events() {
+    // Kept for compatibility; the input backend calls glfwPollEvents().
+    // Do not call both in the same frame.
     glfwPollEvents();
 }
 
