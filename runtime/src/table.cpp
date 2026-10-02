@@ -94,6 +94,32 @@ RowRef Table::add(const std::vector<CellValue>& values) {
     return RowRef(index, slots_[index].generation);
 }
 
+RowRef Table::add_partial(const std::string& column, const CellValue& value) {
+    auto col_it = column_index_.find(column);
+    if (col_it == column_index_.end()) {
+        throw std::runtime_error("No such column: " + column);
+    }
+    const std::size_t col_idx = col_it->second;
+
+    RowIndex idx;
+    if (!free_slots_.empty()) {
+        idx = free_slots_.back();
+        free_slots_.pop_back();
+        slots_[idx].alive = true;
+        slots_[idx].generation += 1;
+    } else {
+        idx = static_cast<RowIndex>(slots_.size());
+        slots_.push_back(Slot{1, true});
+    }
+
+    for (auto& col : columns_) col.ensure_size(slots_.size());
+
+    set_column_from_value(idx, columns_[col_idx], value);
+
+    ++live_count_;
+    return RowRef(idx, slots_[idx].generation);
+}
+
 void Table::remove(RowRef ref) {
     if (!is_valid(ref)) return;
     if (has_primary()) columns_[primary_column_index()].remove_index_for_row(ref.index);

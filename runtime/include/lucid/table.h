@@ -33,6 +33,7 @@ public:
 
     Column& add_column(std::string name, ColumnType type, bool primary = false);
     RowRef add(const std::vector<CellValue>& values);
+    RowRef add_partial(const std::string& column, const CellValue& value);
     void remove(RowRef ref);
     void clear();
 

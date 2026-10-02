@@ -18,6 +18,8 @@ add_executable(lucid_tests
     engine/test_log.cpp
     engine/test_clock.cpp
     engine/test_linear_allocator.cpp
+    engine/test_input.cpp
+    engine/test_entity.cpp
 )
 
 target_link_libraries(lucid_tests
@@ -28,4 +30,3 @@ target_link_libraries(lucid_tests
 )
 
 add_test(NAME lucid_tests COMMAND lucid_tests)
-
