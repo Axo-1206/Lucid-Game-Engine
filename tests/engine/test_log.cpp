@@ -1,34 +1,42 @@
 #include <catch2/catch_test_macros.hpp>
-#include "engine/log.h"
+#include "engine/core/log.h"
 
 #include <string>
 #include <vector>
 
 using namespace engine;
 
-namespace {
+namespace
+{
 
-struct SinkCapture {
-    std::vector<LogRecord> records;
-    LogSinkId              id = 0;
+    struct SinkCapture
+    {
+        std::vector<LogRecord> records;
+        LogSinkId id = 0;
 
-    void attach() {
-        id = add_log_sink([this](const LogRecord& r) { records.push_back(r); });
-    }
-    void detach() {
-        if (id != 0) remove_log_sink(id);
-        id = 0;
-    }
-};
+        void attach()
+        {
+            id = add_log_sink([this](const LogRecord &r)
+                              { records.push_back(r); });
+        }
+        void detach()
+        {
+            if (id != 0)
+                remove_log_sink(id);
+            id = 0;
+        }
+    };
 
 } // namespace
 
-TEST_CASE("log: default level is Info", "[log]") {
+TEST_CASE("log: default level is Info", "[log]")
+{
     set_log_level(LogLevel::Info);
     REQUIRE(get_log_level() == LogLevel::Info);
 }
 
-TEST_CASE("log: sink receives messages", "[log]") {
+TEST_CASE("log: sink receives messages", "[log]")
+{
     clear_log_sinks();
     SinkCapture cap;
     cap.attach();
@@ -44,7 +52,8 @@ TEST_CASE("log: sink receives messages", "[log]") {
     cap.detach();
 }
 
-TEST_CASE("log: level filter drops lower levels", "[log]") {
+TEST_CASE("log: level filter drops lower levels", "[log]")
+{
     clear_log_sinks();
     SinkCapture cap;
     cap.attach();
@@ -61,7 +70,8 @@ TEST_CASE("log: level filter drops lower levels", "[log]") {
     cap.detach();
 }
 
-TEST_CASE("log: multiple sinks receive the same message", "[log]") {
+TEST_CASE("log: multiple sinks receive the same message", "[log]")
+{
     clear_log_sinks();
     SinkCapture a;
     SinkCapture b;
@@ -80,7 +90,8 @@ TEST_CASE("log: multiple sinks receive the same message", "[log]") {
     b.detach();
 }
 
-TEST_CASE("log: remove_log_sink stops delivery", "[log]") {
+TEST_CASE("log: remove_log_sink stops delivery", "[log]")
+{
     clear_log_sinks();
     SinkCapture cap;
     cap.attach();
@@ -94,8 +105,9 @@ TEST_CASE("log: remove_log_sink stops delivery", "[log]") {
     REQUIRE(cap.records[0].message == "first");
 }
 
-TEST_CASE("log: level names", "[log]") {
+TEST_CASE("log: level names", "[log]")
+{
     REQUIRE(std::string(log_level_name(LogLevel::Trace)) == "TRACE");
-    REQUIRE(std::string(log_level_name(LogLevel::Info))  == "INFO ");
+    REQUIRE(std::string(log_level_name(LogLevel::Info)) == "INFO ");
     REQUIRE(std::string(log_level_name(LogLevel::Fatal)) == "FATAL");
 }

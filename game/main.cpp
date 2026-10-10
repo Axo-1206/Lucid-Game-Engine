@@ -1,11 +1,11 @@
 #include "engine/window.h"
-#include "engine/clock.h"
-#include "engine/log.h"
+#include "engine/core/clock.h"
+#include "engine/core/log.h"
 #include "engine/renderer.h"
 #include "engine/input.h"
 #include "engine/entity.h"
 #include "engine/scene.h"
-#include "engine/system_context.h"
+#include "engine/core/system_context.h"
 #include "engine/systems.h"
 
 #include <memory>

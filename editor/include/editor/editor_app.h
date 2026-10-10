@@ -1,28 +1,30 @@
 #pragma once
 
 #include "engine/window.h"
-#include "engine/clock.h"
+#include "engine/core/clock.h"
 
-namespace editor {
+namespace editor
+{
 
-// The editor application. Phase 0: opens a window, runs a loop, closes on Escape.
-// Later: owns the runtime, renderer, scene, and panels.
-class EditorApp {
-public:
-    EditorApp();
-    ~EditorApp();
+    // The editor application. Phase 0: opens a window, runs a loop, closes on Escape.
+    // Later: owns the runtime, renderer, scene, and panels.
+    class EditorApp
+    {
+    public:
+        EditorApp();
+        ~EditorApp();
 
-    // Initialize the editor. Returns false on failure.
-    bool init(int width, int height, const std::string& title);
+        // Initialize the editor. Returns false on failure.
+        bool init(int width, int height, const std::string &title);
 
-    // Run the editor loop. Blocks until the window closes.
-    int run();
+        // Run the editor loop. Blocks until the window closes.
+        int run();
 
-private:
-    engine::Window  window_;
-    engine::Clock   clock_;
+    private:
+        engine::Window window_;
+        engine::Clock clock_;
 
-    bool initialized_ = false;
-};
+        bool initialized_ = false;
+    };
 
 } // namespace editor

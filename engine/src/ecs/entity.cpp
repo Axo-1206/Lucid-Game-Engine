@@ -1,5 +1,5 @@
 #include "engine/entity.h"
-#include "engine/log.h"
+#include "engine/core/log.h"
 
 #include <stdexcept>
 

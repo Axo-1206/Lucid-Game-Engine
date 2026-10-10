@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include "engine/entity.h"
 #include "engine/systems.h"
-#include "engine/system_context.h"
+#include "engine/core/system_context.h"
 #include "engine/render_list.h"
 #include "engine/ecs/world.h"
 

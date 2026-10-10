@@ -1,5 +1,5 @@
 #include "engine/scene.h"
-#include "engine/log.h"
+#include "engine/core/log.h"
 
 namespace engine
 {
