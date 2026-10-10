@@ -13,6 +13,5 @@ namespace engine
     // Placeholders for later steps.
     void physics_sync_system(SystemContext &ctx, float dt);
     void collision_system(SystemContext &ctx, float dt);
-    void script_system(SystemContext &ctx, float dt);
 
 } // namespace engine

@@ -56,10 +56,4 @@ namespace engine
         (void)dt;
     }
 
-    void script_system(SystemContext &ctx, float dt)
-    {
-        (void)ctx;
-        (void)dt;
-    }
-
 } // namespace engine

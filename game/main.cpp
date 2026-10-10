@@ -79,7 +79,6 @@ int main()
 
         engine::physics_sync_system(ctx, dt);
         engine::collision_system(ctx, dt);
-        engine::script_system(ctx, dt);
 
         renderer->begin_frame(cam_data.clear_color);
         engine::render_system(ctx, dt);
