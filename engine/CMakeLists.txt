@@ -2,8 +2,6 @@ add_library(luc_engine STATIC
     src/core/log.cpp
     src/core/clock.cpp
     src/core/linear_allocator.cpp
-    
-    src/ecs/entity.cpp
 
     src/platform/input_state.cpp
     src/platform/input_glfw.cpp
@@ -17,6 +15,7 @@ add_library(luc_engine STATIC
     src/scene/scene.cpp
     src/scene/scene_loader.cpp
     src/scene/scene_saver.cpp
+    src/scene/entity.cpp
 
     src/system/hierarchy_system.cpp
     src/system/movement_system.cpp

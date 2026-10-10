@@ -3,8 +3,8 @@
 #include "engine/core/log.h"
 #include "engine/render/renderer.h"
 #include "engine/platform/input.h"
-#include "engine/entity.h"
-#include "engine/scene.h"
+#include "engine/scene/entity.h"
+#include "engine/scene/scene.h"
 #include "engine/core/system_context.h"
 #include "engine/systems.h"
 

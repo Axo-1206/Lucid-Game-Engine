@@ -1,5 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
-#include "engine/entity.h"
+#include "engine/scene/entity.h"
 #include "engine/ecs/world.h"
 
 using namespace engine;

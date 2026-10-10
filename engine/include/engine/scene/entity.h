@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/component_tags.h"
+#include "engine/scene/component_tags.h"
 #include "engine/ecs/world.h"
 
 #include <cstdint>

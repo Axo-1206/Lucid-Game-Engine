@@ -2,7 +2,7 @@
 
 #include "engine/render/camera.h"
 #include "engine/ecs/world.h"
-#include "engine/entity.h"
+#include "engine/scene/entity.h"
 
 #include <string>
 

@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
-#include "engine/scene.h"
-#include "engine/entity.h"
+#include "engine/scene/scene.h"
+#include "engine/scene/entity.h"
 #include "engine/ecs/world.h"
 
 #include <cstdio>
