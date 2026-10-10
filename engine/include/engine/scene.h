@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/camera.h"
+#include "engine/render/camera.h"
 #include "engine/ecs/world.h"
 #include "engine/entity.h"
 

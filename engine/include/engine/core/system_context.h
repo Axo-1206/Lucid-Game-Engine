@@ -3,8 +3,8 @@
 #include "engine/core/clock.h"
 #include "engine/ecs/world.h"
 #include "engine/platform/input.h"
-#include "engine/render_list.h"
-#include "engine/renderer.h"
+#include "engine/render/render_list.h"
+#include "engine/render/renderer.h"
 
 namespace engine
 {

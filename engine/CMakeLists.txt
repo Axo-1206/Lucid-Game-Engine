@@ -2,20 +2,26 @@ add_library(luc_engine STATIC
     src/core/log.cpp
     src/core/clock.cpp
     src/core/linear_allocator.cpp
+    
     src/ecs/entity.cpp
+
     src/platform/input_state.cpp
     src/platform/input_glfw.cpp
     src/platform/window_glfw.cpp
+
     src/render/backend_gl/shader_gl.cpp
     src/render/backend_gl/sprite_batch_gl.cpp
     src/render/backend_gl/renderer_gl.cpp
+    src/render/render_list.cpp
+
     src/scene/scene.cpp
     src/scene/scene_loader.cpp
     src/scene/scene_saver.cpp
-    src/system/render_list.cpp
+
     src/system/hierarchy_system.cpp
     src/system/movement_system.cpp
     src/system/render_system.cpp
+
     src/nodes/node_registry.cpp
 )
 

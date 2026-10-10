@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/render_types.h"
-#include "engine/texture.h"
+#include "engine/render/render_types.h"
+#include "engine/render/texture.h"
 
 #include <cstdint>
 #include <vector>
