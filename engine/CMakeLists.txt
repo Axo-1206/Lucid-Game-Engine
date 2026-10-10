@@ -29,12 +29,14 @@ target_include_directories(luc_engine
 target_link_libraries(luc_engine
     PUBLIC
         lucid::runtime
+        lucid_sema
     PRIVATE
         lucid::glfw
         lucid::glm
         lucid::glad
         lucid::stb
         lucid::nlohmann
+        lucid_serialization
 )
 
 target_compile_features(luc_engine PUBLIC cxx_std_17)

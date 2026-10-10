@@ -56,6 +56,30 @@ target_include_directories(nlohmann_json INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# ---- Lucid Format Library ----
+#
+# Fetched as a subproject. The options tell the library to build only
+# its libraries — no CLI, no tests. The engine owns the build settings.
+#
+# The library's targets after fetching:
+#   lucid_core, lucid_parser, lucid_formatter, lucid_sema,
+#   lucid_serialization
+#
+# The engine links against lucid_sema (for the Registry and Graph types)
+# and lucid_serialization (for the .lucgraph loader).
+
+set(LUCID_FORMAT_IS_SUBPROJECT ON  CACHE BOOL "" FORCE)
+set(LUCID_FORMAT_BUILD_TESTS  OFF CACHE BOOL "" FORCE)
+set(LUCID_FORMAT_BUILD_CLI    OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    lucid_format
+    GIT_REPOSITORY https://github.com/Axo-1206/Lucid-Graph-Format.git
+    GIT_TAG        main
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(lucid_format)
+
 # ---- Aliases ----
 add_library(lucid::glfw ALIAS glfw)
 add_library(lucid::glm  ALIAS glm)
@@ -63,4 +87,4 @@ add_library(lucid::glad ALIAS glad)
 add_library(lucid::stb  ALIAS stb)
 add_library(lucid::nlohmann ALIAS nlohmann_json)
 
-message(STATUS "Externals: GLFW 3.4 (fetch), GLM 1.0.1 (fetch), GLAD (vendored), stb (vendored), nlohmann/json (vendored)")
+message(STATUS "Externals: GLFW 3.4 (fetch), GLM 1.0.1 (fetch), GLAD (vendored), stb (vendored), nlohmann/json (vendored), Lucid Format (fetched)")
