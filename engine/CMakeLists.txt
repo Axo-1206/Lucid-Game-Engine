@@ -16,6 +16,7 @@ add_library(luc_engine STATIC
     src/system/movement_system.cpp
     src/system/render_system.cpp
     src/platform/window_glfw.cpp
+    src/nodes/node_registry.cpp
 )
 
 target_include_directories(luc_engine
