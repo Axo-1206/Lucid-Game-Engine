@@ -83,14 +83,6 @@ namespace engine
                 tbl->set_int32(c, "layer", j["layer"].get<int>());
         }
 
-        void load_script(lucid::Runtime &rt, EntityRef e, const json &j)
-        {
-            auto c = add_component<ScriptTag>(rt, e);
-            auto *tbl = rt.get_table(ScriptTag::name);
-            if (j.contains("module_path"))
-                tbl->set_string(c, "module_path", j["module_path"].get<std::string>());
-        }
-
         void load_component(lucid::Runtime &rt, EntityRef e,
                             const std::string &name, const json &j)
         {
@@ -102,8 +94,6 @@ namespace engine
                 load_velocity(rt, e, j);
             else if (name == "Sprite")
                 load_sprite(rt, e, j);
-            else if (name == "Script")
-                load_script(rt, e, j);
             else
                 log_warn("Unknown component in scene file: %s", name.c_str());
         }

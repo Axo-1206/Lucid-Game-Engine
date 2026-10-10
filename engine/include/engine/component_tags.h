@@ -32,10 +32,6 @@ namespace engine
     {
         static constexpr const char *name = "Sprite";
     };
-    struct ScriptTag
-    {
-        static constexpr const char *name = "Script";
-    };
     struct CameraTag
     {
         static constexpr const char *name = "Camera";

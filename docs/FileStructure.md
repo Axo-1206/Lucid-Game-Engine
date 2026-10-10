@@ -3,6 +3,7 @@
 ```
 Lucid-Game-Engine/
 ├── assets/
+│   ├── graphs/
 │   ├── scenes/
 │   │   └── demo.lscene
 │   └── .gitkeep

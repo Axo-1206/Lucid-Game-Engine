@@ -80,14 +80,12 @@ TEST_CASE("entity: destroying an entity removes its components", "[entity]") {
     EntityRef e = f.create();
     add_component<TransformTag>(f.rt, e);
     add_component<SpriteTag>(f.rt, e);
-    add_component<ScriptTag>(f.rt, e);
 
     destroy_entity(f.rt, e);
 
     // The component rows should be gone.
     REQUIRE_FALSE(has_component<TransformTag>(f.rt, e));
     REQUIRE_FALSE(has_component<SpriteTag>(f.rt, e));
-    REQUIRE_FALSE(has_component<ScriptTag>(f.rt, e));
 }
 
 TEST_CASE("entity: parent and child", "[entity]") {

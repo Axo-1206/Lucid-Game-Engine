@@ -91,7 +91,6 @@ namespace engine
         // Remove components in reverse dependency order.
         // (Nothing depends on WorldTransform or Sprite, but be tidy.)
         remove_component<VelocityTag>(rt, e);
-        remove_component<ScriptTag>(rt, e);
         remove_component<SpriteTag>(rt, e);
         remove_component<WorldTransformTag>(rt, e);
         remove_component<TransformTag>(rt, e);
@@ -224,13 +223,6 @@ namespace engine
             t->add_column("tint_b", lucid::ColumnType::Float32);
             t->add_column("tint_a", lucid::ColumnType::Float32);
             t->add_column("layer", lucid::ColumnType::Int32);
-        }
-
-        // Script
-        {
-            auto *t = rt.create_table(ScriptTag::name);
-            t->add_column("entity", lucid::ColumnType::RowRef, /*primary=*/true);
-            t->add_column("module_path", lucid::ColumnType::String);
         }
 
         // Camera

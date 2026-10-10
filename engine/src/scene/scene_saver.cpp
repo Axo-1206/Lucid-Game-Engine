@@ -59,13 +59,6 @@ namespace engine
             return j;
         }
 
-        json save_script(const lucid::Table *tbl, lucid::RowRef c)
-        {
-            json j;
-            j["module_path"] = tbl->get_string(c, "module_path");
-            return j;
-        }
-
         json save_component_by_name(lucid::Runtime &rt, EntityRef e,
                                     const std::string &table_name)
         {
@@ -85,8 +78,6 @@ namespace engine
                 return save_velocity(tbl, comp);
             else if (table_name == "Sprite")
                 return save_sprite(tbl, comp);
-            else if (table_name == "Script")
-                return save_script(tbl, comp);
             else
             {
                 log_warn("No saver for component table: %s", table_name.c_str());
