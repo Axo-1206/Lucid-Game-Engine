@@ -3,8 +3,9 @@ add_library(luc_engine STATIC
     src/core/clock.cpp
     src/core/linear_allocator.cpp
     src/ecs/entity.cpp
-    src/input/input_state.cpp
-    src/input/input_glfw.cpp
+    src/platform/input_state.cpp
+    src/platform/input_glfw.cpp
+    src/platform/window_glfw.cpp
     src/render/backend_gl/shader_gl.cpp
     src/render/backend_gl/sprite_batch_gl.cpp
     src/render/backend_gl/renderer_gl.cpp
@@ -15,7 +16,6 @@ add_library(luc_engine STATIC
     src/system/hierarchy_system.cpp
     src/system/movement_system.cpp
     src/system/render_system.cpp
-    src/platform/window_glfw.cpp
     src/nodes/node_registry.cpp
 )
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/window.h"
+#include "engine/platform/window.h"
 #include "engine/core/clock.h"
 
 namespace editor

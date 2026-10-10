@@ -1,9 +1,10 @@
-#include "engine/input.h"
+#include "engine/platform/input.h"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace engine;
 
-TEST_CASE("input: default state is all up", "[input]") {
+TEST_CASE("input: default state is all up", "[input]")
+{
   InputState s;
   REQUIRE_FALSE(s.key_down(Key::A));
   REQUIRE_FALSE(s.key_pressed(Key::A));
@@ -11,7 +12,8 @@ TEST_CASE("input: default state is all up", "[input]") {
   REQUIRE_FALSE(s.mouse_down(MouseButton::Left));
 }
 
-TEST_CASE("input: key_down reflects set_key_down", "[input]") {
+TEST_CASE("input: key_down reflects set_key_down", "[input]")
+{
   InputState s;
   s.set_key_down(Key::A, true);
   REQUIRE(s.key_down(Key::A));
@@ -19,7 +21,8 @@ TEST_CASE("input: key_down reflects set_key_down", "[input]") {
   REQUIRE_FALSE(s.key_down(Key::A));
 }
 
-TEST_CASE("input: key_pressed fires on transition up -> down", "[input]") {
+TEST_CASE("input: key_pressed fires on transition up -> down", "[input]")
+{
   InputState s;
 
   // Frame 0: nothing pressed.
@@ -50,7 +53,8 @@ TEST_CASE("input: key_pressed fires on transition up -> down", "[input]") {
   REQUIRE_FALSE(s.key_pressed(Key::A));
 }
 
-TEST_CASE("input: mouse_dx/dy are deltas between frames", "[input]") {
+TEST_CASE("input: mouse_dx/dy are deltas between frames", "[input]")
+{
   InputState s;
 
   s.set_mouse_pos(100.0f, 200.0f);
@@ -68,7 +72,8 @@ TEST_CASE("input: mouse_dx/dy are deltas between frames", "[input]") {
   REQUIRE(s.mouse_dy() == 50.0f);
 }
 
-TEST_CASE("input: scroll accumulates within a frame then resets", "[input]") {
+TEST_CASE("input: scroll accumulates within a frame then resets", "[input]")
+{
   InputState s;
 
   s.begin_frame();
