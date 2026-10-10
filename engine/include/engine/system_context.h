@@ -10,7 +10,7 @@ namespace engine
 {
     // Everything a system might need.
     //
-    // `world` is the engine's live table store (was `lucid::Runtime`).
+    // `world` is the engine's live table store.
     // It is distinct from `lucid::sema::Registry`, which is the format
     // library's declaration of node vocabulary. A system never touches
     // the latter; that is the engine's node dispatch layer's concern.

@@ -42,7 +42,6 @@ option(LUCID_BUILD_TESTS  "Build tests"                 OFF)
 add_subdirectory(externals)
 
 # ---- Libraries ----
-add_subdirectory(runtime)
 add_subdirectory(engine)
 add_subdirectory(ecs)
 
