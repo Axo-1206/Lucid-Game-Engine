@@ -17,9 +17,9 @@ add_library(luc_engine STATIC
     src/scene/scene_saver.cpp
     src/scene/entity.cpp
 
-    src/system/hierarchy_system.cpp
-    src/system/movement_system.cpp
-    src/system/render_system.cpp
+    src/systems/hierarchy_system.cpp
+    src/systems/movement_system.cpp
+    src/systems/render_system.cpp
 
     src/nodes/node_registry.cpp
 )

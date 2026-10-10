@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "engine/scene/entity.h"
-#include "engine/systems.h"
+#include "engine/systems/systems.h"
 #include "engine/core/system_context.h"
 #include "engine/render/render_list.h"
 #include "engine/ecs/world.h"
