@@ -41,6 +41,26 @@ Lucid-Game-Engine/
 ├── editor_main/
 │   ├── CMakeLists.txt
 │   └── main.cpp
+├── ecs/
+│   ├── include/
+│   │   └── engine/
+│   │       └── ecs/
+│   │           ├── types.h          ← RowIndex, Generation, RowId, ColumnType
+│   │           ├── row_ref.h        ← RowRef
+│   │           ├── callback.h       ← CallbackHandle
+│   │           ├── cell_value.h     ← CellValue
+│   │           ├── column.h         ← Column
+│   │           ├── table.h          ← Table
+│   │           └── world.h          ← World
+│   ├── src/
+│   │   ├── types.cpp
+│   │   ├── row_ref.cpp
+│   │   ├── callback.cpp
+│   │   ├── cell_value.cpp
+│   │   ├── column.cpp
+│   │   ├── table.cpp
+│   │   └── world.cpp
+│   └── CMakeLists.txt               ← target: lucid_ecs
 ├── engine/
 │   ├── include/
 │   │   └── engine/

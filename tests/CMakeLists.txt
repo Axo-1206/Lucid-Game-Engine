@@ -27,6 +27,7 @@ add_executable(lucid_tests
 target_link_libraries(lucid_tests
     PRIVATE
         lucid::runtime
+        lucid::ecs
         lucid::engine
         Catch2::Catch2WithMain
 )

@@ -3,7 +3,7 @@
 #include "engine/systems.h"
 #include "engine/system_context.h"
 #include "engine/render_list.h"
-#include "lucid/runtime.h"
+#include "engine/ecs/world.h"
 
 using namespace engine;
 
@@ -46,107 +46,107 @@ namespace
 
 TEST_CASE("systems: hierarchy computes world transform for root", "[systems]")
 {
-    lucid::Runtime rt;
-    setup_core_tables(rt);
+    engine::ecs::World world;
+    setup_core_tables(world);
 
-    EntityRef e = create_entity(rt, 1, "E");
-    auto t = add_component<TransformTag>(rt, e);
-    rt.get_table("Transform")->set_float32(t, "x", 100.0f);
-    rt.get_table("Transform")->set_float32(t, "y", 200.0f);
+    EntityRef e = create_entity(world, 1, "E");
+    auto t = add_component<TransformTag>(world, e);
+    world.get_table("Transform")->set_float32(t, "x", 100.0f);
+    world.get_table("Transform")->set_float32(t, "y", 200.0f);
 
     StubRenderer r;
     StubInput i;
     Clock c;
     RenderList rl;
-    SystemContext ctx{rt, r, i, c, rl};
+    SystemContext ctx{world, r, i, c, rl};
 
     hierarchy_system(ctx, 0.0f);
 
-    auto w = get_component<WorldTransformTag>(rt, e);
+    auto w = get_component<WorldTransformTag>(world, e);
     REQUIRE_FALSE(w.is_nil());
-    REQUIRE(rt.get_table("WorldTransform")->get_float32(w, "x") == 100.0f);
-    REQUIRE(rt.get_table("WorldTransform")->get_float32(w, "y") == 200.0f);
+    REQUIRE(world.get_table("WorldTransform")->get_float32(w, "x") == 100.0f);
+    REQUIRE(world.get_table("WorldTransform")->get_float32(w, "y") == 200.0f);
 }
 
 TEST_CASE("systems: hierarchy composes parent transforms", "[systems]")
 {
-    lucid::Runtime rt;
-    setup_core_tables(rt);
+    engine::ecs::World world;
+    setup_core_tables(world);
 
-    EntityRef parent = create_entity(rt, 1, "P");
-    auto tp = add_component<TransformTag>(rt, parent);
-    rt.get_table("Transform")->set_float32(tp, "x", 100.0f);
-    rt.get_table("Transform")->set_float32(tp, "y", 200.0f);
+    EntityRef parent = create_entity(world, 1, "P");
+    auto tp = add_component<TransformTag>(world, parent);
+    world.get_table("Transform")->set_float32(tp, "x", 100.0f);
+    world.get_table("Transform")->set_float32(tp, "y", 200.0f);
 
-    EntityRef child = create_entity(rt, 2, "C");
-    auto tc = add_component<TransformTag>(rt, child);
-    rt.get_table("Transform")->set_float32(tc, "x", 10.0f);
-    rt.get_table("Transform")->set_float32(tc, "y", 20.0f);
-    set_parent(rt, child, parent);
+    EntityRef child = create_entity(world, 2, "C");
+    auto tc = add_component<TransformTag>(world, child);
+    world.get_table("Transform")->set_float32(tc, "x", 10.0f);
+    world.get_table("Transform")->set_float32(tc, "y", 20.0f);
+    set_parent(world, child, parent);
 
     StubRenderer r;
     StubInput i;
     Clock c;
     RenderList rl;
-    SystemContext ctx{rt, r, i, c, rl};
+    SystemContext ctx{world, r, i, c, rl};
 
     hierarchy_system(ctx, 0.0f);
 
-    auto wp = get_component<WorldTransformTag>(rt, parent);
-    auto wc = get_component<WorldTransformTag>(rt, child);
+    auto wp = get_component<WorldTransformTag>(world, parent);
+    auto wc = get_component<WorldTransformTag>(world, child);
 
-    REQUIRE(rt.get_table("WorldTransform")->get_float32(wp, "x") == 100.0f);
-    REQUIRE(rt.get_table("WorldTransform")->get_float32(wc, "x") == 110.0f);
-    REQUIRE(rt.get_table("WorldTransform")->get_float32(wc, "y") == 220.0f);
+    REQUIRE(world.get_table("WorldTransform")->get_float32(wp, "x") == 100.0f);
+    REQUIRE(world.get_table("WorldTransform")->get_float32(wc, "x") == 110.0f);
+    REQUIRE(world.get_table("WorldTransform")->get_float32(wc, "y") == 220.0f);
 }
 
 TEST_CASE("systems: movement applies velocity to transform", "[systems]")
 {
-    lucid::Runtime rt;
-    setup_core_tables(rt);
+    engine::ecs::World world;
+    setup_core_tables(world);
 
-    EntityRef e = create_entity(rt, 1, "E");
-    auto t = add_component<TransformTag>(rt, e);
-    rt.get_table("Transform")->set_float32(t, "x", 0.0f);
-    rt.get_table("Transform")->set_float32(t, "y", 0.0f);
+    EntityRef e = create_entity(world, 1, "E");
+    auto t = add_component<TransformTag>(world, e);
+    world.get_table("Transform")->set_float32(t, "x", 0.0f);
+    world.get_table("Transform")->set_float32(t, "y", 0.0f);
 
-    auto v = add_component<VelocityTag>(rt, e);
-    rt.get_table("Velocity")->set_float32(v, "dx", 100.0f);
-    rt.get_table("Velocity")->set_float32(v, "dy", 50.0f);
+    auto v = add_component<VelocityTag>(world, e);
+    world.get_table("Velocity")->set_float32(v, "dx", 100.0f);
+    world.get_table("Velocity")->set_float32(v, "dy", 50.0f);
 
     StubRenderer r;
     StubInput i;
     Clock c;
     RenderList rl;
-    SystemContext ctx{rt, r, i, c, rl};
+    SystemContext ctx{world, r, i, c, rl};
 
     movement_system(ctx, 1.0f);
 
-    REQUIRE(rt.get_table("Transform")->get_float32(t, "x") == 100.0f);
-    REQUIRE(rt.get_table("Transform")->get_float32(t, "y") == 50.0f);
+    REQUIRE(world.get_table("Transform")->get_float32(t, "x") == 100.0f);
+    REQUIRE(world.get_table("Transform")->get_float32(t, "y") == 50.0f);
 }
 
 TEST_CASE("systems: render submits draw calls", "[systems]")
 {
-    lucid::Runtime rt;
-    setup_core_tables(rt);
+    engine::ecs::World world;
+    setup_core_tables(world);
 
-    EntityRef e = create_entity(rt, 1, "E");
-    auto t = add_component<TransformTag>(rt, e);
-    rt.get_table("Transform")->set_float32(t, "x", 10.0f);
-    auto s = add_component<SpriteTag>(rt, e);
-    rt.get_table("Sprite")->set_float32(s, "w", 32.0f);
-    rt.get_table("Sprite")->set_float32(s, "h", 16.0f);
-    rt.get_table("Sprite")->set_float32(s, "tint_r", 1.0f);
-    rt.get_table("Sprite")->set_float32(s, "tint_g", 1.0f);
-    rt.get_table("Sprite")->set_float32(s, "tint_b", 1.0f);
-    rt.get_table("Sprite")->set_float32(s, "tint_a", 1.0f);
+    EntityRef e = create_entity(world, 1, "E");
+    auto t = add_component<TransformTag>(world, e);
+    world.get_table("Transform")->set_float32(t, "x", 10.0f);
+    auto s = add_component<SpriteTag>(world, e);
+    world.get_table("Sprite")->set_float32(s, "w", 32.0f);
+    world.get_table("Sprite")->set_float32(s, "h", 16.0f);
+    world.get_table("Sprite")->set_float32(s, "tint_r", 1.0f);
+    world.get_table("Sprite")->set_float32(s, "tint_g", 1.0f);
+    world.get_table("Sprite")->set_float32(s, "tint_b", 1.0f);
+    world.get_table("Sprite")->set_float32(s, "tint_a", 1.0f);
 
     StubRenderer r;
     StubInput i;
     Clock c;
     RenderList rl;
-    SystemContext ctx{rt, r, i, c, rl};
+    SystemContext ctx{world, r, i, c, rl};
 
     hierarchy_system(ctx, 0.0f);
     render_system(ctx, 0.0f);

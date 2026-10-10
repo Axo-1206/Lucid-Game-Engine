@@ -10,16 +10,16 @@ namespace engine
 
         ctx.render_list.clear();
 
-        auto *world_tbl = ctx.runtime.get_table(WorldTransformTag::name);
-        auto *sprite_tbl = ctx.runtime.get_table(SpriteTag::name);
+        auto *world_tbl = ctx.world.get_table(WorldTransformTag::name);
+        auto *sprite_tbl = ctx.world.get_table(SpriteTag::name);
 
         if (world_tbl && sprite_tbl)
         {
-            world_tbl->each([&](lucid::RowRef world_ref)
+            world_tbl->each([&](engine::ecs::RowRef world_ref)
                             {
-            lucid::RowRef entity = world_tbl->get_row_ref(world_ref, "entity");
-            lucid::RowRef sprite_ref = sprite_tbl->find_by_primary(
-                "entity", lucid::CellValue::from_row_ref(entity));
+            engine::ecs::RowRef entity = world_tbl->get_row_ref(world_ref, "entity");
+            engine::ecs::RowRef sprite_ref = sprite_tbl->find_by_primary(
+                "entity", engine::ecs::CellValue::from_row_ref(entity));
             if (sprite_ref.is_nil()) return;
 
             const float x   = world_tbl->get_float32(world_ref, "x");

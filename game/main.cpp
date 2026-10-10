@@ -31,10 +31,10 @@ int main()
     std::unique_ptr<engine::Input> input(
         engine::create_input_glfw(window.native_handle()));
 
-    lucid::Runtime rt;
-    engine::setup_core_tables(rt);
+    engine::ecs::World world;
+    engine::setup_core_tables(world);
 
-    engine::Scene scene(rt);
+    engine::Scene scene(world);
     if (!scene.load_from_file("assets/scenes/demo.lscene"))
     {
         engine::log_error("Failed to load scene");
@@ -52,7 +52,7 @@ int main()
 
     engine::RenderList render_list;
     engine::SystemContext ctx{
-        rt,
+        world,
         *renderer,
         *input,
         clock,

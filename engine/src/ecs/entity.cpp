@@ -14,26 +14,26 @@ namespace engine
 
         // Reads the value_u64 of the _EngineState row with the given name.
         // Throws if the row doesn't exist.
-        std::uint64_t read_engine_state_u64(lucid::Runtime &rt, const std::string &name)
+        std::uint64_t read_engine_state_u64(engine::ecs::World &world, const std::string &name)
         {
-            auto *tbl = rt.get_table(kEngineStateTable);
+            auto *tbl = world.get_table(kEngineStateTable);
             if (!tbl)
                 throw std::runtime_error("_EngineState table not set up");
 
-            lucid::RowRef row = tbl->find_by_primary("name", lucid::CellValue::from_string(name));
+            engine::ecs::RowRef row = tbl->find_by_primary("name", engine::ecs::CellValue::from_string(name));
             if (row.is_nil())
                 throw std::runtime_error("_EngineState key not found: " + name);
 
             return tbl->get_uint64(row, "value_u64");
         }
 
-        void write_engine_state_u64(lucid::Runtime &rt, const std::string &name, std::uint64_t value)
+        void write_engine_state_u64(engine::ecs::World &world, const std::string &name, std::uint64_t value)
         {
-            auto *tbl = rt.get_table(kEngineStateTable);
+            auto *tbl = world.get_table(kEngineStateTable);
             if (!tbl)
                 throw std::runtime_error("_EngineState table not set up");
 
-            lucid::RowRef row = tbl->find_by_primary("name", lucid::CellValue::from_string(name));
+            engine::ecs::RowRef row = tbl->find_by_primary("name", engine::ecs::CellValue::from_string(name));
             if (row.is_nil())
                 throw std::runtime_error("_EngineState key not found: " + name);
 
@@ -46,16 +46,16 @@ namespace engine
     // Entity id allocation
     // -----------------------------------------------------------------------------
 
-    std::uint64_t allocate_entity_id(lucid::Runtime &rt)
+    std::uint64_t allocate_entity_id(engine::ecs::World &world)
     {
-        const std::uint64_t current = read_engine_state_u64(rt, kNextEntityIdKey);
+        const std::uint64_t current = read_engine_state_u64(world, kNextEntityIdKey);
 
         if (current == UINT64_MAX)
         {
             log_fatal("Entity id counter exhausted");
         }
 
-        write_engine_state_u64(rt, kNextEntityIdKey, current + 1);
+        write_engine_state_u64(world, kNextEntityIdKey, current + 1);
         return current;
     }
 
@@ -63,47 +63,47 @@ namespace engine
     // Entity lifecycle
     // -----------------------------------------------------------------------------
 
-    EntityRef create_entity(lucid::Runtime &rt)
+    EntityRef create_entity(engine::ecs::World &world)
     {
-        return create_entity(rt, allocate_entity_id(rt), "");
+        return create_entity(world, allocate_entity_id(world), "");
     }
 
-    EntityRef create_entity(lucid::Runtime &rt,
+    EntityRef create_entity(engine::ecs::World &world,
                             std::uint64_t id,
                             const std::string &name)
     {
-        auto *tbl = rt.get_table(EntityTag::name);
+        auto *tbl = world.get_table(EntityTag::name);
         if (!tbl)
             throw std::runtime_error("Entity table not set up");
 
         return tbl->add({
-            lucid::CellValue::from_uint64(id),
-            lucid::CellValue::from_string(name),
-            lucid::CellValue::from_row_ref(kNullEntity),
+            engine::ecs::CellValue::from_uint64(id),
+            engine::ecs::CellValue::from_string(name),
+            engine::ecs::CellValue::from_row_ref(kNullEntity),
         });
     }
 
-    void destroy_entity(lucid::Runtime &rt, EntityRef e)
+    void destroy_entity(engine::ecs::World &world, EntityRef e)
     {
-        if (!is_alive(rt, e))
+        if (!is_alive(world, e))
             return;
 
         // Remove components in reverse dependency order.
         // (Nothing depends on WorldTransform or Sprite, but be tidy.)
-        remove_component<VelocityTag>(rt, e);
-        remove_component<SpriteTag>(rt, e);
-        remove_component<WorldTransformTag>(rt, e);
-        remove_component<TransformTag>(rt, e);
+        remove_component<VelocityTag>(world, e);
+        remove_component<SpriteTag>(world, e);
+        remove_component<WorldTransformTag>(world, e);
+        remove_component<TransformTag>(world, e);
 
         // Remove the entity row itself.
-        auto *tbl = rt.get_table(EntityTag::name);
+        auto *tbl = world.get_table(EntityTag::name);
         if (tbl)
             tbl->remove(e);
     }
 
-    bool is_alive(const lucid::Runtime &rt, EntityRef e)
+    bool is_alive(const engine::ecs::World &world, EntityRef e)
     {
-        const auto *tbl = rt.get_table(EntityTag::name);
+        const auto *tbl = world.get_table(EntityTag::name);
         if (!tbl)
             return false;
         return tbl->is_valid(e);
@@ -113,25 +113,25 @@ namespace engine
     // Entity accessors
     // -----------------------------------------------------------------------------
 
-    std::uint64_t get_entity_id(const lucid::Runtime &rt, EntityRef e)
+    std::uint64_t get_entity_id(const engine::ecs::World &world, EntityRef e)
     {
-        const auto *tbl = rt.get_table(EntityTag::name);
+        const auto *tbl = world.get_table(EntityTag::name);
         if (!tbl || !tbl->is_valid(e))
             return 0;
         return tbl->get_uint64(e, "id");
     }
 
-    std::string get_entity_name(const lucid::Runtime &rt, EntityRef e)
+    std::string get_entity_name(const engine::ecs::World &world, EntityRef e)
     {
-        const auto *tbl = rt.get_table(EntityTag::name);
+        const auto *tbl = world.get_table(EntityTag::name);
         if (!tbl || !tbl->is_valid(e))
             return "";
         return tbl->get_string(e, "name");
     }
 
-    void set_entity_name(lucid::Runtime &rt, EntityRef e, const std::string &name)
+    void set_entity_name(engine::ecs::World &world, EntityRef e, const std::string &name)
     {
-        auto *tbl = rt.get_table(EntityTag::name);
+        auto *tbl = world.get_table(EntityTag::name);
         if (!tbl || !tbl->is_valid(e))
             return;
         tbl->set_string(e, "name", name);
@@ -141,17 +141,17 @@ namespace engine
     // Scene tree
     // -----------------------------------------------------------------------------
 
-    EntityRef get_parent(const lucid::Runtime &rt, EntityRef e)
+    EntityRef get_parent(const engine::ecs::World &world, EntityRef e)
     {
-        const auto *tbl = rt.get_table(EntityTag::name);
+        const auto *tbl = world.get_table(EntityTag::name);
         if (!tbl || !tbl->is_valid(e))
             return kNullEntity;
         return tbl->get_row_ref(e, "parent");
     }
 
-    void set_parent(lucid::Runtime &rt, EntityRef child, EntityRef parent)
+    void set_parent(engine::ecs::World &world, EntityRef child, EntityRef parent)
     {
-        auto *tbl = rt.get_table(EntityTag::name);
+        auto *tbl = world.get_table(EntityTag::name);
         if (!tbl || !tbl->is_valid(child))
             return;
         tbl->set_row_ref(child, "parent", parent);
@@ -161,89 +161,89 @@ namespace engine
     // Core table setup
     // -----------------------------------------------------------------------------
 
-    void setup_core_tables(lucid::Runtime &rt)
+    void setup_core_tables(engine::ecs::World &world)
     {
         // _EngineState
         {
-            auto *t = rt.create_table(kEngineStateTable);
-            t->add_column("name", lucid::ColumnType::String, /*primary=*/true);
-            t->add_column("value_u64", lucid::ColumnType::Uint64);
+            auto *t = world.create_table(kEngineStateTable);
+            t->add_column("name", engine::ecs::ColumnType::String, /*primary=*/true);
+            t->add_column("value_u64", engine::ecs::ColumnType::Uint64);
             t->add({
-                lucid::CellValue::from_string(kNextEntityIdKey),
-                lucid::CellValue::from_uint64(1),
+                engine::ecs::CellValue::from_string(kNextEntityIdKey),
+                engine::ecs::CellValue::from_uint64(1),
             });
         }
 
         // Entity
         {
-            auto *t = rt.create_table(EntityTag::name);
-            t->add_column("id", lucid::ColumnType::Uint64, /*primary=*/true);
-            t->add_column("name", lucid::ColumnType::String);
-            t->add_column("parent", lucid::ColumnType::RowRef);
+            auto *t = world.create_table(EntityTag::name);
+            t->add_column("id", engine::ecs::ColumnType::Uint64, /*primary=*/true);
+            t->add_column("name", engine::ecs::ColumnType::String);
+            t->add_column("parent", engine::ecs::ColumnType::RowRef);
         }
 
         // Transform
         {
-            auto *t = rt.create_table(TransformTag::name);
-            t->add_column("entity", lucid::ColumnType::RowRef, /*primary=*/true);
-            t->add_column("x", lucid::ColumnType::Float32);
-            t->add_column("y", lucid::ColumnType::Float32);
-            t->add_column("z", lucid::ColumnType::Float32);
-            t->add_column("rot_z", lucid::ColumnType::Float32);
+            auto *t = world.create_table(TransformTag::name);
+            t->add_column("entity", engine::ecs::ColumnType::RowRef, /*primary=*/true);
+            t->add_column("x", engine::ecs::ColumnType::Float32);
+            t->add_column("y", engine::ecs::ColumnType::Float32);
+            t->add_column("z", engine::ecs::ColumnType::Float32);
+            t->add_column("rot_z", engine::ecs::ColumnType::Float32);
         }
 
         // WorldTransform
         {
-            auto *t = rt.create_table(WorldTransformTag::name);
-            t->add_column("entity", lucid::ColumnType::RowRef, /*primary=*/true);
-            t->add_column("x", lucid::ColumnType::Float32);
-            t->add_column("y", lucid::ColumnType::Float32);
-            t->add_column("z", lucid::ColumnType::Float32);
-            t->add_column("rot_z", lucid::ColumnType::Float32);
+            auto *t = world.create_table(WorldTransformTag::name);
+            t->add_column("entity", engine::ecs::ColumnType::RowRef, /*primary=*/true);
+            t->add_column("x", engine::ecs::ColumnType::Float32);
+            t->add_column("y", engine::ecs::ColumnType::Float32);
+            t->add_column("z", engine::ecs::ColumnType::Float32);
+            t->add_column("rot_z", engine::ecs::ColumnType::Float32);
         }
 
         // Velocity
         {
-            auto *t = rt.create_table(VelocityTag::name);
-            t->add_column("entity", lucid::ColumnType::RowRef, /*primary=*/true);
-            t->add_column("dx", lucid::ColumnType::Float32);
-            t->add_column("dy", lucid::ColumnType::Float32);
-            t->add_column("dz", lucid::ColumnType::Float32);
+            auto *t = world.create_table(VelocityTag::name);
+            t->add_column("entity", engine::ecs::ColumnType::RowRef, /*primary=*/true);
+            t->add_column("dx", engine::ecs::ColumnType::Float32);
+            t->add_column("dy", engine::ecs::ColumnType::Float32);
+            t->add_column("dz", engine::ecs::ColumnType::Float32);
         }
 
         // Sprite
         {
-            auto *t = rt.create_table(SpriteTag::name);
-            t->add_column("entity", lucid::ColumnType::RowRef, /*primary=*/true);
-            t->add_column("texture_path", lucid::ColumnType::String);
-            t->add_column("w", lucid::ColumnType::Float32);
-            t->add_column("h", lucid::ColumnType::Float32);
-            t->add_column("tint_r", lucid::ColumnType::Float32);
-            t->add_column("tint_g", lucid::ColumnType::Float32);
-            t->add_column("tint_b", lucid::ColumnType::Float32);
-            t->add_column("tint_a", lucid::ColumnType::Float32);
-            t->add_column("layer", lucid::ColumnType::Int32);
+            auto *t = world.create_table(SpriteTag::name);
+            t->add_column("entity", engine::ecs::ColumnType::RowRef, /*primary=*/true);
+            t->add_column("texture_path", engine::ecs::ColumnType::String);
+            t->add_column("w", engine::ecs::ColumnType::Float32);
+            t->add_column("h", engine::ecs::ColumnType::Float32);
+            t->add_column("tint_r", engine::ecs::ColumnType::Float32);
+            t->add_column("tint_g", engine::ecs::ColumnType::Float32);
+            t->add_column("tint_b", engine::ecs::ColumnType::Float32);
+            t->add_column("tint_a", engine::ecs::ColumnType::Float32);
+            t->add_column("layer", engine::ecs::ColumnType::Int32);
         }
 
         // Camera
         {
-            auto *t = rt.create_table(CameraTag::name);
-            t->add_column("name", lucid::ColumnType::String, /*primary=*/true);
-            t->add_column("pos_x", lucid::ColumnType::Float32);
-            t->add_column("pos_y", lucid::ColumnType::Float32);
-            t->add_column("pos_z", lucid::ColumnType::Float32);
-            t->add_column("target_x", lucid::ColumnType::Float32);
-            t->add_column("target_y", lucid::ColumnType::Float32);
-            t->add_column("target_z", lucid::ColumnType::Float32);
-            t->add_column("fov", lucid::ColumnType::Float32);
-            t->add_column("near", lucid::ColumnType::Float32);
-            t->add_column("far", lucid::ColumnType::Float32);
-            t->add_column("is_orthographic", lucid::ColumnType::Bool);
-            t->add_column("ortho_size", lucid::ColumnType::Float32);
-            t->add_column("clear_r", lucid::ColumnType::Float32);
-            t->add_column("clear_g", lucid::ColumnType::Float32);
-            t->add_column("clear_b", lucid::ColumnType::Float32);
-            t->add_column("clear_a", lucid::ColumnType::Float32);
+            auto *t = world.create_table(CameraTag::name);
+            t->add_column("name", engine::ecs::ColumnType::String, /*primary=*/true);
+            t->add_column("pos_x", engine::ecs::ColumnType::Float32);
+            t->add_column("pos_y", engine::ecs::ColumnType::Float32);
+            t->add_column("pos_z", engine::ecs::ColumnType::Float32);
+            t->add_column("target_x", engine::ecs::ColumnType::Float32);
+            t->add_column("target_y", engine::ecs::ColumnType::Float32);
+            t->add_column("target_z", engine::ecs::ColumnType::Float32);
+            t->add_column("fov", engine::ecs::ColumnType::Float32);
+            t->add_column("near", engine::ecs::ColumnType::Float32);
+            t->add_column("far", engine::ecs::ColumnType::Float32);
+            t->add_column("is_orthographic", engine::ecs::ColumnType::Bool);
+            t->add_column("ortho_size", engine::ecs::ColumnType::Float32);
+            t->add_column("clear_r", engine::ecs::ColumnType::Float32);
+            t->add_column("clear_g", engine::ecs::ColumnType::Float32);
+            t->add_column("clear_b", engine::ecs::ColumnType::Float32);
+            t->add_column("clear_a", engine::ecs::ColumnType::Float32);
         }
 
         log_info("Core tables created");

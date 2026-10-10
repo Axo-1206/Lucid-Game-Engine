@@ -29,6 +29,7 @@ target_include_directories(luc_engine
 target_link_libraries(luc_engine
     PUBLIC
         lucid::runtime
+        lucid::ecs
         lucid_sema
     PRIVATE
         lucid::glfw

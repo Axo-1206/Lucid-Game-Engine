@@ -16,7 +16,7 @@ namespace engine
 
         // ---- Component savers ----
 
-        json save_transform(const lucid::Table *tbl, lucid::RowRef c)
+        json save_transform(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
         {
             json j;
             j["x"] = tbl->get_float32(c, "x");
@@ -26,7 +26,7 @@ namespace engine
             return j;
         }
 
-        json save_world_transform(const lucid::Table *tbl, lucid::RowRef c)
+        json save_world_transform(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
         {
             json j;
             j["x"] = tbl->get_float32(c, "x");
@@ -36,7 +36,7 @@ namespace engine
             return j;
         }
 
-        json save_velocity(const lucid::Table *tbl, lucid::RowRef c)
+        json save_velocity(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
         {
             json j;
             j["dx"] = tbl->get_float32(c, "dx");
@@ -45,7 +45,7 @@ namespace engine
             return j;
         }
 
-        json save_sprite(const lucid::Table *tbl, lucid::RowRef c)
+        json save_sprite(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
         {
             json j;
             j["texture_path"] = tbl->get_string(c, "texture_path");
@@ -59,14 +59,14 @@ namespace engine
             return j;
         }
 
-        json save_component_by_name(lucid::Runtime &rt, EntityRef e,
+        json save_component_by_name(engine::ecs::World &world, EntityRef e,
                                     const std::string &table_name)
         {
-            auto *tbl = rt.get_table(table_name);
+            auto *tbl = world.get_table(table_name);
             if (!tbl)
                 return json();
 
-            auto comp = tbl->find_by_primary("entity", lucid::CellValue::from_row_ref(e));
+            auto comp = tbl->find_by_primary("entity", engine::ecs::CellValue::from_row_ref(e));
             if (comp.is_nil())
                 return json();
 
@@ -96,10 +96,10 @@ namespace engine
         // --- Cameras ---
         {
             json cameras = json::array();
-            auto *cam_tbl = runtime_.get_table(CameraTag::name);
+            auto *cam_tbl = world_.get_table(CameraTag::name);
             if (cam_tbl)
             {
-                cam_tbl->each([&](lucid::RowRef r)
+                cam_tbl->each([&](engine::ecs::RowRef r)
                               {
                 json cj;
                 cj["name"] = cam_tbl->get_string(r, "name");
@@ -127,25 +127,25 @@ namespace engine
         // Discover the component tables: any table with an `entity` column
         // that is not the `Entity` table itself.
         std::vector<std::string> component_tables;
-        runtime_.each_table([&](lucid::Table &t)
-                            {
+        world_.each_table([&](engine::ecs::Table &t)
+                          {
         if (t.has_column("entity")) {
             component_tables.push_back(t.name());
         } });
 
         {
             json entities = json::array();
-            auto *entity_tbl = runtime_.get_table(EntityTag::name);
+            auto *entity_tbl = world_.get_table(EntityTag::name);
             if (entity_tbl)
             {
-                entity_tbl->each([&](lucid::RowRef r)
+                entity_tbl->each([&](engine::ecs::RowRef r)
                                  {
                 json ej;
                 ej["id"]   = entity_tbl->get_uint64(r, "id");
                 ej["name"] = entity_tbl->get_string(r, "name");
 
                 // Parent: emit the parent's id, or 0.
-                lucid::RowRef parent = entity_tbl->get_row_ref(r, "parent");
+                engine::ecs::RowRef parent = entity_tbl->get_row_ref(r, "parent");
                 if (!parent.is_nil() && entity_tbl->is_valid(parent)) {
                     ej["parent"] = entity_tbl->get_uint64(parent, "id");
                 } else {
@@ -155,7 +155,7 @@ namespace engine
                 // Components.
                 json components = json::object();
                 for (const auto& table_name : component_tables) {
-                    json cj = save_component_by_name(const_cast<lucid::Runtime&>(runtime_), r, table_name);
+                    json cj = save_component_by_name(const_cast<engine::ecs::World&>(world_), r, table_name);
                     if (!cj.is_null()) {
                         components[table_name] = cj;
                     }
@@ -170,10 +170,10 @@ namespace engine
         // --- Engine state ---
         {
             json state = json::object();
-            auto *state_tbl = runtime_.get_table("_EngineState");
+            auto *state_tbl = world_.get_table("_EngineState");
             if (state_tbl)
             {
-                state_tbl->each([&](lucid::RowRef r)
+                state_tbl->each([&](engine::ecs::RowRef r)
                                 {
                 std::string key = state_tbl->get_string(r, "name");
                 if (key == "next_entity_id") {

@@ -44,6 +44,7 @@ add_subdirectory(externals)
 # ---- Libraries ----
 add_subdirectory(runtime)
 add_subdirectory(engine)
+add_subdirectory(ecs)
 
 # ---- Editor library (only if the editor is being built) ----
 if(LUCID_BUILD_EDITOR)

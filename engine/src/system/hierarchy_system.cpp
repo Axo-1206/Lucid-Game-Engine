@@ -10,19 +10,19 @@ namespace engine
     {
         (void)dt;
 
-        auto *entity_tbl = ctx.runtime.get_table(EntityTag::name);
-        auto *local_tbl = ctx.runtime.get_table(TransformTag::name);
-        auto *world_tbl = ctx.runtime.get_table(WorldTransformTag::name);
+        auto *entity_tbl = ctx.world.get_table(EntityTag::name);
+        auto *local_tbl = ctx.world.get_table(TransformTag::name);
+        auto *world_tbl = ctx.world.get_table(WorldTransformTag::name);
         if (!entity_tbl || !local_tbl || !world_tbl)
             return;
 
-        local_tbl->each([&](lucid::RowRef local_ref)
+        local_tbl->each([&](engine::ecs::RowRef local_ref)
                         {
-        lucid::RowRef entity = local_tbl->get_row_ref(local_ref, "entity");
+        engine::ecs::RowRef entity = local_tbl->get_row_ref(local_ref, "entity");
         if (world_tbl->find_by_primary("entity",
-                lucid::CellValue::from_row_ref(entity)).is_nil())
+                engine::ecs::CellValue::from_row_ref(entity)).is_nil())
         {
-            world_tbl->add_partial("entity", lucid::CellValue::from_row_ref(entity));
+            world_tbl->add_partial("entity", engine::ecs::CellValue::from_row_ref(entity));
         } });
 
         constexpr std::size_t kMaxPasses = 32;
@@ -30,11 +30,11 @@ namespace engine
         {
             bool changed = false;
 
-            local_tbl->each([&](lucid::RowRef local_ref)
+            local_tbl->each([&](engine::ecs::RowRef local_ref)
                             {
-            lucid::RowRef entity = local_tbl->get_row_ref(local_ref, "entity");
-            lucid::RowRef world_ref = world_tbl->find_by_primary(
-                "entity", lucid::CellValue::from_row_ref(entity));
+            engine::ecs::RowRef entity = local_tbl->get_row_ref(local_ref, "entity");
+            engine::ecs::RowRef world_ref = world_tbl->find_by_primary(
+                "entity", engine::ecs::CellValue::from_row_ref(entity));
             if (world_ref.is_nil()) return;
 
             const float lx     = local_tbl->get_float32(local_ref, "x");
@@ -42,14 +42,14 @@ namespace engine
             const float lz     = local_tbl->get_float32(local_ref, "z");
             const float lrot_z = local_tbl->get_float32(local_ref, "rot_z");
 
-            const lucid::RowRef parent = entity_tbl->get_row_ref(entity, "parent");
+            const engine::ecs::RowRef parent = entity_tbl->get_row_ref(entity, "parent");
 
             float wx, wy, wz, wrot_z;
             if (parent.is_nil()) {
                 wx = lx; wy = ly; wz = lz; wrot_z = lrot_z;
             } else {
-                const lucid::RowRef pworld = world_tbl->find_by_primary(
-                    "entity", lucid::CellValue::from_row_ref(parent));
+                const engine::ecs::RowRef pworld = world_tbl->find_by_primary(
+                    "entity", engine::ecs::CellValue::from_row_ref(parent));
                 if (pworld.is_nil()) {
                     return;
                 }

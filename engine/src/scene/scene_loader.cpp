@@ -21,10 +21,10 @@ namespace engine
         // the columns present in the JSON. Missing columns keep their default
         // values.
 
-        void load_transform(lucid::Runtime &rt, EntityRef e, const json &j)
+        void load_transform(engine::ecs::World &world, EntityRef e, const json &j)
         {
-            auto c = add_component<TransformTag>(rt, e);
-            auto *tbl = rt.get_table(TransformTag::name);
+            auto c = add_component<TransformTag>(world, e);
+            auto *tbl = world.get_table(TransformTag::name);
             if (j.contains("x"))
                 tbl->set_float32(c, "x", j["x"].get<float>());
             if (j.contains("y"))
@@ -35,10 +35,10 @@ namespace engine
                 tbl->set_float32(c, "rot_z", j["rot_z"].get<float>());
         }
 
-        void load_world_transform(lucid::Runtime &rt, EntityRef e, const json &j)
+        void load_world_transform(engine::ecs::World &world, EntityRef e, const json &j)
         {
-            auto c = add_component<WorldTransformTag>(rt, e);
-            auto *tbl = rt.get_table(WorldTransformTag::name);
+            auto c = add_component<WorldTransformTag>(world, e);
+            auto *tbl = world.get_table(WorldTransformTag::name);
             if (j.contains("x"))
                 tbl->set_float32(c, "x", j["x"].get<float>());
             if (j.contains("y"))
@@ -49,10 +49,10 @@ namespace engine
                 tbl->set_float32(c, "rot_z", j["rot_z"].get<float>());
         }
 
-        void load_velocity(lucid::Runtime &rt, EntityRef e, const json &j)
+        void load_velocity(engine::ecs::World &world, EntityRef e, const json &j)
         {
-            auto c = add_component<VelocityTag>(rt, e);
-            auto *tbl = rt.get_table(VelocityTag::name);
+            auto c = add_component<VelocityTag>(world, e);
+            auto *tbl = world.get_table(VelocityTag::name);
             if (j.contains("dx"))
                 tbl->set_float32(c, "dx", j["dx"].get<float>());
             if (j.contains("dy"))
@@ -61,10 +61,10 @@ namespace engine
                 tbl->set_float32(c, "dz", j["dz"].get<float>());
         }
 
-        void load_sprite(lucid::Runtime &rt, EntityRef e, const json &j)
+        void load_sprite(engine::ecs::World &world, EntityRef e, const json &j)
         {
-            auto c = add_component<SpriteTag>(rt, e);
-            auto *tbl = rt.get_table(SpriteTag::name);
+            auto c = add_component<SpriteTag>(world, e);
+            auto *tbl = world.get_table(SpriteTag::name);
             if (j.contains("texture_path"))
                 tbl->set_string(c, "texture_path", j["texture_path"].get<std::string>());
             if (j.contains("w"))
@@ -83,34 +83,34 @@ namespace engine
                 tbl->set_int32(c, "layer", j["layer"].get<int>());
         }
 
-        void load_component(lucid::Runtime &rt, EntityRef e,
+        void load_component(engine::ecs::World &world, EntityRef e,
                             const std::string &name, const json &j)
         {
             if (name == "Transform")
-                load_transform(rt, e, j);
+                load_transform(world, e, j);
             else if (name == "WorldTransform")
-                load_world_transform(rt, e, j);
+                load_world_transform(world, e, j);
             else if (name == "Velocity")
-                load_velocity(rt, e, j);
+                load_velocity(world, e, j);
             else if (name == "Sprite")
-                load_sprite(rt, e, j);
+                load_sprite(world, e, j);
             else
                 log_warn("Unknown component in scene file: %s", name.c_str());
         }
 
         // ---- Camera loader ----
 
-        lucid::RowRef load_camera(lucid::Runtime &rt, const json &j)
+        engine::ecs::RowRef load_camera(engine::ecs::World &world, const json &j)
         {
-            auto *tbl = rt.get_table(CameraTag::name);
+            auto *tbl = world.get_table(CameraTag::name);
             if (!tbl)
-                return lucid::RowRef{};
+                return engine::ecs::RowRef{};
 
             std::string name = j.value("name", "camera");
-            if (tbl->find_by_primary("name", lucid::CellValue::from_string(name)).is_nil() == false)
+            if (tbl->find_by_primary("name", engine::ecs::CellValue::from_string(name)).is_nil() == false)
             {
                 log_warn("Duplicate camera name in scene: %s", name.c_str());
-                return lucid::RowRef{};
+                return engine::ecs::RowRef{};
             }
 
             // Build the row with all columns.
@@ -143,7 +143,7 @@ namespace engine
             }
 
             // Add the row with the primary key first, then set the rest.
-            auto ref = tbl->add_partial("name", lucid::CellValue::from_string(name));
+            auto ref = tbl->add_partial("name", engine::ecs::CellValue::from_string(name));
 
             tbl->set_float32(ref, "pos_x", pos_x);
             tbl->set_float32(ref, "pos_y", pos_y);
@@ -192,7 +192,7 @@ namespace engine
         int version = j.value("version", 1);
         if (version > 1)
         {
-            log_warn("Scene file '%s' is version %d, engine supports version 1. Loading best-effort.",
+            log_warn("Scene file '%s' is version %d, engine supports version 1. Loading best-effoworld.",
                      path.c_str(), version);
         }
 
@@ -206,7 +206,7 @@ namespace engine
         {
             for (const auto &cj : j["cameras"])
             {
-                load_camera(runtime_, cj);
+                load_camera(world_, cj);
             }
         }
 
@@ -233,7 +233,7 @@ namespace engine
 
                 std::string ename = ej.value("name", "");
 
-                EntityRef e = create_entity(runtime_, id, ename);
+                EntityRef e = create_entity(world_, id, ename);
                 id_to_entity[id] = e;
 
                 // Components.
@@ -241,7 +241,7 @@ namespace engine
                 {
                     for (auto it = ej["components"].begin(); it != ej["components"].end(); ++it)
                     {
-                        load_component(runtime_, e, it.key(), it.value());
+                        load_component(world_, e, it.key(), it.value());
                     }
                 }
             }
@@ -267,7 +267,7 @@ namespace engine
                     continue;
                 }
 
-                set_parent(runtime_, child_it->second, parent_it->second);
+                set_parent(world_, child_it->second, parent_it->second);
             }
         }
 
@@ -288,10 +288,10 @@ namespace engine
         }
 
         {
-            auto *state_tbl = runtime_.get_table("_EngineState");
+            auto *state_tbl = world_.get_table("_EngineState");
             if (state_tbl)
             {
-                auto row = state_tbl->find_by_primary("name", lucid::CellValue::from_string("next_entity_id"));
+                auto row = state_tbl->find_by_primary("name", engine::ecs::CellValue::from_string("next_entity_id"));
                 if (!row.is_nil())
                 {
                     state_tbl->set_uint64(row, "value_u64", next_id);
@@ -302,10 +302,10 @@ namespace engine
         // --- Active camera ---
         // The first camera becomes active.
         {
-            auto *cam_tbl = runtime_.get_table(CameraTag::name);
+            auto *cam_tbl = world_.get_table(CameraTag::name);
             if (cam_tbl && cam_tbl->count() > 0)
             {
-                cam_tbl->each([&](lucid::RowRef r)
+                cam_tbl->each([&](engine::ecs::RowRef r)
                               {
                 if (active_camera_.is_nil()) {
                     active_camera_ = r;
