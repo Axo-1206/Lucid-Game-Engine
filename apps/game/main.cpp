@@ -7,6 +7,8 @@
 #include "engine/scene/scene.h"
 #include "engine/core/system_context.h"
 #include "engine/systems/systems.h"
+#include "engine/graph/graph_runtime.h"
+#include "engine/nodes/node_registry.h"
 
 #include <memory>
 
@@ -41,6 +43,16 @@ int main()
         return 1;
     }
 
+    // The graph runtime loads the .lucgraph files referenced by
+    // the scene's Script components. It must run after the scene
+    // load, because it reads the Script table the scene populates.
+    engine::graph::GraphRuntime runtime(world, engine::node_registry());
+    runtime.set_asset_root(std::filesystem::current_path());
+    if (!runtime.load())
+    {
+        engine::log_warn("Some graphs failed to load; continuing without them.");
+    }
+
     engine::CameraData cam_data = scene.get_active_camera_data();
     engine::Camera2D camera;
     camera.x = cam_data.pos_x;
@@ -73,6 +85,8 @@ int main()
             window.request_close();
         }
 
+        runtime.tick(dt);
+
         engine::hierarchy_system(ctx, dt);
         engine::movement_system(ctx, dt);
         engine::hierarchy_system(ctx, dt);
@@ -86,6 +100,7 @@ int main()
         renderer->present();
     }
 
+    runtime.clear();
     renderer->shutdown();
     engine::log_info("Lucid Game ended");
     return 0;

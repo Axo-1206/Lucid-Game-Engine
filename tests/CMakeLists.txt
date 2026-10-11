@@ -17,8 +17,13 @@ add_executable(lucid_tests
     engine/test_entity.cpp
     engine/test_scene.cpp
     engine/test_systems.cpp
+    engine/test_diagnostic_log.cpp
+
     nodes/test_node_registry.cpp
+
     ecs/test_world.cpp
+
+    graph/test_graph_runtime.cpp
 )
 
 target_link_libraries(lucid_tests

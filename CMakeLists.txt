@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20...4.3)
 
 project(LucidEngine
     VERSION 0.1.0
-    DESCRIPTION "A game engine with an embedded data-oriented scripting language"
+    DESCRIPTION "A game engine"
     LANGUAGES C CXX
 )
 

@@ -2,6 +2,7 @@ add_library(luc_engine STATIC
     src/core/log.cpp
     src/core/clock.cpp
     src/core/linear_allocator.cpp
+    src/core/diagnostic_log.cpp
 
     src/platform/input_state.cpp
     src/platform/input_glfw.cpp
@@ -22,6 +23,9 @@ add_library(luc_engine STATIC
     src/systems/render_system.cpp
 
     src/nodes/node_registry.cpp
+
+    src/graph/node_dispatch.cpp
+    src/graph/graph_runtime.cpp
 )
 
 target_include_directories(luc_engine
@@ -36,6 +40,7 @@ target_link_libraries(luc_engine
     PUBLIC
         lucid::ecs
         lucid_sema
+        lucid_serialization
     PRIVATE
         lucid::glfw
         lucid::glm
