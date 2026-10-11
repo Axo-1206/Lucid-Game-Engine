@@ -42,11 +42,11 @@ namespace engine
     //
     // See docs/notes/SceneFormat.md for each component's fields and defaults.
     inline constexpr const char *kSceneComponents[] = {
-        "Transform",      // 2D transform: x, y, z, rot_z
-        "WorldTransform", // derived; usually not authored in a scene
-        "Velocity",       // dx, dy, dz
-        "Sprite",         // 2D sprite: texture_path, w, h, tint_rgba, layer
-        "Script",         // reference to a .lucgraph file
+        "Engine_Transform",      // 2D transform: x, y, z, rot_z
+        "Engine_WorldTransform", // derived; usually not authored in a scene
+        "Engine_Velocity",       // dx, dy, dz
+        "Engine_Sprite",         // 2D sprite: texture_path, w, h, tint_rgba, layer
+        "Engine_Script",         // reference to a .lucgraph file
     };
 
     // -----------------------------------------------------------------------------

@@ -50,39 +50,39 @@ namespace engine::graph
         //
         // An Action reads its arguments and performs a side effect.
 
-        // 0: Float32Node(value: float32) -> float32
+        // 0: Engine_Float32Node(value: float32) -> float32
         void exec_float32(TickContext &ctx, std::uint32_t node_index)
         {
             const auto &node = ctx.graph.nodes[node_index];
             ctx.results[node_index] = ctx.arg_values[node.args_offset];
         }
 
-        // 1: Int32Node(value: int32) -> int32
+        // 1: Engine_Int32Node(value: int32) -> int32
         void exec_int32(TickContext &ctx, std::uint32_t node_index)
         {
             const auto &node = ctx.graph.nodes[node_index];
             ctx.results[node_index] = ctx.arg_values[node.args_offset];
         }
 
-        // 2: EveryFrame() — source trigger. Never dispatched.
+        // 2: Engine_EveryFrame() — source trigger. Never dispatched.
         void exec_every_frame(TickContext &, std::uint32_t) {}
 
-        // 3: PrintNode(value: float32) — action.
+        // 3: Engine_PrintNode(value: float32) — action.
         void exec_print(TickContext &ctx, std::uint32_t node_index)
         {
             const auto &node = ctx.graph.nodes[node_index];
             const float v = cell_as_float(ctx.arg_values[node.args_offset]);
-            engine::log_info("[graph] PrintNode: %f", static_cast<double>(v));
+            engine::log_info("[graph] Engine_PrintNode: %f", static_cast<double>(v));
         }
 
-        // 4: BoolNode(value: bool) -> bool
+        // 4: Engine_BoolNode(value: bool) -> bool
         void exec_bool(TickContext &ctx, std::uint32_t node_index)
         {
             const auto &node = ctx.graph.nodes[node_index];
             ctx.results[node_index] = ctx.arg_values[node.args_offset];
         }
 
-        // 5: LessThanNode(a: f32, b: f32) -> bool
+        // 5: Engine_LessThanNode(a: f32, b: f32) -> bool
         void exec_less_than(TickContext &ctx, std::uint32_t node_index)
         {
             const auto &node = ctx.graph.nodes[node_index];
@@ -91,7 +91,7 @@ namespace engine::graph
             ctx.results[node_index] = engine::ecs::CellValue::from_bool(a < b);
         }
 
-        // 6: IfNode(cond: bool) — gating trigger. Never dispatched.
+        // 6: Engine_IfNode(cond: bool) — gating trigger. Never dispatched.
         void exec_if(TickContext &, std::uint32_t) {}
 
         // -----------------------------------------------------------------------------
@@ -103,13 +103,13 @@ namespace engine::graph
         // same index.
 
         constexpr NodeExecutor kExecutors[] = {
-            exec_float32,     // 0: Float32Node
-            exec_int32,       // 1: Int32Node
-            exec_every_frame, // 2: EveryFrame
-            exec_print,       // 3: PrintNode
-            exec_bool,        // 4: BoolNode
-            exec_less_than,   // 5: LessThanNode
-            exec_if,          // 6: IfNode
+            exec_float32,     // 0: Engine_Float32Node
+            exec_int32,       // 1: Engine_Int32Node
+            exec_every_frame, // 2: Engine_EveryFrame
+            exec_print,       // 3: Engine_PrintNode
+            exec_bool,        // 4: Engine_BoolNode
+            exec_less_than,   // 5: Engine_LessThanNode
+            exec_if,          // 6: Engine_IfNode
         };
 
     } // namespace

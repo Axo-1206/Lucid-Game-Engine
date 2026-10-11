@@ -16,31 +16,31 @@ namespace engine
 
     struct EntityTag
     {
-        static constexpr const char *name = "Entity";
+        static constexpr const char *name = "Engine_Entity";
     };
     struct TransformTag
     {
-        static constexpr const char *name = "Transform";
+        static constexpr const char *name = "Engine_Transform";
     };
     struct WorldTransformTag
     {
-        static constexpr const char *name = "WorldTransform";
+        static constexpr const char *name = "Engine_WorldTransform";
     };
     struct VelocityTag
     {
-        static constexpr const char *name = "Velocity";
+        static constexpr const char *name = "Engine_Velocity";
     };
     struct SpriteTag
     {
-        static constexpr const char *name = "Sprite";
+        static constexpr const char *name = "Engine_Sprite";
     };
     struct ScriptTag
     {
-        static constexpr const char *name = "Script";
+        static constexpr const char *name = "Engine_Script";
     };
     struct CameraTag
     {
-        static constexpr const char *name = "Camera";
+        static constexpr const char *name = "Engine_Camera";
     }; // not an entity component
 
 } // namespace engine

@@ -42,10 +42,10 @@ Here `regen` subscribes to `if_below_max`. When `if_below_max` fires,
 A Trigger has one of two modes, chosen by the engine.
 
 **Source trigger.** The engine fires it directly, each frame. The
-canonical example is `EveryFrame`:
+canonical example is `Engine_EveryFrame`:
 
 ```
-node every_frame = EveryFrame()
+node every_frame = Engine_EveryFrame()
 ```
 
 Every tick, the engine fires `every_frame`. It doesn't wait for
@@ -55,10 +55,10 @@ anything; it fires.
 trigger subscribes to a parent trigger, and it has a condition. When
 the parent fires, the engine evaluates the condition. If the
 condition is true, the gating trigger fires. If false, it does not.
-The canonical example is `IfNode`:
+The canonical example is `Engine_IfNode`:
 
 ```
-node if_below_max = IfNode(below_max) on every_frame
+node if_below_max = Engine_IfNode(below_max) on every_frame
 ```
 
 `if_below_max` subscribes to `every_frame`. When `every_frame` fires,
@@ -76,11 +76,11 @@ which mode each trigger type has.
 Consider:
 
 ```
-node every_frame  = EveryFrame()
+node every_frame  = Engine_EveryFrame()
 node hp           = PlayerHpNode(player)
 node max_hp       = PlayerMaxHpNode(player)
-node below_max    = LessThanNode(hp, max_hp)
-node if_below_max = IfNode(below_max) on every_frame
+node below_max    = Engine_LessThanNode(hp, max_hp)
+node if_below_max = Engine_IfNode(below_max) on every_frame
 node regen        = RegenNode(player, 5) on if_below_max
 ```
 
@@ -108,10 +108,10 @@ node regen        = RegenNode(player, 5) on if_below_max
 
 ## 4. The distinction that matters
 
-**`EveryFrame` runs every frame.** It's a source trigger. The engine
+**`Engine_EveryFrame` runs every frame.** It's a source trigger. The engine
 fires it each tick, unconditionally.
 
-**`IfNode` is *asked to fire* every frame, because its parent fires
+**`Engine_IfNode` is *asked to fire* every frame, because its parent fires
 every frame.** But it *fires* only when its condition is true. Being
 asked and firing are different events.
 
@@ -149,13 +149,13 @@ runs. `condition` is evaluated once per iteration, at the point the
 In Lucid:
 
 ```
-node every_frame  = EveryFrame()
-node below_max    = LessThanNode(hp, max_hp)
-node if_below_max = IfNode(below_max) on every_frame
+node every_frame  = Engine_EveryFrame()
+node below_max    = Engine_LessThanNode(hp, max_hp)
+node if_below_max = Engine_IfNode(below_max) on every_frame
 node regen        = RegenNode(player, 5) on if_below_max
 ```
 
-There is no body. There are nodes and subscriptions. `EveryFrame` is
+There is no body. There are nodes and subscriptions. `Engine_EveryFrame` is
 a source trigger that fires each tick. `if_below_max` subscribes to
 it. When `every_frame` fires, the engine evaluates `below_max`; if
 true, `if_below_max` fires; if `if_below_max` fires, `regen` runs.
@@ -169,20 +169,20 @@ body.
 ## 6. Composition
 
 Conditionals compose by gating gates. Every condition is a Value node
-that produces a `bool`. `LessThanNode`, `GreaterThanNode`,
+that produces a `bool`. `Engine_LessThanNode`, `GreaterThanNode`,
 `EqualToNode`, `AndNode`, `OrNode`, `NotNode` are all Value nodes.
-`IfNode` is the only gating trigger you need.
+`Engine_IfNode` is the only gating trigger you need.
 
 Nested conditionals:
 
 ```
-node every_frame = EveryFrame()
+node every_frame = Engine_EveryFrame()
 node a           = ...
 node b           = ...
 node both        = AndNode(a, b)
-node gate1       = IfNode(both) on every_frame
+node gate1       = Engine_IfNode(both) on every_frame
 node c           = ...
-node gate2       = IfNode(c) on gate1
+node gate2       = Engine_IfNode(c) on gate1
 node action      = DoThing() on gate2
 ```
 
@@ -195,11 +195,11 @@ One tick: `every_frame` fires. `gate1` evaluates `both`. If true,
 Chained conditions:
 
 ```
-node every_frame = EveryFrame()
-node hp_low      = LessThanNode(hp, 10)
+node every_frame = Engine_EveryFrame()
+node hp_low      = Engine_LessThanNode(hp, 10)
 node hp_zero     = EqualToNode(hp, 0)
-node dying       = IfNode(hp_low) on every_frame
-node dead        = IfNode(hp_zero) on dying
+node dying       = Engine_IfNode(hp_low) on every_frame
+node dead        = Engine_IfNode(hp_zero) on dying
 ```
 
 Every frame, if hp is low, then if hp is zero, ... .
@@ -241,7 +241,7 @@ tick, but not to `below_max`, which was evaluated in step 1.
 
 If you need a condition to see the state after some action has run,
 put the condition after the action in the graph: gate a second
-`IfNode` on the action's trigger, and it will evaluate after the
+`Engine_IfNode` on the action's trigger, and it will evaluate after the
 action has fired.
 
 If you need a condition to see the state as of the *start* of the
@@ -257,12 +257,12 @@ of the v1 design; conditions see current state.
 | Value node              | Produces a value. No side effects. Evaluated on demand.                                      |
 | Action node             | Performs a side effect. Runs when fired.                                                     |
 | Trigger node            | Fires. Asks subscribers to fire. Source (engine fires) or gating (condition checked).        |
-| `EveryFrame`            | A source trigger. Fires each tick.                                                           |
-| `IfNode`                | A gating trigger. Evaluated each tick its parent fires; fires only if its condition is true. |
+| `Engine_EveryFrame`     | A source trigger. Fires each tick.                                                           |
+| `Engine_IfNode`         | A gating trigger. Evaluated each tick its parent fires; fires only if its condition is true. |
 | `on`                    | Subscription. `A on B` means "when B fires, A is asked to fire."                             |
-| A conditional           | `IfNode(cond) on parent`, with `cond` a bool-producing Value node.                           |
+| A conditional           | `Engine_IfNode(cond) on parent`, with `cond` a bool-producing Value node.                    |
 | A loop                  | A source trigger fired each tick.                                                            |
-| A loop with a condition | A source trigger, a Value node producing bool, an `IfNode`, and an Action.                   |
+| A loop with a condition | A source trigger, a Value node producing bool, an `Engine_IfNode`, and an Action.            |
 
 The mental model: **the graph is the control flow.** Nodes are not
 statements inside a function body. The engine walks the graph, firing

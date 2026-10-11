@@ -51,8 +51,8 @@ TEST_CASE("systems: hierarchy computes world transform for root", "[systems]")
 
     EntityRef e = create_entity(world, 1, "E");
     auto t = add_component<TransformTag>(world, e);
-    world.get_table("Transform")->set_float32(t, "x", 100.0f);
-    world.get_table("Transform")->set_float32(t, "y", 200.0f);
+    world.get_table("Engine_Transform")->set_float32(t, "x", 100.0f);
+    world.get_table("Engine_Transform")->set_float32(t, "y", 200.0f);
 
     StubRenderer r;
     StubInput i;
@@ -64,8 +64,8 @@ TEST_CASE("systems: hierarchy computes world transform for root", "[systems]")
 
     auto w = get_component<WorldTransformTag>(world, e);
     REQUIRE_FALSE(w.is_nil());
-    REQUIRE(world.get_table("WorldTransform")->get_float32(w, "x") == 100.0f);
-    REQUIRE(world.get_table("WorldTransform")->get_float32(w, "y") == 200.0f);
+    REQUIRE(world.get_table("Engine_WorldTransform")->get_float32(w, "x") == 100.0f);
+    REQUIRE(world.get_table("Engine_WorldTransform")->get_float32(w, "y") == 200.0f);
 }
 
 TEST_CASE("systems: hierarchy composes parent transforms", "[systems]")
@@ -75,13 +75,13 @@ TEST_CASE("systems: hierarchy composes parent transforms", "[systems]")
 
     EntityRef parent = create_entity(world, 1, "P");
     auto tp = add_component<TransformTag>(world, parent);
-    world.get_table("Transform")->set_float32(tp, "x", 100.0f);
-    world.get_table("Transform")->set_float32(tp, "y", 200.0f);
+    world.get_table("Engine_Transform")->set_float32(tp, "x", 100.0f);
+    world.get_table("Engine_Transform")->set_float32(tp, "y", 200.0f);
 
     EntityRef child = create_entity(world, 2, "C");
     auto tc = add_component<TransformTag>(world, child);
-    world.get_table("Transform")->set_float32(tc, "x", 10.0f);
-    world.get_table("Transform")->set_float32(tc, "y", 20.0f);
+    world.get_table("Engine_Transform")->set_float32(tc, "x", 10.0f);
+    world.get_table("Engine_Transform")->set_float32(tc, "y", 20.0f);
     set_parent(world, child, parent);
 
     StubRenderer r;
@@ -95,9 +95,9 @@ TEST_CASE("systems: hierarchy composes parent transforms", "[systems]")
     auto wp = get_component<WorldTransformTag>(world, parent);
     auto wc = get_component<WorldTransformTag>(world, child);
 
-    REQUIRE(world.get_table("WorldTransform")->get_float32(wp, "x") == 100.0f);
-    REQUIRE(world.get_table("WorldTransform")->get_float32(wc, "x") == 110.0f);
-    REQUIRE(world.get_table("WorldTransform")->get_float32(wc, "y") == 220.0f);
+    REQUIRE(world.get_table("Engine_WorldTransform")->get_float32(wp, "x") == 100.0f);
+    REQUIRE(world.get_table("Engine_WorldTransform")->get_float32(wc, "x") == 110.0f);
+    REQUIRE(world.get_table("Engine_WorldTransform")->get_float32(wc, "y") == 220.0f);
 }
 
 TEST_CASE("systems: movement applies velocity to transform", "[systems]")
@@ -107,12 +107,12 @@ TEST_CASE("systems: movement applies velocity to transform", "[systems]")
 
     EntityRef e = create_entity(world, 1, "E");
     auto t = add_component<TransformTag>(world, e);
-    world.get_table("Transform")->set_float32(t, "x", 0.0f);
-    world.get_table("Transform")->set_float32(t, "y", 0.0f);
+    world.get_table("Engine_Transform")->set_float32(t, "x", 0.0f);
+    world.get_table("Engine_Transform")->set_float32(t, "y", 0.0f);
 
     auto v = add_component<VelocityTag>(world, e);
-    world.get_table("Velocity")->set_float32(v, "dx", 100.0f);
-    world.get_table("Velocity")->set_float32(v, "dy", 50.0f);
+    world.get_table("Engine_Velocity")->set_float32(v, "dx", 100.0f);
+    world.get_table("Engine_Velocity")->set_float32(v, "dy", 50.0f);
 
     StubRenderer r;
     StubInput i;
@@ -122,8 +122,8 @@ TEST_CASE("systems: movement applies velocity to transform", "[systems]")
 
     movement_system(ctx, 1.0f);
 
-    REQUIRE(world.get_table("Transform")->get_float32(t, "x") == 100.0f);
-    REQUIRE(world.get_table("Transform")->get_float32(t, "y") == 50.0f);
+    REQUIRE(world.get_table("Engine_Transform")->get_float32(t, "x") == 100.0f);
+    REQUIRE(world.get_table("Engine_Transform")->get_float32(t, "y") == 50.0f);
 }
 
 TEST_CASE("systems: render submits draw calls", "[systems]")

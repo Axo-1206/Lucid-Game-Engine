@@ -97,15 +97,15 @@ namespace engine
         void load_component(engine::ecs::World &world, EntityRef e,
                             const std::string &name, const json &j)
         {
-            if (name == "Transform")
+            if (name == "Engine_Transform")
                 load_transform(world, e, j);
-            else if (name == "WorldTransform")
+            else if (name == "Engine_WorldTransform")
                 load_world_transform(world, e, j);
-            else if (name == "Velocity")
+            else if (name == "Engine_Velocity")
                 load_velocity(world, e, j);
-            else if (name == "Sprite")
+            else if (name == "Engine_Sprite")
                 load_sprite(world, e, j);
-            else if (name == "Script")
+            else if (name == "Engine_Script")
                 load_script(world, e, j);
             else
                 log_warn("Unknown component in scene file: %s", name.c_str());
@@ -312,7 +312,7 @@ namespace engine
         }
 
         {
-            auto *state_tbl = world_.get_table("_EngineState");
+            auto *state_tbl = world_.get_table("Engine_EngineState");
             if (state_tbl)
             {
                 auto row = state_tbl->find_by_primary("name", engine::ecs::CellValue::from_string("next_entity_id"));

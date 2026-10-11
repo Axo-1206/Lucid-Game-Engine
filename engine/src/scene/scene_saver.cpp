@@ -78,15 +78,15 @@ namespace engine
             if (comp.is_nil())
                 return json();
 
-            if (table_name == "Transform")
+            if (table_name == "Engine_Transform")
                 return save_transform(tbl, comp);
-            else if (table_name == "WorldTransform")
+            else if (table_name == "Engine_WorldTransform")
                 return save_world_transform(tbl, comp);
-            else if (table_name == "Velocity")
+            else if (table_name == "Engine_Velocity")
                 return save_velocity(tbl, comp);
-            else if (table_name == "Sprite")
+            else if (table_name == "Engine_Sprite")
                 return save_sprite(tbl, comp);
-            else if (table_name == "Script")
+            else if (table_name == "Engine_Script")
                 return save_script(tbl, comp);
             else
             {
@@ -180,7 +180,7 @@ namespace engine
         // --- Engine state ---
         {
             json state = json::object();
-            auto *state_tbl = world_.get_table("_EngineState");
+            auto *state_tbl = world_.get_table("Engine_EngineState");
             if (state_tbl)
             {
                 state_tbl->each([&](engine::ecs::RowRef r)

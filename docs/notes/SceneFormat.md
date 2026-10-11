@@ -8,7 +8,7 @@ A `.lscene` file is **not** a `.lucgraph`. A `.lucgraph` describes
 behavior — a graph of nodes and subscriptions — and is read and written
 by the format library (`lucid::serialization`). A scene is data; a graph
 is behavior. They are separate, and the only interface between them is a
-`Script` component that holds a path to a `.lucgraph` file.
+`Engine_Script` component that holds a path to a `.lucgraph` file.
 
 See `docs/Decision.md` Decision 8 for why the two are separate.
 
@@ -117,7 +117,7 @@ A component's fields are all optional. A missing field keeps the table's
 default value (0 for numbers, `""` for strings, `false` for booleans).
 A missing component means the entity doesn't have it.
 
-### `Transform`
+### `Engine_Transform`
 
 A 2D transform. 3D will add columns or a sibling component; see
 "Evolution" below.
@@ -129,7 +129,7 @@ A 2D transform. 3D will add columns or a sibling component; see
 - `x`, `y`, `z`: floats, default `0.0`.
 - `rot_z`: float, radians, default `0.0`.
 
-### `WorldTransform`
+### `Engine_WorldTransform`
 
 The computed world-space transform. Written by `hierarchy_system`. Not
 usually authored in a scene; the loader accepts it for round-tripping.
@@ -138,7 +138,7 @@ usually authored in a scene; the loader accepts it for round-tripping.
 { "x": 0.0, "y": 0.0, "z": 0.0, "rot_z": 0.0 }
 ```
 
-### `Velocity`
+### `Engine_Velocity`
 
 ```json
 { "dx": 0.0, "dy": 0.0, "dz": 0.0 }
@@ -146,9 +146,9 @@ usually authored in a scene; the loader accepts it for round-tripping.
 
 - `dx`, `dy`, `dz`: floats, default `0.0`. Units per second.
 
-### `Sprite`
+### `Engine_Sprite`
 
-A 2D sprite. 3D will add a sibling `Mesh` component; `Sprite` stays as
+A 2D sprite. 3D will add a sibling `Mesh` component; `Engine_Sprite` stays as
 it is.
 
 ```json
@@ -169,7 +169,7 @@ it is.
 - `tint_r`, `tint_g`, `tint_b`, `tint_a`: floats in `[0, 1]`. Default `1.0`.
 - `layer`: int32. Draw order. Higher layers draw later. Default `0`.
 
-### `Script`
+### `Engine_Script`
 
 A reference to a compiled behavior graph.
 
@@ -261,15 +261,15 @@ with a clear message.
 
 There is no scene-level 2D/3D mode. The camera's `is_orthographic` field
 chooses the projection. Whether an entity is 2D or 3D is determined by
-which components it has: `Sprite` is 2D, a future `Mesh` is 3D.
+which components it has: `Engine_Sprite` is 2D, a future `Mesh` is 3D.
 
 3D support will be additive:
 
-- Rotation: `Transform` is 2D-only (`rot_z`). 3D will either add
-  `rot_x`/`rot_y` columns to `Transform`, or add a `Rot3D` component with
+- Rotation: `Engine_Transform` is 2D-only (`rot_z`). 3D will either add
+  `rot_x`/`rot_y` columns to `Engine_Transform`, or add a `Rot3D` component with
   a quaternion. Existing 2D scenes are unaffected either way.
-- Rendering: a `Mesh` component alongside `Sprite`. A 3D entity has
-  `Mesh`; a 2D entity has `Sprite`; an entity with both is unusual but
+- Rendering: a `Mesh` component alongside `Engine_Sprite`. A 3D entity has
+  `Mesh`; a 2D entity has `Engine_Sprite`; an entity with both is unusual but
   not forbidden.
 - Materials, lights, skeletons: new components, added as needed.
 
@@ -312,6 +312,6 @@ The format library is used only for behavior graphs (`.lucid` source and
 
 ## Related
 
-A scene's `Script` component references a `.lucgraph` file. For what a
+A scene's `Engine_Script` component references a `.lucgraph` file. For what a
 graph does when it runs — how triggers fire, how conditions gate actions,
 how the engine scheduler walks the graph — see `docs/notes/TriggerModel.md`.

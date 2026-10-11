@@ -6,28 +6,28 @@ using namespace engine::ecs;
 TEST_CASE("world: create and look up a table", "[ecs][world]")
 {
     World w;
-    REQUIRE_FALSE(w.has_table("Entity"));
+    REQUIRE_FALSE(w.has_table("Engine_Entity"));
 
-    Table *t = w.create_table("Entity");
+    Table *t = w.create_table("Engine_Entity");
     REQUIRE(t != nullptr);
-    REQUIRE(w.has_table("Entity"));
-    REQUIRE(w.get_table("Entity") == t);
+    REQUIRE(w.has_table("Engine_Entity"));
+    REQUIRE(w.get_table("Engine_Entity") == t);
     REQUIRE(w.table_count() == 1);
 }
 
 TEST_CASE("world: creating a duplicate table throws", "[ecs][world]")
 {
     World w;
-    w.create_table("Entity");
-    REQUIRE_THROWS(w.create_table("Entity"));
+    w.create_table("Engine_Entity");
+    REQUIRE_THROWS(w.create_table("Engine_Entity"));
 }
 
 TEST_CASE("world: missing table returns nullptr", "[ecs][world]")
 {
     World w;
-    REQUIRE(w.get_table("Nope") == nullptr);
+    REQUIRE(w.get_table("Engine_Nope") == nullptr);
     const World &cw = w;
-    REQUIRE(cw.get_table("Nope") == nullptr);
+    REQUIRE(cw.get_table("Engine_Nope") == nullptr);
 }
 
 TEST_CASE("world: each_table visits in creation order", "[ecs][world]")

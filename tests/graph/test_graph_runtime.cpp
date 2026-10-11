@@ -84,8 +84,8 @@ TEST_CASE("graph_runtime: loads a graph referenced by a Script component",
     // 1. Compile a tiny graph to .lucgraph.
     const auto lucgraph_path = temp_dir() / "test.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = EveryFrame()\n"
-        "node p = PrintNode(1.0) on frame\n",
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(1.0) on frame\n",
         lucgraph_path));
 
     // 2. Create an entity with a Script component pointing at it.
@@ -99,7 +99,7 @@ TEST_CASE("graph_runtime: loads a graph referenced by a Script component",
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
 
-    // 4. Tick. The PrintNode logs; we can't easily assert on the
+    // 4. Tick. The Engine_PrintNode logs; we can't easily assert on the
     //    log output without a custom sink, so this test asserts the
     //    runtime doesn't crash and the graph count is correct.
     rt.tick(0.016f);
@@ -111,8 +111,8 @@ TEST_CASE("graph_runtime: clear releases loaded graphs", "[graph][runtime]")
     Fixture f;
     const auto lucgraph_path = temp_dir() / "test.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = EveryFrame()\n"
-        "node p = PrintNode(1.0) on frame\n",
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(1.0) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -183,7 +183,7 @@ namespace
 
 } // namespace
 
-TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
+TEST_CASE("graph_runtime: Engine_IfNode(false) blocks its subscriber",
           "[graph][runtime]")
 {
     Fixture f;
@@ -195,10 +195,10 @@ TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
 
     const auto lucgraph_path = temp_dir() / "false_gate.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = EveryFrame()\n"
-        "node cond = BoolNode(false)\n"
-        "node gate = IfNode(cond) on frame\n"
-        "node p = PrintNode(1.0) on gate\n",
+        "node frame = Engine_EveryFrame()\n"
+        "node cond = Engine_BoolNode(false)\n"
+        "node gate = Engine_IfNode(cond) on frame\n"
+        "node p = Engine_PrintNode(1.0) on gate\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -212,11 +212,11 @@ TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
     const std::size_t before = cap.messages.size();
     rt.tick(0.016f);
 
-    // PrintNode did not run, so no new "[graph] PrintNode" log line.
+    // Engine_PrintNode did not run, so no new "[graph] Engine_PrintNode" log line.
     bool found_print = false;
     for (std::size_t i = before; i < cap.messages.size(); ++i)
     {
-        if (cap.messages[i].find("PrintNode") != std::string::npos)
+        if (cap.messages[i].find("Engine_PrintNode") != std::string::npos)
         {
             found_print = true;
             break;
@@ -228,7 +228,7 @@ TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
     engine::install_default_log_sink();
 }
 
-TEST_CASE("graph_runtime: IfNode(true) lets its subscriber run",
+TEST_CASE("graph_runtime: Engine_IfNode(true) lets its subscriber run",
           "[graph][runtime]")
 {
     Fixture f;
@@ -240,10 +240,10 @@ TEST_CASE("graph_runtime: IfNode(true) lets its subscriber run",
 
     const auto lucgraph_path = temp_dir() / "true_gate.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = EveryFrame()\n"
-        "node cond = BoolNode(true)\n"
-        "node gate = IfNode(cond) on frame\n"
-        "node p = PrintNode(1.0) on gate\n",
+        "node frame = Engine_EveryFrame()\n"
+        "node cond = Engine_BoolNode(true)\n"
+        "node gate = Engine_IfNode(cond) on frame\n"
+        "node p = Engine_PrintNode(1.0) on gate\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -256,8 +256,8 @@ TEST_CASE("graph_runtime: IfNode(true) lets its subscriber run",
 
     rt.tick(0.016f);
 
-    // PrintNode ran, so a "[graph] PrintNode" log line exists.
-    REQUIRE(cap.contains("PrintNode"));
+    // Engine_PrintNode ran, so a "[graph] Engine_PrintNode" log line exists.
+    REQUIRE(cap.contains("Engine_PrintNode"));
 
     cap.detach();
     engine::install_default_log_sink();
@@ -276,9 +276,9 @@ TEST_CASE("graph_runtime: a node fires at most once per tick",
     // Two source triggers subscribing the same Action
     const auto lucgraph_path = temp_dir() / "multiple_parents.lucgraph";
     REQUIRE(compile_to_file(
-        "node f1 = EveryFrame()\n"
-        "node f2 = EveryFrame()\n"
-        "node p = PrintNode(1.0) on f1, f2\n",
+        "node f1 = Engine_EveryFrame()\n"
+        "node f2 = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(1.0) on f1, f2\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -291,8 +291,8 @@ TEST_CASE("graph_runtime: a node fires at most once per tick",
 
     rt.tick(0.016f);
 
-    // PrintNode should fire only once even though subscribed to both f1 and f2.
-    REQUIRE(cap.count_occurrences("PrintNode") == 1);
+    // Engine_PrintNode should fire only once even though subscribed to both f1 and f2.
+    REQUIRE(cap.count_occurrences("Engine_PrintNode") == 1);
 
     cap.detach();
     engine::install_default_log_sink();
@@ -313,8 +313,8 @@ TEST_CASE("graph_runtime: a node reads a resource field",
         "resource Config {\n"
         "    speed: float32 = 42.0,\n"
         "}\n"
-        "node frame = EveryFrame()\n"
-        "node p = PrintNode(Config.speed) on frame\n",
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(Config.speed) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -328,7 +328,7 @@ TEST_CASE("graph_runtime: a node reads a resource field",
 
     rt.tick(0.016f);
 
-    // PrintNode logged the resource field's value.
+    // Engine_PrintNode logged the resource field's value.
     REQUIRE(cap.contains("42"));
 
     cap.detach();
@@ -349,8 +349,8 @@ TEST_CASE("graph_runtime: a resource field with no written default is zero",
         "resource Config {\n"
         "    speed: float32,\n"
         "}\n"
-        "node frame = EveryFrame()\n"
-        "node p = PrintNode(Config.speed) on frame\n",
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(Config.speed) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -364,7 +364,7 @@ TEST_CASE("graph_runtime: a resource field with no written default is zero",
 
     rt.tick(0.016f);
 
-    // PrintNode logged 0.0, the type's zero.
+    // Engine_PrintNode logged 0.0, the type's zero.
     REQUIRE(cap.contains("0.0"));
 
     cap.detach();

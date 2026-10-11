@@ -26,10 +26,10 @@ namespace engine
     //   - 1 enum: Key, with members W=0, A=1, S=2, D=3
     //   - 1 handle: BodyRef
     //   - 4 node types:
-    //       Float32Node(value: float32) -> float32   (Value, Math)
-    //       Int32Node  (value: int32)   -> int32     (Value, Math)
-    //       EveryFrame ()                            (Trigger, Flow)
-    //       PrintNode  (value: float32)              (Action, Debug, update)
+    //       Engine_Float32Node(value: float32) -> float32   (Value, Math)
+    //       Engine_Int32Node  (value: int32)   -> int32     (Value, Math)
+    //       Engine_EveryFrame ()                            (Trigger, Flow)
+    //       Engine_PrintNode  (value: float32)              (Action, Debug, update)
     //
     // Append-only. The index of a node type in nodeTypes is its NodeId
     // in every .lucgraph. Reordering renumbers existing files and breaks

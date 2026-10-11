@@ -18,9 +18,15 @@ top-level folder map.
   full: every folder, every source file, and a note on what each
   subdirectory is responsible for.
 
+- [`notes/TriggerModel.md`](notes/PackageNaming.md.md) — how the 
+engine names its content: node types, enum types, handle types, 
+and table names. It explains the prefix convention, why it exists, 
+how the engine enforces it, and what a package author and a 
+script author need to know.
+
 - [`notes/TriggerModel.md`](notes/TriggerModel.md) — how a Lucid
   graph expresses control flow: value nodes, action nodes, trigger
-  nodes, source triggers, gating triggers (`IfNode`), and the
+  nodes, source triggers, gating triggers (`Engine_IfNode`), and the
   ordering contract within a tick.
 
 - [`notes/SceneFormat.md`](notes/SceneFormat.md) — the `.lscene`

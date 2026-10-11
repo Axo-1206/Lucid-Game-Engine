@@ -89,63 +89,63 @@ namespace engine
         // Append only.
         // -----------------------------------------------------------------------------
         static const std::array<NodeTypeInfo, 7> kNodeTypes = {{
-            // 0: Float32Node — Value, category Math
+            // 0: Engine_Float32Node — Value, category Math
             NodeTypeInfo{
-                "Float32Node",
+                "Engine_Float32Node",
                 NodeKind::Value,
                 "Math",
                 0, // phase (unused for Value)
                 ArenaSpan<NodeArgInfo>(kFloat32Args.data(), kFloat32Args.size()),
                 TypeId::primitive("float32"), // result type
             },
-            // 1: Int32Node — Value, category Math
+            // 1: Engine_Int32Node — Value, category Math
             NodeTypeInfo{
-                "Int32Node",
+                "Engine_Int32Node",
                 NodeKind::Value,
                 "Math",
                 0,
                 ArenaSpan<NodeArgInfo>(kInt32Args.data(), kInt32Args.size()),
                 TypeId::primitive("int32"),
             },
-            // 2: EveryFrame — Trigger, category Flow
+            // 2: Engine_EveryFrame — Trigger, category Flow
             NodeTypeInfo{
-                "EveryFrame",
+                "Engine_EveryFrame",
                 NodeKind::Trigger,
                 "Flow",
                 0,
                 ArenaSpan<NodeArgInfo>{}, // no arguments
                 TypeId{},                 // no result
             },
-            // 3: PrintNode — Action, category Debug, phase 0 (update)
+            // 3: Engine_PrintNode — Action, category Debug, phase 0 (update)
             NodeTypeInfo{
-                "PrintNode",
+                "Engine_PrintNode",
                 NodeKind::Action,
                 "Debug",
                 0, // phase index: "update"
                 ArenaSpan<NodeArgInfo>(kFloat32Args.data(), kFloat32Args.size()),
                 TypeId{}, // no result
             },
-            // 4: BoolNode — Value, category Logic
+            // 4: Engine_BoolNode — Value, category Logic
             NodeTypeInfo{
-                "BoolNode",
+                "Engine_BoolNode",
                 NodeKind::Value,
                 "Logic",
                 0,
                 ArenaSpan<NodeArgInfo>(kBoolArgs.data(), kBoolArgs.size()),
                 TypeId::primitive("bool"),
             },
-            // 5: LessThanNode — Value, category Logic
+            // 5: Engine_LessThanNode — Value, category Logic
             NodeTypeInfo{
-                "LessThanNode",
+                "Engine_LessThanNode",
                 NodeKind::Value,
                 "Logic",
                 0,
                 ArenaSpan<NodeArgInfo>(kLessThanArgs.data(), kLessThanArgs.size()),
                 TypeId::primitive("bool"),
             },
-            // 6: IfNode — Trigger, category Flow
+            // 6: Engine_IfNode — Trigger, category Flow
             NodeTypeInfo{
-                "IfNode",
+                "Engine_IfNode",
                 NodeKind::Trigger,
                 "Flow",
                 0,
@@ -158,13 +158,13 @@ namespace engine
         // Runtime metadata — parallel to kNodeTypes, indexed by the same id.
         // -----------------------------------------------------------------------------
         static const std::array<NodeTypeRuntimeInfo, 7> kNodeRuntimeInfo = {{
-            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Float32Node
-            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Int32Node
-            NodeTypeRuntimeInfo{TriggerMode::Source},      // EveryFrame
-            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // PrintNode
-            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // BoolNode
-            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // LessThanNode
-            NodeTypeRuntimeInfo{TriggerMode::Gating},      // IfNode
+            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Engine_Float32Node
+            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Engine_Int32Node
+            NodeTypeRuntimeInfo{TriggerMode::Source},      // Engine_EveryFrame
+            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Engine_PrintNode
+            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Engine_BoolNode
+            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Engine_LessThanNode
+            NodeTypeRuntimeInfo{TriggerMode::Gating},      // Engine_IfNode
         }};
 
         // -----------------------------------------------------------------------------

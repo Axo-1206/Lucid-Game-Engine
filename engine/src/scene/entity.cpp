@@ -9,20 +9,20 @@ namespace engine
     namespace
     {
 
-        constexpr const char *kEngineStateTable = "_EngineState";
+        constexpr const char *kEngineStateTable = "Engine_EngineState";
         constexpr const char *kNextEntityIdKey = "next_entity_id";
 
-        // Reads the value_u64 of the _EngineState row with the given name.
+        // Reads the value_u64 of the Engine_EngineState row with the given name.
         // Throws if the row doesn't exist.
         std::uint64_t read_engine_state_u64(engine::ecs::World &world, const std::string &name)
         {
             auto *tbl = world.get_table(kEngineStateTable);
             if (!tbl)
-                throw std::runtime_error("_EngineState table not set up");
+                throw std::runtime_error("Engine_EngineState table not set up");
 
             engine::ecs::RowRef row = tbl->find_by_primary("name", engine::ecs::CellValue::from_string(name));
             if (row.is_nil())
-                throw std::runtime_error("_EngineState key not found: " + name);
+                throw std::runtime_error("Engine_EngineState key not found: " + name);
 
             return tbl->get_uint64(row, "value_u64");
         }
@@ -31,11 +31,11 @@ namespace engine
         {
             auto *tbl = world.get_table(kEngineStateTable);
             if (!tbl)
-                throw std::runtime_error("_EngineState table not set up");
+                throw std::runtime_error("Engine_EngineState table not set up");
 
             engine::ecs::RowRef row = tbl->find_by_primary("name", engine::ecs::CellValue::from_string(name));
             if (row.is_nil())
-                throw std::runtime_error("_EngineState key not found: " + name);
+                throw std::runtime_error("Engine_EngineState key not found: " + name);
 
             tbl->set_uint64(row, "value_u64", value);
         }
@@ -164,7 +164,7 @@ namespace engine
 
     void setup_core_tables(engine::ecs::World &world)
     {
-        // _EngineState
+        // Engine_EngineState
         {
             auto *t = world.create_table(kEngineStateTable);
             t->add_column("name", engine::ecs::ColumnType::String, /*primary=*/true);

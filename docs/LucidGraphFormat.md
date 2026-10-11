@@ -257,7 +257,7 @@ trigger_list ::= IDENTIFIER { ',' IDENTIFIER } [ ',' ]
 A node is `node <name> = <NodeType>(<args>)`, optionally followed by `on <trigger>, <trigger>, ...`.
 
 ```
-node speed       = Float32Node(200.0)
+node speed       = Engine_Float32Node(200.0)
 node input_x     = InputAxis1D(Key.A, Key.D)
 node body        = BodyNode(player)
 node on_hit      = OnCollision(body, "hazard")
@@ -277,8 +277,8 @@ optional `on` clause on `node_decl`, not on a specific node kind.
 Syntactically, any node declaration may have an `on` clause:
 
 ```
-node source       = EveryFrameNode()                   -- a trigger, no `on`
-node gated        = IfNode(condition) on source        -- a trigger, with `on`
+node source       = Engine_EveryFrameNode()                   -- a trigger, no `on`
+node gated        = Engine_IfNode(condition) on source        -- a trigger, with `on`
 node effect       = ApplyGravityNode(player) on gated  -- an action, with `on`
 ```
 
@@ -315,7 +315,7 @@ literal ::= INT_LIT
 
 A `value` is what may appear as an argument to a node or as the default of a resource field.
 
-A bare literal is equivalent to a primitive node whose argument is that literal: `200.0` ≡ `Float32Node(200.0)`, `10` ≡ `Int32Node(10)`, `"hit.wav"` ≡ `StringNode("hit.wav")`. A signed literal is a literal like any other: `-400.0` ≡ `Float32Node(-400.0)`.
+A bare literal is equivalent to a primitive node whose argument is that literal: `200.0` ≡ `Engine_Float32Node(200.0)`, `10` ≡ `Engine_Int32Node(10)`, `"hit.wav"` ≡ `StringNode("hit.wav")`. A signed literal is a literal like any other: `-400.0` ≡ `Engine_Float32Node(-400.0)`.
 
 An `IDENTIFIER` alone refers to a node or a resource by name.
 
