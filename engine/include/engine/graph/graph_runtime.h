@@ -22,11 +22,18 @@ namespace engine::graph
         // LoadedGraph is movable.
         lucid::sema::Graph graph;
 
-        // Per-node result scratch. Sized to graph.nodes.size() at load
-        // time, reused every tick. Value nodes write here; Action and
-        // Trigger nodes read from here when their arguments reference
-        // other nodes.
+        // Value results, one per node. Sized to graph.nodes.size().
+        // Rewritten each tick for Value nodes; Action/Trigger nodes
+        // may read from here for their arguments.
         std::vector<float> results;
+
+        // Per-tick scratch: which nodes have been fired this tick.
+        // Reset to all-false at the start of tick; set true as firing
+        // propagates. An Action runs in step 3 only if its bit is set.
+        // A Trigger or Value node's bit is used to prevent re-entrant
+        // firing within the same tick (a node fires at most once per
+        // tick; see TriggerModel.md §6's cycle note).
+        std::vector<bool> fired;
     };
 
     // The graph runtime: loads .lucgraph files referenced by the

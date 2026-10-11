@@ -2,6 +2,7 @@
 #include "engine/graph/node_dispatch.h"
 #include "engine/core/log.h"
 #include "engine/nodes/node_registry.h"
+#include "engine/nodes/node_runtime.h"
 #include "engine/scene/component_tags.h"
 #include "engine/core/diagnostic_log.h"
 
@@ -48,6 +49,132 @@ namespace engine::graph
             in.read(reinterpret_cast<char *>(bytes.data()), size);
             ok = true;
             return bytes;
+        }
+
+        // Evaluate a node's argument as a bool, for gating conditions.
+        // The argument must be a NodeRef to a Value node whose result was
+        // computed in the value-order pass, or a Literal.
+        bool arg_as_bool(const lucid::sema::Graph &g,
+                         const lucid::sema::Arg &arg,
+                         const std::vector<float> &results)
+        {
+            using Arg = lucid::sema::Arg;
+            switch (arg.kind)
+            {
+            case Arg::Kind::Literal:
+                return (arg.literal.kind == lucid::sema::Literal::Kind::Bool)
+                           ? arg.literal.b
+                           : (arg.literal.i != 0);
+            case Arg::Kind::NodeRef:
+                return results[arg.node_ref] != 0.0f;
+            case Arg::Kind::ResourceRef:
+                // Not supported in Phase 9.5.
+                return false;
+            }
+            return false;
+        }
+
+        void fire_node(LoadedGraph &lg, std::uint32_t node_index)
+        {
+            // A node fires at most once per tick. See TriggerModel.md §6.
+            if (lg.fired[node_index])
+                return;
+            lg.fired[node_index] = true;
+
+            const auto &node = lg.graph.nodes[node_index];
+            const auto &info = engine::node_runtime_info(node.type_id);
+
+            // Gating triggers check their condition before propagating.
+            if (info.mode == engine::TriggerMode::Gating)
+            {
+                if (node.args_count == 0)
+                {
+                    engine::log_error(
+                        "GraphRuntime: gating trigger node %u has no condition argument",
+                        static_cast<unsigned>(node_index));
+                    return;
+                }
+                const auto *args = lg.graph.args.data() + node.args_offset;
+                if (!arg_as_bool(lg.graph, args[0], lg.results))
+                    return;
+            }
+
+            // Propagate to subscribers.
+            const auto *subs = lg.graph.subscribers.data() + node.subscribers_offset;
+            for (std::uint32_t i = 0; i < node.subscribers_count; ++i)
+            {
+                fire_node(lg, subs[i]);
+            }
+        }
+
+        void tick_one_graph(engine::ecs::World &world,
+                            LoadedGraph &lg,
+                            float dt)
+        {
+            // 1. Reset the per-tick fired flags.
+            std::fill(lg.fired.begin(), lg.fired.end(), false);
+
+            // 2. Evaluate Value nodes, in value_order.
+            //
+            //    Value nodes don't have side effects; they write their
+            //    result to lg.results[node_index]. After this pass, every
+            //    Value node's result is available for the firing pass.
+            const NodeExecutor *executors = node_executors();
+            const std::uint32_t executor_count = node_executor_count();
+
+            for (lucid::sema::NodeIndex node_idx : lg.graph.value_order)
+            {
+                const auto &node = lg.graph.nodes[node_idx];
+                if (node.type_id >= executor_count)
+                {
+                    engine::log_error(
+                        "GraphRuntime: node %u has type_id %u out of range",
+                        static_cast<unsigned>(node_idx),
+                        static_cast<unsigned>(node.type_id));
+                    continue;
+                }
+                executors[node.type_id](world, lg.graph,
+                                        static_cast<std::uint32_t>(node_idx),
+                                        lg.results, dt);
+            }
+
+            // 3. Fire source triggers.
+            //
+            //    A source trigger is any node whose runtime info says
+            //    TriggerMode::Source. Firing it propagates through its
+            //    subscribers, marking fired nodes and stopping at gates
+            //    whose condition is false.
+            for (std::uint32_t node_idx = 0;
+                 node_idx < lg.graph.nodes.size();
+                 ++node_idx)
+            {
+                const auto &node = lg.graph.nodes[node_idx];
+                const auto &info = engine::node_runtime_info(node.type_id);
+                if (info.mode == engine::TriggerMode::Source)
+                {
+                    fire_node(lg, node_idx);
+                }
+            }
+
+            // 4. Run fired Actions in phase order.
+            //
+            //    Actions that were not fired this tick do not run. The
+            //    phase_order list contains only Action nodes, sorted by
+            //    phase; we filter it by the fired set.
+            for (lucid::sema::NodeIndex node_idx : lg.graph.phase_order)
+            {
+                if (!lg.fired[node_idx])
+                    continue;
+
+                const auto &node = lg.graph.nodes[node_idx];
+                if (node.type_id >= executor_count)
+                {
+                    continue; // already logged in the value pass
+                }
+                executors[node.type_id](world, lg.graph,
+                                        static_cast<std::uint32_t>(node_idx),
+                                        lg.results, dt);
+            }
         }
 
     } // namespace
@@ -97,6 +224,7 @@ namespace engine::graph
         lg.source_path = full.string();
         lg.graph = std::move(*dr.graph);
         lg.results.assign(lg.graph.nodes.size(), 0.0f);
+        lg.fired.assign(lg.graph.nodes.size(), false);
         graphs_.push_back(std::move(lg));
 
         engine::log_info("GraphRuntime: loaded '%s' (%zu nodes)",
@@ -109,31 +237,9 @@ namespace engine::graph
 
     void GraphRuntime::tick(float dt)
     {
-        const NodeExecutor *executors = node_executors();
-        const std::uint32_t executor_count = node_executor_count();
-
         for (auto &lg : graphs_)
         {
-            for (lucid::sema::NodeIndex node_idx : lg.graph.phase_order)
-            {
-                const auto &node = lg.graph.nodes[node_idx];
-                const std::uint32_t type_id = node.type_id;
-
-                if (type_id >= executor_count)
-                {
-                    engine::log_error(
-                        "GraphRuntime: node %u has type_id %u out of range "
-                        "(executor table has %u entries)",
-                        static_cast<unsigned>(node_idx),
-                        static_cast<unsigned>(type_id),
-                        static_cast<unsigned>(executor_count));
-                    continue;
-                }
-
-                executors[type_id](world_, lg.graph,
-                                   static_cast<std::uint32_t>(node_idx),
-                                   lg.results, dt);
-            }
+            tick_one_graph(world_, lg, dt);
         }
     }
 

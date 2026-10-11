@@ -2,6 +2,7 @@
 
 #include "engine/graph/graph_runtime.h"
 #include "engine/nodes/node_registry.h"
+#include "engine/core/log.h"
 #include "engine/scene/entity.h"
 #include "engine/scene/scene.h"
 #include "engine/scene/component_tags.h"
@@ -139,4 +140,160 @@ TEST_CASE("graph_runtime: missing file does not throw", "[graph][runtime]")
     rt.set_asset_root(temp_dir());
     REQUIRE_FALSE(rt.load()); // returns false, doesn't throw
     REQUIRE(rt.graph_count() == 0);
+}
+
+namespace
+{
+
+    struct LogCapture
+    {
+        std::vector<std::string> messages;
+        engine::LogSinkId id = 0;
+        void attach()
+        {
+            id = engine::add_log_sink([this](const engine::LogRecord &r)
+                                      { messages.push_back(r.message); });
+        }
+        void detach()
+        {
+            if (id != 0)
+                engine::remove_log_sink(id);
+            id = 0;
+        }
+        bool contains(const std::string &needle) const
+        {
+            for (const auto &m : messages)
+            {
+                if (m.find(needle) != std::string::npos)
+                    return true;
+            }
+            return false;
+        }
+        std::size_t count_occurrences(const std::string &needle) const
+        {
+            std::size_t c = 0;
+            for (const auto &m : messages)
+            {
+                if (m.find(needle) != std::string::npos)
+                    ++c;
+            }
+            return c;
+        }
+    };
+
+} // namespace
+
+TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
+          "[graph][runtime]")
+{
+    Fixture f;
+
+    engine::clear_log_sinks();
+    LogCapture cap;
+    cap.attach();
+    engine::set_log_level(engine::LogLevel::Trace);
+
+    const auto lucgraph_path = temp_dir() / "false_gate.lucgraph";
+    REQUIRE(compile_to_file(
+        "node frame = EveryFrame()\n"
+        "node cond = BoolNode(false)\n"
+        "node gate = IfNode(cond) on frame\n"
+        "node p = PrintNode(1.0) on gate\n",
+        lucgraph_path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "false_gate.lucgraph");
+
+    graph::GraphRuntime rt(f.world, node_registry());
+    rt.set_asset_root(temp_dir());
+    REQUIRE(rt.load());
+
+    const std::size_t before = cap.messages.size();
+    rt.tick(0.016f);
+
+    // PrintNode did not run, so no new "[graph] PrintNode" log line.
+    bool found_print = false;
+    for (std::size_t i = before; i < cap.messages.size(); ++i)
+    {
+        if (cap.messages[i].find("PrintNode") != std::string::npos)
+        {
+            found_print = true;
+            break;
+        }
+    }
+    REQUIRE_FALSE(found_print);
+
+    cap.detach();
+    engine::install_default_log_sink();
+}
+
+TEST_CASE("graph_runtime: IfNode(true) lets its subscriber run",
+          "[graph][runtime]")
+{
+    Fixture f;
+
+    engine::clear_log_sinks();
+    LogCapture cap;
+    cap.attach();
+    engine::set_log_level(engine::LogLevel::Trace);
+
+    const auto lucgraph_path = temp_dir() / "true_gate.lucgraph";
+    REQUIRE(compile_to_file(
+        "node frame = EveryFrame()\n"
+        "node cond = BoolNode(true)\n"
+        "node gate = IfNode(cond) on frame\n"
+        "node p = PrintNode(1.0) on gate\n",
+        lucgraph_path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "true_gate.lucgraph");
+
+    graph::GraphRuntime rt(f.world, node_registry());
+    rt.set_asset_root(temp_dir());
+    REQUIRE(rt.load());
+
+    rt.tick(0.016f);
+
+    // PrintNode ran, so a "[graph] PrintNode" log line exists.
+    REQUIRE(cap.contains("PrintNode"));
+
+    cap.detach();
+    engine::install_default_log_sink();
+}
+
+TEST_CASE("graph_runtime: a node fires at most once per tick",
+          "[graph][runtime]")
+{
+    Fixture f;
+
+    engine::clear_log_sinks();
+    LogCapture cap;
+    cap.attach();
+    engine::set_log_level(engine::LogLevel::Trace);
+
+    // Two source triggers subscribing the same Action
+    const auto lucgraph_path = temp_dir() / "multiple_parents.lucgraph";
+    REQUIRE(compile_to_file(
+        "node f1 = EveryFrame()\n"
+        "node f2 = EveryFrame()\n"
+        "node p = PrintNode(1.0) on f1, f2\n",
+        lucgraph_path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "multiple_parents.lucgraph");
+
+    graph::GraphRuntime rt(f.world, node_registry());
+    rt.set_asset_root(temp_dir());
+    REQUIRE(rt.load());
+
+    rt.tick(0.016f);
+
+    // PrintNode should fire only once even though subscribed to both f1 and f2.
+    REQUIRE(cap.count_occurrences("PrintNode") == 1);
+
+    cap.detach();
+    engine::install_default_log_sink();
 }

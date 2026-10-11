@@ -126,6 +126,47 @@ namespace engine::graph
             engine::log_info("[graph] PrintNode: %f", static_cast<double>(v));
         }
 
+        // BoolNode(value: bool) -> bool (stored as 0.0 or 1.0)
+        void exec_bool(engine::ecs::World &,
+                       const lucid::sema::Graph &g,
+                       std::uint32_t node_index,
+                       std::vector<float> &results,
+                       float)
+        {
+            const auto *args = args_of(g, node_index);
+            // Literal::Kind::Bool uses .b (or .i != 0). Checking .b != false or .i != 0.
+            results[node_index] = (args[0].literal.kind == lucid::sema::Literal::Kind::Bool
+                                       ? args[0].literal.b
+                                       : args[0].literal.i != 0)
+                                      ? 1.0f
+                                      : 0.0f;
+        }
+
+        // LessThanNode(a: float32, b: float32) -> bool
+        void exec_less_than(engine::ecs::World &,
+                            const lucid::sema::Graph &g,
+                            std::uint32_t node_index,
+                            std::vector<float> &results,
+                            float)
+        {
+            const auto *args = args_of(g, node_index);
+            const float a = arg_as_float(g, args[0], results);
+            const float b = arg_as_float(g, args[1], results);
+            results[node_index] = (a < b) ? 1.0f : 0.0f;
+        }
+
+        // IfNode(cond: bool) — gating trigger. Handled in fire_node.
+        void exec_if(engine::ecs::World &,
+                     const lucid::sema::Graph &,
+                     std::uint32_t,
+                     std::vector<float> &,
+                     float)
+        {
+            // Gating triggers do not run. Firing is handled by fire_node,
+            // which evaluates the condition (this node's first argument)
+            // before propagating. See graph_runtime.cpp.
+        }
+
         // -----------------------------------------------------------------------------
         // The table
         // -----------------------------------------------------------------------------
@@ -139,6 +180,9 @@ namespace engine::graph
             exec_int32,       // 1: Int32Node
             exec_every_frame, // 2: EveryFrame
             exec_print,       // 3: PrintNode
+            exec_bool,        // 4: BoolNode
+            exec_less_than,   // 5: LessThanNode
+            exec_if,          // 6: IfNode
         };
 
     } // namespace

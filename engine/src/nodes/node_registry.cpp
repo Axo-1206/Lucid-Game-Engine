@@ -71,11 +71,24 @@ namespace engine
             NodeArgInfo{"value", TypeId::primitive("int32")},
         }};
 
+        static const std::array<NodeArgInfo, 1> kBoolArgs = {{
+            NodeArgInfo{"value", TypeId::primitive("bool")},
+        }};
+
+        static const std::array<NodeArgInfo, 2> kLessThanArgs = {{
+            NodeArgInfo{"a", TypeId::primitive("float32")},
+            NodeArgInfo{"b", TypeId::primitive("float32")},
+        }};
+
+        static const std::array<NodeArgInfo, 1> kIfArgs = {{
+            NodeArgInfo{"cond", TypeId::primitive("bool")},
+        }};
+
         // -----------------------------------------------------------------------------
         // Node types. This array's index is the NodeId space in every .lucgraph.
         // Append only.
         // -----------------------------------------------------------------------------
-        static const std::array<NodeTypeInfo, 4> kNodeTypes = {{
+        static const std::array<NodeTypeInfo, 7> kNodeTypes = {{
             // 0: Float32Node — Value, category Math
             NodeTypeInfo{
                 "Float32Node",
@@ -112,16 +125,46 @@ namespace engine
                 ArenaSpan<NodeArgInfo>(kFloat32Args.data(), kFloat32Args.size()),
                 TypeId{}, // no result
             },
+            // 4: BoolNode — Value, category Logic
+            NodeTypeInfo{
+                "BoolNode",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kBoolArgs.data(), kBoolArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            // 5: LessThanNode — Value, category Logic
+            NodeTypeInfo{
+                "LessThanNode",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kLessThanArgs.data(), kLessThanArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            // 6: IfNode — Trigger, category Flow
+            NodeTypeInfo{
+                "IfNode",
+                NodeKind::Trigger,
+                "Flow",
+                0,
+                ArenaSpan<NodeArgInfo>(kIfArgs.data(), kIfArgs.size()),
+                TypeId{},
+            },
         }};
 
         // -----------------------------------------------------------------------------
         // Runtime metadata — parallel to kNodeTypes, indexed by the same id.
         // -----------------------------------------------------------------------------
-        static const std::array<NodeTypeRuntimeInfo, 4> kNodeRuntimeInfo = {{
+        static const std::array<NodeTypeRuntimeInfo, 7> kNodeRuntimeInfo = {{
             NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Float32Node
             NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // Int32Node
             NodeTypeRuntimeInfo{TriggerMode::Source},      // EveryFrame
             NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // PrintNode
+            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // BoolNode
+            NodeTypeRuntimeInfo{TriggerMode::NotATrigger}, // LessThanNode
+            NodeTypeRuntimeInfo{TriggerMode::Gating},      // IfNode
         }};
 
         // -----------------------------------------------------------------------------
