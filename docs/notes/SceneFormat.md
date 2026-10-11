@@ -307,3 +307,11 @@ do not go through the format library.
 
 The format library is used only for behavior graphs (`.lucid` source and
 `.lucgraph` binaries). It is never invoked by scene tools.
+
+---
+
+## Related
+
+A scene's `Script` component references a `.lucgraph` file. For what a
+graph does when it runs — how triggers fire, how conditions gate actions,
+how the engine scheduler walks the graph — see `docs/notes/TriggerModel.md`.

@@ -252,17 +252,17 @@ of the v1 design; conditions see current state.
 
 ## 9. Summary
 
-| Concept | What it is |
-|---|---|
-| Value node | Produces a value. No side effects. Evaluated on demand. |
-| Action node | Performs a side effect. Runs when fired. |
-| Trigger node | Fires. Asks subscribers to fire. Source (engine fires) or gating (condition checked). |
-| `EveryFrame` | A source trigger. Fires each tick. |
-| `IfNode` | A gating trigger. Evaluated each tick its parent fires; fires only if its condition is true. |
-| `on` | Subscription. `A on B` means "when B fires, A is asked to fire." |
-| A conditional | `IfNode(cond) on parent`, with `cond` a bool-producing Value node. |
-| A loop | A source trigger fired each tick. |
-| A loop with a condition | A source trigger, a Value node producing bool, an `IfNode`, and an Action. |
+| Concept                 | What it is                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| Value node              | Produces a value. No side effects. Evaluated on demand.                                      |
+| Action node             | Performs a side effect. Runs when fired.                                                     |
+| Trigger node            | Fires. Asks subscribers to fire. Source (engine fires) or gating (condition checked).        |
+| `EveryFrame`            | A source trigger. Fires each tick.                                                           |
+| `IfNode`                | A gating trigger. Evaluated each tick its parent fires; fires only if its condition is true. |
+| `on`                    | Subscription. `A on B` means "when B fires, A is asked to fire."                             |
+| A conditional           | `IfNode(cond) on parent`, with `cond` a bool-producing Value node.                           |
+| A loop                  | A source trigger fired each tick.                                                            |
+| A loop with a condition | A source trigger, a Value node producing bool, an `IfNode`, and an Action.                   |
 
 The mental model: **the graph is the control flow.** Nodes are not
 statements inside a function body. The engine walks the graph, firing
@@ -274,3 +274,11 @@ The subscription structure *is* the loop and the branch.
 The draft above is written to be read *without* the reader having read `LucidGraphFormat.md` first. It says "Value node," "Action node," "Trigger node" and defines them, rather than assuming the reader has the format's `NodeKind` enum in their head. That's deliberate. A note that only makes sense after three other documents is a note that won't get read.
 
 If you want to shorten it, cut §6 (Composition) and §7 (Where the side effect happens), since those are elaborations of §3. Keep §1–§5 and §8–§9. But I'd keep the whole thing; it's not long, and every section answers a question a new reader will have.
+
+---
+
+## Related
+
+A graph is referenced from a scene by a `Script` component that holds a
+`.lucgraph` path. For the scene format — how entities, components, and
+cameras are described and serialized — see `docs/notes/SceneFormat.md`.
