@@ -53,7 +53,7 @@ TEST_CASE("entity: add and get transform", "[entity]")
     EntityRef e = f.create();
 
     auto t = add_component<TransformTag>(f.world, e);
-    f.world.get_table("")->set_float32(t, "x", 100.0f);
+    f.world.get_table("Engine_Transform")->set_float32(t, "x", 100.0f);
     f.world.get_table("Engine_Transform")->set_float32(t, "y", 200.0f);
 
     REQUIRE(has_component<TransformTag>(f.world, e));
@@ -133,7 +133,7 @@ TEST_CASE("entity: iterate all entities", "[entity]")
         f.create();
 
     std::size_t count = 0;
-    f.world.get_table("Entity")->each([&](engine::ecs::RowRef)
-                                      { ++count; });
+    f.world.get_table("Engine_Entity")->each([&](engine::ecs::RowRef)
+                                             { ++count; });
     REQUIRE(count == 5);
 }

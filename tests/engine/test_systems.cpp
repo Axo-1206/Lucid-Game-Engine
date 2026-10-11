@@ -133,14 +133,14 @@ TEST_CASE("systems: render submits draw calls", "[systems]")
 
     EntityRef e = create_entity(world, 1, "E");
     auto t = add_component<TransformTag>(world, e);
-    world.get_table("Transform")->set_float32(t, "x", 10.0f);
+    world.get_table("Engine_Transform")->set_float32(t, "x", 10.0f);
     auto s = add_component<SpriteTag>(world, e);
-    world.get_table("Sprite")->set_float32(s, "w", 32.0f);
-    world.get_table("Sprite")->set_float32(s, "h", 16.0f);
-    world.get_table("Sprite")->set_float32(s, "tint_r", 1.0f);
-    world.get_table("Sprite")->set_float32(s, "tint_g", 1.0f);
-    world.get_table("Sprite")->set_float32(s, "tint_b", 1.0f);
-    world.get_table("Sprite")->set_float32(s, "tint_a", 1.0f);
+    world.get_table("Engine_Sprite")->set_float32(s, "w", 32.0f);
+    world.get_table("Engine_Sprite")->set_float32(s, "h", 16.0f);
+    world.get_table("Engine_Sprite")->set_float32(s, "tint_r", 1.0f);
+    world.get_table("Engine_Sprite")->set_float32(s, "tint_g", 1.0f);
+    world.get_table("Engine_Sprite")->set_float32(s, "tint_b", 1.0f);
+    world.get_table("Engine_Sprite")->set_float32(s, "tint_a", 1.0f);
 
     StubRenderer r;
     StubInput i;
