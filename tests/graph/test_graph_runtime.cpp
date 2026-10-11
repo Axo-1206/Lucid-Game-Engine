@@ -297,3 +297,75 @@ TEST_CASE("graph_runtime: a node fires at most once per tick",
     cap.detach();
     engine::install_default_log_sink();
 }
+
+TEST_CASE("graph_runtime: a node reads a resource field",
+          "[graph][runtime][resource]")
+{
+    Fixture f;
+
+    engine::clear_log_sinks();
+    LogCapture cap;
+    cap.attach();
+    engine::set_log_level(engine::LogLevel::Trace);
+
+    const auto lucgraph_path = temp_dir() / "resource.lucgraph";
+    REQUIRE(compile_to_file(
+        "resource Config {\n"
+        "    speed: float32 = 42.0,\n"
+        "}\n"
+        "node frame = EveryFrame()\n"
+        "node p = PrintNode(Config.speed) on frame\n",
+        lucgraph_path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "resource.lucgraph");
+
+    graph::GraphRuntime rt(f.world, node_registry());
+    rt.set_asset_root(temp_dir());
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+
+    rt.tick(0.016f);
+
+    // PrintNode logged the resource field's value.
+    REQUIRE(cap.contains("42"));
+
+    cap.detach();
+}
+
+TEST_CASE("graph_runtime: a resource field with no written default is zero",
+          "[graph][runtime][resource]")
+{
+    Fixture f;
+
+    engine::clear_log_sinks();
+    LogCapture cap;
+    cap.attach();
+    engine::set_log_level(engine::LogLevel::Trace);
+
+    const auto lucgraph_path = temp_dir() / "zero_resource.lucgraph";
+    REQUIRE(compile_to_file(
+        "resource Config {\n"
+        "    speed: float32,\n"
+        "}\n"
+        "node frame = EveryFrame()\n"
+        "node p = PrintNode(Config.speed) on frame\n",
+        lucgraph_path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "zero_resource.lucgraph");
+
+    graph::GraphRuntime rt(f.world, node_registry());
+    rt.set_asset_root(temp_dir());
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+
+    rt.tick(0.016f);
+
+    // PrintNode logged 0.0, the type's zero.
+    REQUIRE(cap.contains("0.0"));
+
+    cap.detach();
+}

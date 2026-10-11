@@ -1,8 +1,5 @@
 #include "engine/graph/node_dispatch.h"
 #include "engine/core/log.h"
-#include "engine/nodes/node_registry.h"
-
-#include <cassert>
 
 namespace engine::graph
 {
@@ -11,161 +8,91 @@ namespace engine::graph
     {
 
         // -----------------------------------------------------------------------------
-        // Helpers
+        // Numeric coercion
         // -----------------------------------------------------------------------------
         //
-        // The graph's arguments are stored flat, and each node slices its own
-        // with (offset, count). These helpers read the common shapes.
+        // A node type declares its argument types via the registry. The
+        // executor for that node reads its arguments as the declared type.
+        // In practice the only widths that matter at the argument level are
+        // "float-like" and "int-like"; bools coerce to 0.0f / 1.0f.
+        //
+        // cell_as_float covers the cases an executor needs for a numeric
+        // read. A String, RowRef, or Callback argument read as a float
+        // yields 0.0f; that is a Sema bug if it happens, not a runtime one.
 
-        const lucid::sema::Arg *args_of(const lucid::sema::Graph &g,
-                                        std::uint32_t node_index)
+        float cell_as_float(const engine::ecs::CellValue &v)
         {
-            const auto &node = g.nodes[node_index];
-            return g.args.data() + node.args_offset;
-        }
-
-        std::uint32_t arg_count_of(const lucid::sema::Graph &g,
-                                   std::uint32_t node_index)
-        {
-            return g.nodes[node_index].args_count;
-        }
-
-        // Read the float value of an argument. If the arg is a literal,
-        // use its literal value. If it's a node reference, read the
-        // referenced node's result from `results`. If it's a resource
-        // reference, this Phase 9 runtime does not support it; log and
-        // return 0.
-        float arg_as_float(const lucid::sema::Graph &g,
-                           const lucid::sema::Arg &arg,
-                           const std::vector<float> &results)
-        {
-            using Arg = lucid::sema::Arg;
-            switch (arg.kind)
+            using Kind = engine::ecs::CellValue::Kind;
+            switch (v.kind())
             {
-            case Arg::Kind::Literal:
-                // Literal carries either a float or an int; the
-                // executor for the node knows which. Use the float
-                // field for both for now.
-                return arg.literal.f;
-            case Arg::Kind::NodeRef:
-                return results[arg.node_ref];
-            case Arg::Kind::ResourceRef:
-                // Not supported in Phase 9. A future phase adds a
-                // resource-to-value conversion path.
+            case Kind::Float:
+                return static_cast<float>(v.as_float());
+            case Kind::Int:
+                return static_cast<float>(v.as_int());
+            case Kind::Bool:
+                return v.as_bool() ? 1.0f : 0.0f;
+            case Kind::Nil:
+                return 0.0f;
+            default:
                 return 0.0f;
             }
-            return 0.0f;
-        }
-
-        // Read the int value of an argument. See arg_as_float.
-        std::int64_t arg_as_int(const lucid::sema::Graph &g,
-                                const lucid::sema::Arg &arg,
-                                const std::vector<float> &results)
-        {
-            using Arg = lucid::sema::Arg;
-            switch (arg.kind)
-            {
-            case Arg::Kind::Literal:
-                return arg.literal.i;
-            case Arg::Kind::NodeRef:
-                return static_cast<std::int64_t>(results[arg.node_ref]);
-            case Arg::Kind::ResourceRef:
-                return 0;
-            }
-            return 0;
         }
 
         // -----------------------------------------------------------------------------
         // Executors
         // -----------------------------------------------------------------------------
+        //
+        // A Value node reads its arguments from ctx.arg_values and writes
+        // its result to ctx.results[node_index].
+        //
+        // A Trigger never reaches its executor: firing is handled by
+        // fire_node in graph_runtime.cpp. Its table entry is a no-op.
+        //
+        // An Action reads its arguments and performs a side effect.
 
-        // Float32Node(value: float32) -> float32
-        void exec_float32(engine::ecs::World &,
-                          const lucid::sema::Graph &g,
-                          std::uint32_t node_index,
-                          std::vector<float> &results,
-                          float)
+        // 0: Float32Node(value: float32) -> float32
+        void exec_float32(TickContext &ctx, std::uint32_t node_index)
         {
-            const auto *args = args_of(g, node_index);
-            results[node_index] = args[0].literal.f;
+            const auto &node = ctx.graph.nodes[node_index];
+            ctx.results[node_index] = ctx.arg_values[node.args_offset];
         }
 
-        // Int32Node(value: int32) -> int32
-        void exec_int32(engine::ecs::World &,
-                        const lucid::sema::Graph &g,
-                        std::uint32_t node_index,
-                        std::vector<float> &results,
-                        float)
+        // 1: Int32Node(value: int32) -> int32
+        void exec_int32(TickContext &ctx, std::uint32_t node_index)
         {
-            const auto *args = args_of(g, node_index);
-            results[node_index] = static_cast<float>(args[0].literal.i);
+            const auto &node = ctx.graph.nodes[node_index];
+            ctx.results[node_index] = ctx.arg_values[node.args_offset];
         }
 
-        // EveryFrame() — source trigger. The runtime fires it directly;
-        // the executor does nothing. Subscribers are dispatched by the
-        // runtime's trigger logic, which Phase 9 does not yet implement.
-        void exec_every_frame(engine::ecs::World &,
-                              const lucid::sema::Graph &,
-                              std::uint32_t,
-                              std::vector<float> &,
-                              float)
-        {
-            // No-op. See the note in graph_runtime.cpp about trigger
-            // dispatch being a Phase 9.5 addition.
-        }
+        // 2: EveryFrame() — source trigger. Never dispatched.
+        void exec_every_frame(TickContext &, std::uint32_t) {}
 
-        // PrintNode(value: float32) — action.
-        void exec_print(engine::ecs::World &,
-                        const lucid::sema::Graph &g,
-                        std::uint32_t node_index,
-                        std::vector<float> &results,
-                        float)
+        // 3: PrintNode(value: float32) — action.
+        void exec_print(TickContext &ctx, std::uint32_t node_index)
         {
-            const auto *args = args_of(g, node_index);
-            const float v = arg_as_float(g, args[0], results);
+            const auto &node = ctx.graph.nodes[node_index];
+            const float v = cell_as_float(ctx.arg_values[node.args_offset]);
             engine::log_info("[graph] PrintNode: %f", static_cast<double>(v));
         }
 
-        // BoolNode(value: bool) -> bool (stored as 0.0 or 1.0)
-        void exec_bool(engine::ecs::World &,
-                       const lucid::sema::Graph &g,
-                       std::uint32_t node_index,
-                       std::vector<float> &results,
-                       float)
+        // 4: BoolNode(value: bool) -> bool
+        void exec_bool(TickContext &ctx, std::uint32_t node_index)
         {
-            const auto *args = args_of(g, node_index);
-            // Literal::Kind::Bool uses .b (or .i != 0). Checking .b != false or .i != 0.
-            results[node_index] = (args[0].literal.kind == lucid::sema::Literal::Kind::Bool
-                                       ? args[0].literal.b
-                                       : args[0].literal.i != 0)
-                                      ? 1.0f
-                                      : 0.0f;
+            const auto &node = ctx.graph.nodes[node_index];
+            ctx.results[node_index] = ctx.arg_values[node.args_offset];
         }
 
-        // LessThanNode(a: float32, b: float32) -> bool
-        void exec_less_than(engine::ecs::World &,
-                            const lucid::sema::Graph &g,
-                            std::uint32_t node_index,
-                            std::vector<float> &results,
-                            float)
+        // 5: LessThanNode(a: f32, b: f32) -> bool
+        void exec_less_than(TickContext &ctx, std::uint32_t node_index)
         {
-            const auto *args = args_of(g, node_index);
-            const float a = arg_as_float(g, args[0], results);
-            const float b = arg_as_float(g, args[1], results);
-            results[node_index] = (a < b) ? 1.0f : 0.0f;
+            const auto &node = ctx.graph.nodes[node_index];
+            const float a = cell_as_float(ctx.arg_values[node.args_offset + 0]);
+            const float b = cell_as_float(ctx.arg_values[node.args_offset + 1]);
+            ctx.results[node_index] = engine::ecs::CellValue::from_bool(a < b);
         }
 
-        // IfNode(cond: bool) — gating trigger. Handled in fire_node.
-        void exec_if(engine::ecs::World &,
-                     const lucid::sema::Graph &,
-                     std::uint32_t,
-                     std::vector<float> &,
-                     float)
-        {
-            // Gating triggers do not run. Firing is handled by fire_node,
-            // which evaluates the condition (this node's first argument)
-            // before propagating. See graph_runtime.cpp.
-        }
+        // 6: IfNode(cond: bool) — gating trigger. Never dispatched.
+        void exec_if(TickContext &, std::uint32_t) {}
 
         // -----------------------------------------------------------------------------
         // The table
@@ -194,7 +121,8 @@ namespace engine::graph
 
     std::uint32_t node_executor_count()
     {
-        return static_cast<std::uint32_t>(sizeof(kExecutors) / sizeof(kExecutors[0]));
+        return static_cast<std::uint32_t>(
+            sizeof(kExecutors) / sizeof(kExecutors[0]));
     }
 
 } // namespace engine::graph

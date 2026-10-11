@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/ecs/cell_value.h"
 #include "engine/ecs/world.h"
 #include "sema/Graph.hpp"
 #include "sema/Registry.hpp"
@@ -12,27 +13,28 @@ namespace engine::graph
 {
 
     // A compiled graph loaded from a .lucgraph file, plus the
-    // per-tick scratch space its executors use.
+    // per-tick scratch its executors use.
     struct LoadedGraph
     {
         // Where the graph came from, for diagnostics.
         std::string source_path;
 
-        // The deserialized graph. `lucid::sema::Graph` is movable, so
-        // LoadedGraph is movable.
+        // The deserialized graph. `lucid::sema::Graph` is movable.
         lucid::sema::Graph graph;
 
-        // Value results, one per node. Sized to graph.nodes.size().
-        // Rewritten each tick for Value nodes; Action/Trigger nodes
-        // may read from here for their arguments.
-        std::vector<float> results;
+        // One CellValue per node. A Value node's executor writes its
+        // result here; an Action or Trigger reads from here when its
+        // arguments reference other nodes. Reset to nil at the start
+        // of each tick.
+        std::vector<engine::ecs::CellValue> results;
 
-        // Per-tick scratch: which nodes have been fired this tick.
-        // Reset to all-false at the start of tick; set true as firing
-        // propagates. An Action runs in step 3 only if its bit is set.
-        // A Trigger or Value node's bit is used to prevent re-entrant
-        // firing within the same tick (a node fires at most once per
-        // tick; see TriggerModel.md §6's cycle note).
+        // One CellValue per graph.args entry. Filled per tick before a
+        // node's executor runs. Indexed by (node.args_offset + i).
+        std::vector<engine::ecs::CellValue> arg_values;
+
+        // One bool per node. Set true as firing propagates this tick.
+        // Reset at the start of each tick. A node fires at most once
+        // per tick; see docs/notes/TriggerModel.md §6.
         std::vector<bool> fired;
     };
 
@@ -40,14 +42,11 @@ namespace engine::graph
     // world's Script table, and ticks them against the world.
     //
     // Lifetime:
-    //   - Construct after the world has core tables. GraphRuntime
-    //     does not create tables.
-    //   - Call load(world) after the scene has been applied to the
-    //     world. load() reads the world's Script table; if the scene
-    //     has not been applied yet, the Script table is empty.
+    //   - Construct after the world has core tables.
+    //   - Call load() after the scene has been applied to the world.
+    //     load() reads the world's Script table.
     //   - Call tick(dt) once per frame, before the systems.
-    //   - Call clear() before destroying the world, if you want to
-    //     release the graphs eagerly.
+    //   - Call clear() before destroying the world.
     //
     // GraphRuntime does not own the world; it holds a reference.
     // GraphRuntime does not own the registry; node_registry() returns
@@ -58,7 +57,6 @@ namespace engine::graph
         GraphRuntime(engine::ecs::World &world,
                      const lucid::sema::Registry &registry);
 
-        // Non-copyable (holds a reference to the world); movable.
         GraphRuntime(const GraphRuntime &) = delete;
         GraphRuntime &operator=(const GraphRuntime &) = delete;
         GraphRuntime(GraphRuntime &&) noexcept = default;
@@ -69,19 +67,17 @@ namespace engine::graph
         // graph is skipped and the others are loaded. Logs each error.
         bool load();
 
-        // Tick every loaded graph. For each graph, walk
-        // graph.phase_order and dispatch each node's executor.
+        // Tick every loaded graph.
         void tick(float dt);
 
-        // Release all loaded graphs and their scratch space.
+        // Release all loaded graphs and their scratch.
         void clear();
 
         std::size_t graph_count() const { return graphs_.size(); }
         const std::vector<LoadedGraph> &graphs() const { return graphs_; }
 
         // The asset root used to resolve Script.graph paths. Defaults
-        // to the process's current working directory. Set before
-        // calling load().
+        // to the process's current working directory. Set before load().
         void set_asset_root(const std::filesystem::path &root);
         const std::filesystem::path &asset_root() const { return asset_root_; }
 

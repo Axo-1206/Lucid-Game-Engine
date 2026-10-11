@@ -1,26 +1,29 @@
 #include "engine/graph/graph_runtime.h"
 #include "engine/graph/node_dispatch.h"
+#include "engine/core/diagnostic_log.h"
 #include "engine/core/log.h"
 #include "engine/nodes/node_registry.h"
 #include "engine/nodes/node_runtime.h"
 #include "engine/scene/component_tags.h"
-#include "engine/core/diagnostic_log.h"
 
+#include "sema/Literal.hpp"
 #include "serialization/Deserializer.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 
 namespace engine::graph
 {
 
+    // =============================================================================
+    // Construction
+    // =============================================================================
+
     GraphRuntime::GraphRuntime(engine::ecs::World &world,
                                const lucid::sema::Registry &registry)
         : world_(world), registry_(registry), asset_root_(std::filesystem::current_path())
     {
-        // The executor table and the node registry must have the same
-        // length and the same order. This is the engine's private
-        // contract with itself; a mismatch is a programming error.
         assert(node_executor_count() == registry_.nodeTypes.size() && "node_dispatch table size must equal node registry size");
     }
 
@@ -28,6 +31,307 @@ namespace engine::graph
     {
         asset_root_ = root;
     }
+
+    // =============================================================================
+    // Literal -> CellValue
+    // =============================================================================
+
+    namespace
+    {
+
+        // Convert a format-library Literal to an engine CellValue.
+        //
+        // The two type systems have different granularity. Literal has 14
+        // kinds (sized integers and floats, char, string). CellValue has 7
+        // (Bool, Int, Float, String, Nil, RowRef, Callback). The widths
+        // collapse: Int8..Int64 all become CellValue::Int; Float32 and
+        // Float64 both become CellValue::Float. The value survives; the
+        // specific width does not. That is fine, because the executor for
+        // a node type is written against the type the registry declares
+        // for that argument, and reads the CellValue accordingly.
+        //
+        // A String literal stores (offset, length) into the graph's string
+        // pool. Reconstruct the bytes; bounds-check against the pool.
+        engine::ecs::CellValue literal_to_cell_value(
+            const lucid::sema::Literal &lit,
+            const lucid::sema::Graph &g)
+        {
+
+            using LitKind = lucid::sema::Literal::Kind;
+            using CV = engine::ecs::CellValue;
+
+            switch (lit.kind)
+            {
+            case LitKind::Nil:
+                return CV::nil();
+
+            case LitKind::Bool:
+                return CV::from_bool(lit.b);
+
+            case LitKind::Char:
+                return CV::from_char(lit.c);
+
+            case LitKind::Int8:
+            case LitKind::Int16:
+            case LitKind::Int32:
+            case LitKind::Int64:
+                return CV::from_int(lit.i);
+
+            case LitKind::UInt8:
+            case LitKind::UInt16:
+            case LitKind::UInt32:
+            case LitKind::UInt64:
+                // The union stores unsigned in `u`. CellValue stores
+                // integers as int64_t. A uint64 above 2^63 wraps; for
+                // values below 2^63 this is exact.
+                return CV::from_int(static_cast<std::int64_t>(lit.u));
+
+            case LitKind::Float32:
+            case LitKind::Float64:
+                return CV::from_float(lit.f);
+
+            case LitKind::String:
+            {
+                const auto off = lit.string.offset;
+                const auto len = lit.string.length;
+                if (off + len > g.string_pool.size())
+                {
+                    engine::log_error(
+                        "GraphRuntime: string literal (off=%u len=%u) "
+                        "out of pool bounds (%zu)",
+                        static_cast<unsigned>(off),
+                        static_cast<unsigned>(len),
+                        g.string_pool.size());
+                    return CV::nil();
+                }
+                return CV::from_string(std::string(
+                    g.string_pool.data() + off, len));
+            }
+            }
+            return CV::nil();
+        }
+
+        // =============================================================================
+        // Argument resolution
+        // =============================================================================
+
+        // Read a resource field's value.
+        //
+        // Resources are compile-time constants. The library's
+        // zeroLiteralOf resolves a field whose source omitted `= value`
+        // to the type's zero; the graph carries only values, no
+        // hasDefault flag. There is no branch here.
+        engine::ecs::CellValue resolve_resource_arg(
+            const lucid::sema::Graph &g,
+            const lucid::sema::Arg &arg)
+        {
+
+            const auto &ref = arg.resource_ref;
+
+            if (ref.resource_index >= g.resources.size())
+            {
+                engine::log_error(
+                    "GraphRuntime: resource index %u out of range",
+                    static_cast<unsigned>(ref.resource_index));
+                return engine::ecs::CellValue::nil();
+            }
+
+            const auto &res = g.resources[ref.resource_index];
+
+            if (ref.field_index >= res.fields_count)
+            {
+                engine::log_error(
+                    "GraphRuntime: field index %u out of range for resource %u",
+                    static_cast<unsigned>(ref.field_index),
+                    static_cast<unsigned>(ref.resource_index));
+                return engine::ecs::CellValue::nil();
+            }
+
+            const auto &field =
+                g.resource_fields[res.fields_offset + ref.field_index];
+
+            return literal_to_cell_value(field.value, g);
+        }
+
+        // Resolve one argument to a concrete CellValue.
+        engine::ecs::CellValue resolve_arg(
+            const lucid::sema::Graph &g,
+            const lucid::sema::Arg &arg,
+            const std::vector<engine::ecs::CellValue> &results)
+        {
+
+            using Arg = lucid::sema::Arg;
+
+            switch (arg.kind)
+            {
+            case Arg::Kind::Literal:
+                return literal_to_cell_value(arg.literal, g);
+
+            case Arg::Kind::NodeRef:
+            {
+                const auto idx = arg.node_ref;
+                if (idx >= results.size())
+                {
+                    engine::log_error(
+                        "GraphRuntime: NodeRef %u out of range",
+                        static_cast<unsigned>(idx));
+                    return engine::ecs::CellValue::nil();
+                }
+                return results[idx];
+            }
+
+            case Arg::Kind::ResourceRef:
+                return resolve_resource_arg(g, arg);
+            }
+
+            return engine::ecs::CellValue::nil();
+        }
+
+        // Fill ctx.arg_values for one node's arguments.
+        void resolve_args_of(std::uint32_t node_index,
+                             LoadedGraph &lg,
+                             TickContext &ctx)
+        {
+            const auto &node = lg.graph.nodes[node_index];
+            for (std::uint32_t i = 0; i < node.args_count; ++i)
+            {
+                const auto &arg = lg.graph.args[node.args_offset + i];
+                lg.arg_values[node.args_offset + i] =
+                    resolve_arg(lg.graph, arg, lg.results);
+            }
+        }
+
+    } // namespace
+
+    // =============================================================================
+    // Firing
+    // =============================================================================
+
+    namespace
+    {
+
+        // Fire a node: mark it fired, and if it is a gating trigger with a
+        // true condition, propagate to its subscribers.
+        void fire_node(LoadedGraph &lg,
+                       TickContext &ctx,
+                       std::uint32_t node_index)
+        {
+
+            // A node fires at most once per tick. TriggerModel.md §6.
+            if (lg.fired[node_index])
+                return;
+            lg.fired[node_index] = true;
+
+            const auto &node = lg.graph.nodes[node_index];
+            const auto &info = engine::node_runtime_info(node.type_id);
+
+            if (info.mode == engine::TriggerMode::Gating)
+            {
+                if (node.args_count == 0)
+                {
+                    engine::log_error(
+                        "GraphRuntime: gating trigger node %u has no condition argument",
+                        static_cast<unsigned>(node_index));
+                    return;
+                }
+
+                // Resolve the gate's arguments; the first is the condition.
+                resolve_args_of(node_index, lg, ctx);
+
+                const auto &cond = lg.arg_values[node.args_offset];
+
+                if (cond.kind() != engine::ecs::CellValue::Kind::Bool)
+                {
+                    engine::log_error(
+                        "GraphRuntime: gating trigger node %u condition is not bool",
+                        static_cast<unsigned>(node_index));
+                    return;
+                }
+                if (!cond.as_bool())
+                {
+                    return; // gate did not pass; do not propagate
+                }
+            }
+
+            // Propagate to subscribers.
+            const auto *subs = lg.graph.subscribers.data() + node.subscribers_offset;
+            for (std::uint32_t i = 0; i < node.subscribers_count; ++i)
+            {
+                fire_node(lg, ctx, subs[i]);
+            }
+        }
+
+        // Tick one graph: reset state, evaluate values, fire triggers,
+        // run fired actions in phase order.
+        void tick_one_graph(engine::ecs::World &world,
+                            LoadedGraph &lg,
+                            float dt)
+        {
+
+            // 1. Reset per-tick state.
+            std::fill(lg.fired.begin(), lg.fired.end(), false);
+            std::fill(lg.results.begin(), lg.results.end(),
+                      engine::ecs::CellValue::nil());
+
+            TickContext ctx{world, lg.graph, lg.results, lg.arg_values, dt};
+
+            const NodeExecutor *executors = node_executors();
+            const std::uint32_t executor_count = node_executor_count();
+
+            // 2. Evaluate Value nodes in value_order.
+            //
+            //    value_order is a topological order: a Value node's
+            //    NodeRef arguments reference earlier Value nodes (or
+            //    literals or resources). Evaluating in this order means
+            //    each node's arguments are already resolved.
+            for (lucid::sema::NodeIndex node_idx : lg.graph.value_order)
+            {
+                const auto &node = lg.graph.nodes[node_idx];
+                if (node.type_id >= executor_count)
+                {
+                    engine::log_error(
+                        "GraphRuntime: node %u has type_id %u out of range",
+                        static_cast<unsigned>(node_idx),
+                        static_cast<unsigned>(node.type_id));
+                    continue;
+                }
+                resolve_args_of(static_cast<std::uint32_t>(node_idx), lg, ctx);
+                executors[node.type_id](ctx, static_cast<std::uint32_t>(node_idx));
+            }
+
+            // 3. Fire source triggers.
+            for (std::uint32_t node_idx = 0;
+                 node_idx < lg.graph.nodes.size();
+                 ++node_idx)
+            {
+                const auto &node = lg.graph.nodes[node_idx];
+                const auto &info = engine::node_runtime_info(node.type_id);
+                if (info.mode == engine::TriggerMode::Source)
+                {
+                    fire_node(lg, ctx, node_idx);
+                }
+            }
+
+            // 4. Run fired Actions in phase order.
+            for (lucid::sema::NodeIndex node_idx : lg.graph.phase_order)
+            {
+                if (!lg.fired[node_idx])
+                    continue;
+
+                const auto &node = lg.graph.nodes[node_idx];
+                if (node.type_id >= executor_count)
+                    continue;
+
+                resolve_args_of(static_cast<std::uint32_t>(node_idx), lg, ctx);
+                executors[node.type_id](ctx, static_cast<std::uint32_t>(node_idx));
+            }
+        }
+
+    } // namespace
+
+    // =============================================================================
+    // File I/O
+    // =============================================================================
 
     namespace
     {
@@ -38,7 +342,8 @@ namespace engine::graph
             std::ifstream in(path, std::ios::binary);
             if (!in.is_open())
             {
-                engine::log_error("GraphRuntime: cannot open '%s'", path.string().c_str());
+                engine::log_error("GraphRuntime: cannot open '%s'",
+                                  path.string().c_str());
                 ok = false;
                 return {};
             }
@@ -51,133 +356,11 @@ namespace engine::graph
             return bytes;
         }
 
-        // Evaluate a node's argument as a bool, for gating conditions.
-        // The argument must be a NodeRef to a Value node whose result was
-        // computed in the value-order pass, or a Literal.
-        bool arg_as_bool(const lucid::sema::Graph &g,
-                         const lucid::sema::Arg &arg,
-                         const std::vector<float> &results)
-        {
-            using Arg = lucid::sema::Arg;
-            switch (arg.kind)
-            {
-            case Arg::Kind::Literal:
-                return (arg.literal.kind == lucid::sema::Literal::Kind::Bool)
-                           ? arg.literal.b
-                           : (arg.literal.i != 0);
-            case Arg::Kind::NodeRef:
-                return results[arg.node_ref] != 0.0f;
-            case Arg::Kind::ResourceRef:
-                // Not supported in Phase 9.5.
-                return false;
-            }
-            return false;
-        }
-
-        void fire_node(LoadedGraph &lg, std::uint32_t node_index)
-        {
-            // A node fires at most once per tick. See TriggerModel.md §6.
-            if (lg.fired[node_index])
-                return;
-            lg.fired[node_index] = true;
-
-            const auto &node = lg.graph.nodes[node_index];
-            const auto &info = engine::node_runtime_info(node.type_id);
-
-            // Gating triggers check their condition before propagating.
-            if (info.mode == engine::TriggerMode::Gating)
-            {
-                if (node.args_count == 0)
-                {
-                    engine::log_error(
-                        "GraphRuntime: gating trigger node %u has no condition argument",
-                        static_cast<unsigned>(node_index));
-                    return;
-                }
-                const auto *args = lg.graph.args.data() + node.args_offset;
-                if (!arg_as_bool(lg.graph, args[0], lg.results))
-                    return;
-            }
-
-            // Propagate to subscribers.
-            const auto *subs = lg.graph.subscribers.data() + node.subscribers_offset;
-            for (std::uint32_t i = 0; i < node.subscribers_count; ++i)
-            {
-                fire_node(lg, subs[i]);
-            }
-        }
-
-        void tick_one_graph(engine::ecs::World &world,
-                            LoadedGraph &lg,
-                            float dt)
-        {
-            // 1. Reset the per-tick fired flags.
-            std::fill(lg.fired.begin(), lg.fired.end(), false);
-
-            // 2. Evaluate Value nodes, in value_order.
-            //
-            //    Value nodes don't have side effects; they write their
-            //    result to lg.results[node_index]. After this pass, every
-            //    Value node's result is available for the firing pass.
-            const NodeExecutor *executors = node_executors();
-            const std::uint32_t executor_count = node_executor_count();
-
-            for (lucid::sema::NodeIndex node_idx : lg.graph.value_order)
-            {
-                const auto &node = lg.graph.nodes[node_idx];
-                if (node.type_id >= executor_count)
-                {
-                    engine::log_error(
-                        "GraphRuntime: node %u has type_id %u out of range",
-                        static_cast<unsigned>(node_idx),
-                        static_cast<unsigned>(node.type_id));
-                    continue;
-                }
-                executors[node.type_id](world, lg.graph,
-                                        static_cast<std::uint32_t>(node_idx),
-                                        lg.results, dt);
-            }
-
-            // 3. Fire source triggers.
-            //
-            //    A source trigger is any node whose runtime info says
-            //    TriggerMode::Source. Firing it propagates through its
-            //    subscribers, marking fired nodes and stopping at gates
-            //    whose condition is false.
-            for (std::uint32_t node_idx = 0;
-                 node_idx < lg.graph.nodes.size();
-                 ++node_idx)
-            {
-                const auto &node = lg.graph.nodes[node_idx];
-                const auto &info = engine::node_runtime_info(node.type_id);
-                if (info.mode == engine::TriggerMode::Source)
-                {
-                    fire_node(lg, node_idx);
-                }
-            }
-
-            // 4. Run fired Actions in phase order.
-            //
-            //    Actions that were not fired this tick do not run. The
-            //    phase_order list contains only Action nodes, sorted by
-            //    phase; we filter it by the fired set.
-            for (lucid::sema::NodeIndex node_idx : lg.graph.phase_order)
-            {
-                if (!lg.fired[node_idx])
-                    continue;
-
-                const auto &node = lg.graph.nodes[node_idx];
-                if (node.type_id >= executor_count)
-                {
-                    continue; // already logged in the value pass
-                }
-                executors[node.type_id](world, lg.graph,
-                                        static_cast<std::uint32_t>(node_idx),
-                                        lg.results, dt);
-            }
-        }
-
     } // namespace
+
+    // =============================================================================
+    // Public API
+    // =============================================================================
 
     bool GraphRuntime::load()
     {
@@ -186,9 +369,6 @@ namespace engine::graph
         auto *script_tbl = world_.get_table(ScriptTag::name);
         if (!script_tbl)
         {
-            // No Script table means the scene loader hasn't populated
-            // the world, or the world is empty. Either way, nothing to
-            // load. Not an error.
             engine::log_info("GraphRuntime: no Script table; no graphs to load.");
             return true;
         }
@@ -211,8 +391,7 @@ namespace engine::graph
 
         auto dr = lucid::serialization::deserialize(
             lucid::serialization::ByteSpan(bytes), registry_);
-        if (!dr.ok)
-        {
+        if (!dr.ok) {
             engine::log_error("GraphRuntime: failed to deserialize '%s'",
                               full.string().c_str());
             engine::log_diagnostics(dr.diagnostics);
@@ -223,8 +402,12 @@ namespace engine::graph
         LoadedGraph lg;
         lg.source_path = full.string();
         lg.graph = std::move(*dr.graph);
-        lg.results.assign(lg.graph.nodes.size(), 0.0f);
+        lg.results.assign(lg.graph.nodes.size(),
+                          engine::ecs::CellValue::nil());
+        lg.arg_values.assign(lg.graph.args.size(),
+                             engine::ecs::CellValue::nil());
         lg.fired.assign(lg.graph.nodes.size(), false);
+
         graphs_.push_back(std::move(lg));
 
         engine::log_info("GraphRuntime: loaded '%s' (%zu nodes)",
