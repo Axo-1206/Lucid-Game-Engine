@@ -4,13 +4,15 @@ namespace engine
 {
 
     // Each core component table has a tag type. The tag's `name` is the
-    // table's name in the runtime.
+    // table's name in the world.
     //
     // These tags are used as template parameters for add_component<Tag>(),
     // get_component<Tag>(), has_component<Tag>(), and remove_component<Tag>().
     //
     // To add a new component type, add its table in setup_core_tables() and
-    // add a tag here.
+    // add a tag here. Also add the component name to kSceneComponents in
+    // engine/scene/scene_schema.h, and a loader/saver in the scene loader
+    // and saver.
 
     struct EntityTag
     {
@@ -31,6 +33,10 @@ namespace engine
     struct SpriteTag
     {
         static constexpr const char *name = "Sprite";
+    };
+    struct ScriptTag
+    {
+        static constexpr const char *name = "Script";
     };
     struct CameraTag
     {

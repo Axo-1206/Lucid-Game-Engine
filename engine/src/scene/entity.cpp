@@ -92,6 +92,7 @@ namespace engine
         // (Nothing depends on WorldTransform or Sprite, but be tidy.)
         remove_component<VelocityTag>(world, e);
         remove_component<SpriteTag>(world, e);
+        remove_component<ScriptTag>(world, e);
         remove_component<WorldTransformTag>(world, e);
         remove_component<TransformTag>(world, e);
 
@@ -223,6 +224,17 @@ namespace engine
             t->add_column("tint_b", engine::ecs::ColumnType::Float32);
             t->add_column("tint_a", engine::ecs::ColumnType::Float32);
             t->add_column("layer", engine::ecs::ColumnType::Int32);
+        }
+
+        // Script
+        //
+        // A Script component references a .lucgraph file by path. The
+        // scene loader stores the path; the runtime loads the graph.
+        // The scene itself never compiles or loads the graph.
+        {
+            auto *t = world.create_table(ScriptTag::name);
+            t->add_column("entity", engine::ecs::ColumnType::RowRef, /*primary=*/true);
+            t->add_column("graph", engine::ecs::ColumnType::String);
         }
 
         // Camera

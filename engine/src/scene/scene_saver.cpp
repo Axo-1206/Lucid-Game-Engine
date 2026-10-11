@@ -1,5 +1,6 @@
 #include "engine/scene/scene.h"
 #include "engine/core/log.h"
+#include "engine/scene/scene_schema.h"
 
 #include <nlohmann/json.hpp>
 
@@ -59,6 +60,13 @@ namespace engine
             return j;
         }
 
+        json save_script(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
+        {
+            json j;
+            j["graph"] = tbl->get_string(c, "graph");
+            return j;
+        }
+
         json save_component_by_name(engine::ecs::World &world, EntityRef e,
                                     const std::string &table_name)
         {
@@ -78,6 +86,8 @@ namespace engine
                 return save_velocity(tbl, comp);
             else if (table_name == "Sprite")
                 return save_sprite(tbl, comp);
+            else if (table_name == "Script")
+                return save_script(tbl, comp);
             else
             {
                 log_warn("No saver for component table: %s", table_name.c_str());

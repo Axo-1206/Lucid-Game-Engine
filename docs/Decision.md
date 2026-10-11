@@ -80,29 +80,12 @@ Write the decision down. Name every schema type. Name every runtime type. Say wh
 
 ---
 
-## Decision 5 — What `.lscene` is
+## Decision 5 — What `.lscene` is (superseded by Decision 8)
 
-This is the JSON-vs-Lucid question. Resolve it in writing. There are two coherent answers.
-
-**Answer A — `.lscene` is JSON.**
-- The scene description (`SceneDesc`) serializes to JSON via nlohmann/json.
-- Lucid (`.lucid` / `.lucgraph`) is used *only* for node graphs attached to entities. An entity with a `Script` component references a `.lucgraph` file path.
-- Rationale: scenes are entity/component/camera data, which doesn't map cleanly onto Lucid's `node` / `on` / `resource` grammar. A scene is not a graph. A node graph *inside* an entity is a graph.
-- The current `scene_loader.cpp` / `scene_saver.cpp` code stays, refactored to operate on `SceneDesc` instead of a `Runtime`.
-
-**Answer B — `.lscene` is a Lucid file.**
-- The scene serializes through `lucid::serialization`. Entities map to Lucid `resource` declarations; cameras map to a `Camera` resource; parent references map to fields.
-- Rationale: one format for everything. The editor edits one language.
-- Cost: you have to design the entity/component-to-`resource` mapping, and it's not obvious. A scene with 200 entities and mixed components is awkward as a flat `resource` file.
-- This is a bigger rewrite. The loader/saver become `lucid::serialization` calls.
-
-**My recommendation: Answer A.** A scene is a description of entities and cameras, not a graph. Node graphs are a separate concern that lives *inside* entities. JSON is the right tool for the scene; Lucid is the right tool for the graph. Two formats, two jobs, each one honest.
-
-Whichever you pick, state:
-- The file extension and what it contains.
-- Which library reads/writes it.
-- Where the loader/saver source lives.
-- Whether the format is stable (v1 frozen) or evolving.
+Decision 5 deferred the .lscene format choice. Decision 8 records
+the resolution: .lscene is JSON, its schema is engine-owned and
+versioned separately, and its only interface to the format library
+is a Script component holding a .lucgraph path.
 
 ---
 
@@ -140,6 +123,45 @@ Answer these in writing:
   
   The second is safer (ids never reuse within a session) and matches what most engines do. Recommend: **preserve the counter, clear the table content.** Document it.
 - **What else lives in it?** Name anything you know now. Leave it open to grow. State that adding fields is allowed; removing them is a breaking change.
+
+## Decision 8: The .lscene format
+
+`.lscene` files are JSON. The engine's scene loader and saver read
+and write JSON via nlohmann/json. The scene format is an
+independent, engine-owned schema, with its own version
+(kSceneSchemaVersion), its own schema header (scene_schema.h), its
+own spec (docs/notes/SceneFormat.md), and its own evolution
+schedule.
+
+`.lucgraph` files are the Lucid format library's binary format for
+behavior graphs. They are read and written only by
+`lucid::serialization`.
+
+The two are different things. A scene is data — entities,
+components, cameras. A graph is behavior — nodes, subscriptions,
+phases. Their shapes are different, their lifetimes are different,
+their versioning is different. The only interface between them is
+a `Script` component that holds a `.lucgraph` file path. The
+scene neither compiles nor loads the graph; the runtime does, and
+passes the same node registry that was used at compile time.
+
+Rationale:
+- Data and behavior are different categories. Expressing one in
+  the other's format bends the format.
+- The format library's Registry, Graph, and NodeInstance are
+  designed for graphs, not for entity lists. Coupling them to
+  the ECS is a category error.
+- The registry fingerprint is meaningful for graphs (node
+  vocabularies must match) and meaningless for scenes (a scene's
+  compatibility is about table schemas).
+- The scene schema evolves frequently — new components, new
+  columns — and must not invalidate compiled graphs. The behavior
+  format evolves rarely and must not be invalidated by scene
+  changes.
+- Independent evolution is what makes each layer stable.
+
+See docs/notes/SceneFormat.md for the full spec and the schema's
+evolution rules.
 
 ---
 

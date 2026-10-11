@@ -1,5 +1,6 @@
 #include "engine/scene/scene.h"
 #include "engine/core/log.h"
+#include "engine/scene/scene_schema.h"
 
 #include <nlohmann/json.hpp>
 
@@ -83,6 +84,16 @@ namespace engine
                 tbl->set_int32(c, "layer", j["layer"].get<int>());
         }
 
+        void load_script(engine::ecs::World &world, EntityRef e, const json &j)
+        {
+            auto c = add_component<ScriptTag>(world, e);
+            auto *tbl = world.get_table(ScriptTag::name);
+            if (!tbl)
+                return;
+            if (j.contains("graph"))
+                tbl->set_string(c, "graph", j["graph"].get<std::string>());
+        }
+
         void load_component(engine::ecs::World &world, EntityRef e,
                             const std::string &name, const json &j)
         {
@@ -94,6 +105,8 @@ namespace engine
                 load_velocity(world, e, j);
             else if (name == "Sprite")
                 load_sprite(world, e, j);
+            else if (name == "Script")
+                load_script(world, e, j);
             else
                 log_warn("Unknown component in scene file: %s", name.c_str());
         }
@@ -189,11 +202,22 @@ namespace engine
         }
 
         // Version check.
+        //
+        // The loader accepts the current version and any older version
+        // (compatible changes don't break old scenes). It refuses newer
+        // versions: a scene from a newer engine may contain fields this
+        // engine doesn't know how to interpret.
         int version = j.value("version", 1);
-        if (version > 1)
+        if (version > kSceneSchemaVersion)
         {
-            log_warn("Scene file '%s' is version %d, engine supports version 1. Loading best-effoworld.",
-                     path.c_str(), version);
+            log_error("Scene file '%s' is version %d; this engine supports up to version %d. Refusing to load.",
+                      path.c_str(), version, kSceneSchemaVersion);
+            return false;
+        }
+        if (version < kSceneSchemaVersion)
+        {
+            log_info("Scene file '%s' is version %d; this engine is version %d. Loading with best-effort compatibility.",
+                     path.c_str(), version, kSceneSchemaVersion);
         }
 
         // Clear existing content.

@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 
 using namespace engine;
 
@@ -72,6 +73,49 @@ TEST_CASE("scene: save and load round-trip", "[scene]")
     REQUIRE_FALSE(b_id.is_nil());
     REQUIRE(get_parent(f.world, b_id) == a_id);
 
+    std::filesystem::remove(path);
+}
+
+TEST_CASE("scene: script component round-trip", "[scene]")
+{
+    Fixture f;
+    Scene scene(f.world);
+    scene.set_name("scripts");
+
+    EntityRef a = create_entity(f.world, allocate_entity_id(f.world), "A");
+    auto sa = add_component<ScriptTag>(f.world, a);
+    f.world.get_table("Script")->set_string(sa, "graph", "scripts/player.lucgraph");
+
+    std::string path = make_temp_path("lucid_test_scene_script.lscene");
+    REQUIRE(scene.save_to_file(path));
+
+    scene.clear();
+    REQUIRE(scene.load_from_file(path));
+
+    auto a_id = f.world.get_table("Entity")->find_by_primary(
+        "id", engine::ecs::CellValue::from_uint64(1));
+    REQUIRE_FALSE(a_id.is_nil());
+
+    auto sa2 = get_component<ScriptTag>(f.world, a_id);
+    REQUIRE_FALSE(sa2.is_nil());
+    REQUIRE(f.world.get_table("Script")->get_string(sa2, "graph") == "scripts/player.lucgraph");
+
+    std::filesystem::remove(path);
+}
+
+TEST_CASE("scene: refuses a newer version", "[scene]")
+{
+    Fixture f;
+    Scene scene(f.world);
+
+    // Write a scene file with a version newer than the engine's.
+    std::string path = make_temp_path("lucid_test_scene_newer.lscene");
+    {
+        std::ofstream out(path);
+        out << R"({ "version": 999, "name": "future", "entities": [] })";
+    }
+
+    REQUIRE_FALSE(scene.load_from_file(path));
     std::filesystem::remove(path);
 }
 
