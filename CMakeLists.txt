@@ -36,7 +36,7 @@ endforeach()
 # ---- Build options ----
 option(LUCID_BUILD_EDITOR "Build the editor executable" ON)
 option(LUCID_BUILD_GAME   "Build the game executable"   ON)
-option(LUCID_BUILD_TESTS  "Build tests"                 OFF)
+option(LUCID_BUILD_TESTS  "Build tests"                 ON)
 
 # ---- Dependencies ----
 add_subdirectory(externals)
@@ -45,19 +45,13 @@ add_subdirectory(externals)
 add_subdirectory(engine)
 add_subdirectory(ecs)
 
-# ---- Editor library (only if the editor is being built) ----
-if(LUCID_BUILD_EDITOR)
-    add_subdirectory(editor)
-endif()
-
-# ---- Executables ----
-if(LUCID_BUILD_GAME)
-    add_subdirectory(game)
-endif()
-
-if(LUCID_BUILD_EDITOR)
-    add_subdirectory(editor_main)
-endif()
+# ---- Applications ----
+#
+# apps/ holds every executable target and the libraries that exist
+# only to serve them (the editor library, for instance). The
+# LUCID_BUILD_* flags gate applications, not folders; apps/CMakeLists.txt
+# reads the flags and adds the corresponding subdirectories.
+add_subdirectory(apps)
 
 # ---- Tests ----
 if(LUCID_BUILD_TESTS)
