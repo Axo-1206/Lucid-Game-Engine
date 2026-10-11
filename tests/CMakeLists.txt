@@ -24,6 +24,7 @@ add_executable(lucid_tests
     ecs/test_world.cpp
 
     graph/test_graph_runtime.cpp
+    package/test_package_manager.cpp
 )
 
 target_link_libraries(lucid_tests

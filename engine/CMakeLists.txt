@@ -23,9 +23,16 @@ add_library(luc_engine STATIC
     src/systems/render_system.cpp
 
     src/nodes/node_registry.cpp
+    src/nodes/node_runtime.cpp
 
     src/graph/node_dispatch.cpp
     src/graph/graph_runtime.cpp
+    
+    src/package/package_builder.cpp
+    src/package/package_manager.cpp
+    src/package/core_package.cpp
+    src/package/logic_package.cpp
+    src/package/default_manager.cpp
 )
 
 target_include_directories(luc_engine

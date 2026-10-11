@@ -2,38 +2,33 @@
 
 #include "sema/Registry.hpp"
 
+#include <cstdint>
+
 namespace engine
 {
 
-    // The engine's node vocabulary, in the shape the format library expects.
+    // The engine's node registry, produced by the process-lifetime
+    // PackageManager (see default_manager.h).
     //
-    // This function returns a reference to a process-lifetime, immutable
-    // lucid::sema::Registry. It is built once, on first call, from static
-    // const arrays. The reference is valid for the rest of the process.
+    // Constructed once, on first call, from CorePackage and
+    // LogicPackage. Returns a reference valid for the process's
+    // lifetime.
     //
-    // The format library reads this registry:
-    //   - at compile time, via lucid::sema::compile(), to check every
-    //     node type, every argument, every kind-based rule.
-    //   - at load time, via lucid::serialization::deserialize(), to
-    //     verify the fingerprint of a .lucgraph file.
+    // This function is the compatibility shim for existing call sites.
+    // New code uses a PackageManager directly, so that custom packages
+    // can be added.
     //
-    // The engine does not store this registry in engine::ecs::World. World
-    // is the live table store; the registry is metadata about node
-    // vocabulary. They are unrelated. See docs/Decision.md.
-    //
-    // Content of the registry:
-    //   - 3 phases: update, physics, render
-    //   - 1 enum: Key, with members W=0, A=1, S=2, D=3
-    //   - 1 handle: BodyRef
-    //   - 4 node types:
-    //       Engine_Float32Node(value: float32) -> float32   (Value, Math)
-    //       Engine_Int32Node  (value: int32)   -> int32     (Value, Math)
-    //       Engine_EveryFrame ()                            (Trigger, Flow)
-    //       Engine_PrintNode  (value: float32)              (Action, Debug, update)
+    // Node types registered (in this order):
+    //   0: Engine_Float32Node    (engine.core)
+    //   1: Engine_Int32Node      (engine.core)
+    //   2: Engine_EveryFrame     (engine.core)
+    //   3: Engine_PrintNode      (engine.core)
+    //   4: Engine_BoolNode       (engine.logic)
+    //   5: Engine_LessThanNode   (engine.logic)
+    //   6: Engine_IfNode         (engine.logic)
     //
     // Append-only. The index of a node type in nodeTypes is its NodeId
-    // in every .lucgraph. Reordering renumbers existing files and breaks
-    // the engine's node_runtime_info() table.
+    // in every .lucgraph.
     const lucid::sema::Registry &node_registry();
 
 } // namespace engine
