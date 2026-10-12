@@ -19,7 +19,7 @@ add_executable(lucid_tests
     engine/test_systems.cpp
     engine/test_diagnostic_log.cpp
 
-    nodes/test_node_registry.cpp
+    nodes/test_default_registry.cpp
 
     ecs/test_world.cpp
 

@@ -29,6 +29,6 @@ namespace engine
     //
     // Append-only. The index of a node type in nodeTypes is its NodeId
     // in every .lucgraph.
-    const lucid::sema::Registry &node_registry();
+    const lucid::sema::Registry &default_registry();
 
 } // namespace engine

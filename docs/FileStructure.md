@@ -75,7 +75,7 @@ engine/
 │   │   ├── graph_runtime.h
 │   │   └── tick_context.h
 │   ├── nodes/
-│   │   ├── node_registry.h
+│   │   ├── default_registry.h
 │   │   └── node_runtime.h
 │   ├── package/
 │   │   ├── core_package.h
@@ -110,7 +110,7 @@ engine/
 │   ├── graph/
 │   │   └── graph_runtime.cpp
 │   ├── nodes/
-│   │   ├── node_registry.cpp
+│   │   ├── default_registry.cpp
 │   │   └── node_runtime.cpp
 │   ├── package/
 │   │   ├── core_package.cpp
@@ -202,7 +202,7 @@ tests/
 ├── graph/
 │   └── test_graph_runtime.cpp
 ├── nodes/
-│   └── test_node_registry.cpp
+│   └── test_default_registry.cpp
 ├── package/
 │   └── test_package_manager.cpp
 └── CMakeLists.txt

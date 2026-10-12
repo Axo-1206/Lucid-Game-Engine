@@ -22,7 +22,7 @@ add_library(luc_engine STATIC
     src/systems/movement_system.cpp
     src/systems/render_system.cpp
 
-    src/nodes/node_registry.cpp
+    src/nodes/default_registry.cpp
     src/nodes/node_runtime.cpp
     src/graph/graph_runtime.cpp
     

@@ -7,7 +7,7 @@ namespace engine
 
     // The process-lifetime PackageManager that holds the engine's
     // built-in packages (CorePackage, LogicPackage). Used by
-    // node_registry() and node_runtime_info() to answer queries from
+    // default_registry() and node_runtime_info() to answer queries from
     // code that predates PackageManager.
     //
     // New code should construct its own PackageManager and pass it to

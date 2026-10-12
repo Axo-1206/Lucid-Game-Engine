@@ -1,4 +1,4 @@
-#include "engine/nodes/node_registry.h"
+#include "engine/nodes/default_registry.h"
 #include "engine/package/default_manager.h"
 #include "engine/core/log.h"
 
@@ -21,7 +21,7 @@ namespace engine
                 {
                     for (const auto &c : default_package_manager().conflicts())
                     {
-                        engine::log_error("node_registry: %s", c.c_str());
+                        engine::log_error("default_registry: %s", c.c_str());
                     }
                     return false;
                 }
@@ -32,7 +32,7 @@ namespace engine
 
     } // namespace
 
-    const lucid::sema::Registry &node_registry()
+    const lucid::sema::Registry &default_registry()
     {
         ensure_default_applied();
         return default_package_manager().registry();

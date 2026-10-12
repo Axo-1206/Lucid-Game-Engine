@@ -1,15 +1,15 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "engine/nodes/node_registry.h"
+#include "engine/nodes/default_registry.h"
 #include "engine/nodes/node_runtime.h"
 
 #include "sema/Sema.hpp"
 
 using namespace engine;
 
-TEST_CASE("node_registry: shape", "[nodes][registry]")
+TEST_CASE("default_registry: shape", "[nodes][registry]")
 {
-    const auto &reg = node_registry();
+    const auto &reg = default_registry();
 
     REQUIRE(reg.phases.size() == 3);
     REQUIRE(reg.enums.size() == 1);
@@ -29,9 +29,9 @@ TEST_CASE("node_registry: shape", "[nodes][registry]")
     REQUIRE(reg.nodeTypes[6].name == "Engine_IfNode");
 }
 
-TEST_CASE("node_registry: node kinds", "[nodes][registry]")
+TEST_CASE("default_registry: node kinds", "[nodes][registry]")
 {
-    const auto &reg = node_registry();
+    const auto &reg = default_registry();
 
     using lucid::sema::NodeKind;
 
@@ -57,9 +57,9 @@ TEST_CASE("node_registry: node kinds", "[nodes][registry]")
     REQUIRE(reg.nodeTypes[6].kind == NodeKind::Trigger);
 }
 
-TEST_CASE("node_registry: runtime info parallels nodeTypes", "[nodes][registry]")
+TEST_CASE("default_registry: runtime info parallels nodeTypes", "[nodes][registry]")
 {
-    REQUIRE(node_runtime_info_count() == node_registry().nodeTypes.size());
+    REQUIRE(node_runtime_info_count() == default_registry().nodeTypes.size());
 
     REQUIRE(node_runtime_info(0).mode == TriggerMode::NotATrigger); // Engine_Float32Node
     REQUIRE(node_runtime_info(1).mode == TriggerMode::NotATrigger); // Engine_Int32Node
@@ -70,14 +70,14 @@ TEST_CASE("node_registry: runtime info parallels nodeTypes", "[nodes][registry]"
     REQUIRE(node_runtime_info(6).mode == TriggerMode::Gating);      // Engine_IfNode
 }
 
-TEST_CASE("node_registry: compile a trivial file", "[nodes][compile]")
+TEST_CASE("default_registry: compile a trivial file", "[nodes][compile]")
 {
     const char *source =
         "node v = Engine_Float32Node(1.0)\n"
         "node frame = Engine_EveryFrame()\n"
         "node p = Engine_PrintNode(v) on frame\n";
 
-    auto result = lucid::sema::compile(source, "smoke.lucid", node_registry());
+    auto result = lucid::sema::compile(source, "smoke.lucid", default_registry());
 
     if (!result.ok)
     {
@@ -90,7 +90,7 @@ TEST_CASE("node_registry: compile a trivial file", "[nodes][compile]")
     REQUIRE(result.graph != nullptr);
 }
 
-TEST_CASE("node_registry: compile a gated file", "[nodes][compile]")
+TEST_CASE("default_registry: compile a gated file", "[nodes][compile]")
 {
     const char *source =
         "node frame = Engine_EveryFrame()\n"
@@ -98,7 +98,7 @@ TEST_CASE("node_registry: compile a gated file", "[nodes][compile]")
         "node gate = Engine_IfNode(cond) on frame\n"
         "node p = Engine_PrintNode(1.0) on gate\n";
 
-    auto result = lucid::sema::compile(source, "gate.lucid", node_registry());
+    auto result = lucid::sema::compile(source, "gate.lucid", default_registry());
     if (!result.ok)
     {
         for (const auto &d : result.diagnostics)
