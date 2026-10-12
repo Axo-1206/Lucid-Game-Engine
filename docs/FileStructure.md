@@ -263,6 +263,7 @@ docs/
 ├── FileStructure.md     this file
 ├── notes/
 │   ├── PackageNaming.md defines how the engine names its content
+│   ├── RenderPasses.md
 │   ├── TriggerModel.md  how a Lucid graph expresses control flow
 │   └── SceneFormat.md   the .lscene format spec and evolution rules
 ├── implementationPlans/
