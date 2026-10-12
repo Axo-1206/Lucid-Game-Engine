@@ -67,9 +67,23 @@ engine/
 ├── include/engine/
 │   ├── core/
 │   │   ├── clock.h
+│   │   ├── diagnostic_log.h
 │   │   ├── linear_allocator.h
 │   │   ├── log.h
 │   │   └── system_context.h
+│   ├── graph/
+│   │   ├── graph_runtime.h
+│   │   └── node_dispatch.h
+│   ├── nodes/
+│   │   ├── node_registry.h
+│   │   └── node_runtime.h
+│   ├── package/
+│   │   ├── core_package.h
+│   │   ├── default_manager.h
+│   │   ├── logic_package.h
+│   │   ├── package_builder.h
+│   │   ├── package_manager.h
+│   │   └── package.h
 │   ├── platform/
 │   │   ├── input.h
 │   │   └── window.h
@@ -85,16 +99,26 @@ engine/
 │   │   ├── entity.h
 │   │   ├── scene.h
 │   │   └── scene_schema.h
-│   ├── systems/
-│   │   └── systems.h
-│   └── nodes/
-│       ├── node_registry.h
-│       └── node_runtime.h
+│   └── systems/
+│       └── systems.h
 ├── src/
 │   ├── core/
 │   │   ├── clock.cpp
+│   │   ├── diagnostic_log.cpp
 │   │   ├── linear_allocator.cpp
 │   │   └── log.cpp
+│   ├── graph/
+│   │   ├── graph_runtime.cpp
+│   │   └── node_dispatch.cpp
+│   ├── nodes/
+│   │   ├── node_registry.cpp
+│   │   └── node_runtime.cpp
+│   ├── package/
+│   │   ├── core_package.cpp
+│   │   ├── default_package.cpp
+│   │   ├── logic_package.cpp
+│   │   ├── package_builder.cpp
+│   │   └── package_manager.cpp
 │   ├── platform/
 │   │   ├── input_glfw.h      (private header)
 │   │   ├── input_glfw.cpp
@@ -114,12 +138,10 @@ engine/
 │   │   ├── scene.cpp
 │   │   ├── scene_loader.cpp
 │   │   └── scene_saver.cpp
-│   ├── systems/
-│   │   ├── hierarchy_system.cpp
-│   │   ├── movement_system.cpp
-│   │   └── render_system.cpp
-│   └── nodes/
-│       └── node_registry.cpp
+│   └── systems/
+│       ├── hierarchy_system.cpp
+│       ├── movement_system.cpp
+│       └── render_system.cpp
 └── CMakeLists.txt       target: luc_engine, alias lucid::engine
 ```
 
@@ -178,8 +200,12 @@ tests/
 │   ├── test_log.cpp
 │   ├── test_scene.cpp
 │   └── test_systems.cpp
+├── graph/
+│   └── test_graph_runtime.cpp
 ├── nodes/
 │   └── test_node_registry.cpp
+├── package/
+│   └── test_package_manager.cpp
 └── CMakeLists.txt
 ```
 
