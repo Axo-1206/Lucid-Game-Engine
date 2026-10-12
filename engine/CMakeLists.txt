@@ -24,8 +24,6 @@ add_library(luc_engine STATIC
 
     src/nodes/node_registry.cpp
     src/nodes/node_runtime.cpp
-
-    src/graph/node_dispatch.cpp
     src/graph/graph_runtime.cpp
     
     src/package/package_builder.cpp

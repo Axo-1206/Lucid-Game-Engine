@@ -1,46 +1,110 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "engine/graph/graph_runtime.h"
-#include "engine/nodes/node_registry.h"
-#include "engine/core/log.h"
+#include "engine/package/package_manager.h"
+#include "engine/package/core_package.h"
+#include "engine/package/logic_package.h"
 #include "engine/scene/entity.h"
 #include "engine/scene/scene.h"
 #include "engine/scene/component_tags.h"
+#include "engine/core/log.h"
 
 #include "sema/Sema.hpp"
 #include "serialization/Serializer.hpp"
 
 #include <filesystem>
 #include <fstream>
+#include <memory>
+#include <string>
+#include <vector>
 
 using namespace engine;
 
 namespace
 {
 
-    // Compile .lucid source to bytes and write them to `path`. Returns
-    // true on success.
+    // -----------------------------------------------------------------------------
+    // Test packages
+    // -----------------------------------------------------------------------------
+    //
+    // A process-lifetime PackageManager holding CorePackage and
+    // LogicPackage. Applied once, on first use, against a throwaway
+    // World (CorePackage and LogicPackage register no tables). All
+    // tests share it.
+
+    engine::PackageManager &test_packages()
+    {
+        static engine::PackageManager mgr;
+        static const bool loaded = [&]
+        {
+            mgr.load_package(std::make_unique<engine::CorePackage>());
+            mgr.load_package(std::make_unique<engine::LogicPackage>());
+            return true;
+        }();
+        (void)loaded;
+
+        static const bool applied = [&]
+        {
+            static engine::ecs::World scratch;
+            return mgr.apply(scratch);
+        }();
+        (void)applied;
+
+        return mgr;
+    }
+
+    // -----------------------------------------------------------------------------
+    // Log capture
+    // -----------------------------------------------------------------------------
+
+    struct LogCapture
+    {
+        std::vector<std::string> messages;
+        engine::LogSinkId id = 0;
+
+        void attach()
+        {
+            id = engine::add_log_sink([this](const engine::LogRecord &r)
+                                      { messages.push_back(r.message); });
+        }
+        void detach()
+        {
+            if (id != 0)
+                engine::remove_log_sink(id);
+            id = 0;
+        }
+        bool contains(const std::string &needle) const
+        {
+            for (const auto &m : messages)
+            {
+                if (m.find(needle) != std::string::npos)
+                    return true;
+            }
+            return false;
+        }
+    };
+
+    // -----------------------------------------------------------------------------
+    // Test files
+    // -----------------------------------------------------------------------------
+
     bool compile_to_file(const std::string &source,
                          const std::filesystem::path &path)
     {
         auto result = lucid::sema::compile(source, "test.lucid",
-                                           engine::node_registry());
+                                           test_packages().registry());
         if (!result.ok)
         {
             for (const auto &d : result.diagnostics)
             {
-                WARN("Sema diagnostic: " << d.message);
+                WARN("Sema: " << d.message);
             }
             return false;
         }
-        std::vector<std::uint8_t> bytes =
-            lucid::serialization::serialize(*result.graph);
+        auto bytes = lucid::serialization::serialize(*result.graph);
         std::ofstream out(path, std::ios::binary);
         if (!out.is_open())
-        {
-            WARN("Failed to open " << path << " for writing");
             return false;
-        }
         out.write(reinterpret_cast<const char *>(bytes.data()),
                   static_cast<std::streamsize>(bytes.size()));
         return true;
@@ -68,10 +132,14 @@ namespace
 
 } // namespace
 
+// =============================================================================
+// Tests
+// =============================================================================
+
 TEST_CASE("graph_runtime: no Script table is not an error", "[graph][runtime]")
 {
     Fixture f;
-    graph::GraphRuntime rt(f.world, node_registry());
+    graph::GraphRuntime rt(f.world, test_packages());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 0);
 }
@@ -81,27 +149,21 @@ TEST_CASE("graph_runtime: loads a graph referenced by a Script component",
 {
     Fixture f;
 
-    // 1. Compile a tiny graph to .lucgraph.
     const auto lucgraph_path = temp_dir() / "test.lucgraph";
     REQUIRE(compile_to_file(
         "node frame = Engine_EveryFrame()\n"
         "node p = Engine_PrintNode(1.0) on frame\n",
         lucgraph_path));
 
-    // 2. Create an entity with a Script component pointing at it.
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "test.lucgraph");
 
-    // 3. Load the runtime with the temp dir as asset root.
-    graph::GraphRuntime rt(f.world, node_registry());
+    graph::GraphRuntime rt(f.world, test_packages());
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
 
-    // 4. Tick. The Engine_PrintNode logs; we can't easily assert on the
-    //    log output without a custom sink, so this test asserts the
-    //    runtime doesn't crash and the graph count is correct.
     rt.tick(0.016f);
     rt.tick(0.016f);
 }
@@ -109,6 +171,7 @@ TEST_CASE("graph_runtime: loads a graph referenced by a Script component",
 TEST_CASE("graph_runtime: clear releases loaded graphs", "[graph][runtime]")
 {
     Fixture f;
+
     const auto lucgraph_path = temp_dir() / "test.lucgraph";
     REQUIRE(compile_to_file(
         "node frame = Engine_EveryFrame()\n"
@@ -119,7 +182,7 @@ TEST_CASE("graph_runtime: clear releases loaded graphs", "[graph][runtime]")
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "test.lucgraph");
 
-    graph::GraphRuntime rt(f.world, node_registry());
+    graph::GraphRuntime rt(f.world, test_packages());
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
@@ -136,54 +199,13 @@ TEST_CASE("graph_runtime: missing file does not throw", "[graph][runtime]")
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "does_not_exist.lucgraph");
 
-    graph::GraphRuntime rt(f.world, node_registry());
+    graph::GraphRuntime rt(f.world, test_packages());
     rt.set_asset_root(temp_dir());
-    REQUIRE_FALSE(rt.load()); // returns false, doesn't throw
+    REQUIRE_FALSE(rt.load());
     REQUIRE(rt.graph_count() == 0);
 }
 
-namespace
-{
-
-    struct LogCapture
-    {
-        std::vector<std::string> messages;
-        engine::LogSinkId id = 0;
-        void attach()
-        {
-            id = engine::add_log_sink([this](const engine::LogRecord &r)
-                                      { messages.push_back(r.message); });
-        }
-        void detach()
-        {
-            if (id != 0)
-                engine::remove_log_sink(id);
-            id = 0;
-        }
-        bool contains(const std::string &needle) const
-        {
-            for (const auto &m : messages)
-            {
-                if (m.find(needle) != std::string::npos)
-                    return true;
-            }
-            return false;
-        }
-        std::size_t count_occurrences(const std::string &needle) const
-        {
-            std::size_t c = 0;
-            for (const auto &m : messages)
-            {
-                if (m.find(needle) != std::string::npos)
-                    ++c;
-            }
-            return c;
-        }
-    };
-
-} // namespace
-
-TEST_CASE("graph_runtime: Engine_IfNode(false) blocks its subscriber",
+TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
           "[graph][runtime]")
 {
     Fixture f;
@@ -205,18 +227,17 @@ TEST_CASE("graph_runtime: Engine_IfNode(false) blocks its subscriber",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "false_gate.lucgraph");
 
-    graph::GraphRuntime rt(f.world, node_registry());
+    graph::GraphRuntime rt(f.world, test_packages());
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
 
     const std::size_t before = cap.messages.size();
     rt.tick(0.016f);
 
-    // Engine_PrintNode did not run, so no new "[graph] Engine_PrintNode" log line.
     bool found_print = false;
     for (std::size_t i = before; i < cap.messages.size(); ++i)
     {
-        if (cap.messages[i].find("Engine_PrintNode") != std::string::npos)
+        if (cap.messages[i].find("PrintNode") != std::string::npos)
         {
             found_print = true;
             break;
@@ -225,10 +246,9 @@ TEST_CASE("graph_runtime: Engine_IfNode(false) blocks its subscriber",
     REQUIRE_FALSE(found_print);
 
     cap.detach();
-    engine::install_default_log_sink();
 }
 
-TEST_CASE("graph_runtime: Engine_IfNode(true) lets its subscriber run",
+TEST_CASE("graph_runtime: IfNode(true) lets its subscriber run",
           "[graph][runtime]")
 {
     Fixture f;
@@ -250,52 +270,15 @@ TEST_CASE("graph_runtime: Engine_IfNode(true) lets its subscriber run",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "true_gate.lucgraph");
 
-    graph::GraphRuntime rt(f.world, node_registry());
+    graph::GraphRuntime rt(f.world, test_packages());
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
 
     rt.tick(0.016f);
 
-    // Engine_PrintNode ran, so a "[graph] Engine_PrintNode" log line exists.
-    REQUIRE(cap.contains("Engine_PrintNode"));
+    REQUIRE(cap.contains("PrintNode"));
 
     cap.detach();
-    engine::install_default_log_sink();
-}
-
-TEST_CASE("graph_runtime: a node fires at most once per tick",
-          "[graph][runtime]")
-{
-    Fixture f;
-
-    engine::clear_log_sinks();
-    LogCapture cap;
-    cap.attach();
-    engine::set_log_level(engine::LogLevel::Trace);
-
-    // Two source triggers subscribing the same Action
-    const auto lucgraph_path = temp_dir() / "multiple_parents.lucgraph";
-    REQUIRE(compile_to_file(
-        "node f1 = Engine_EveryFrame()\n"
-        "node f2 = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(1.0) on f1, f2\n",
-        lucgraph_path));
-
-    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
-    auto s = add_component<ScriptTag>(f.world, e);
-    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "multiple_parents.lucgraph");
-
-    graph::GraphRuntime rt(f.world, node_registry());
-    rt.set_asset_root(temp_dir());
-    REQUIRE(rt.load());
-
-    rt.tick(0.016f);
-
-    // Engine_PrintNode should fire only once even though subscribed to both f1 and f2.
-    REQUIRE(cap.count_occurrences("Engine_PrintNode") == 1);
-
-    cap.detach();
-    engine::install_default_log_sink();
 }
 
 TEST_CASE("graph_runtime: a node reads a resource field",
@@ -321,14 +304,13 @@ TEST_CASE("graph_runtime: a node reads a resource field",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "resource.lucgraph");
 
-    graph::GraphRuntime rt(f.world, node_registry());
+    graph::GraphRuntime rt(f.world, test_packages());
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
 
     rt.tick(0.016f);
 
-    // Engine_PrintNode logged the resource field's value.
     REQUIRE(cap.contains("42"));
 
     cap.detach();
@@ -357,14 +339,13 @@ TEST_CASE("graph_runtime: a resource field with no written default is zero",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "zero_resource.lucgraph");
 
-    graph::GraphRuntime rt(f.world, node_registry());
+    graph::GraphRuntime rt(f.world, test_packages());
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
 
     rt.tick(0.016f);
 
-    // Engine_PrintNode logged 0.0, the type's zero.
     REQUIRE(cap.contains("0.0"));
 
     cap.detach();

@@ -2,6 +2,7 @@
 
 #include "engine/ecs/cell_value.h"
 #include "engine/ecs/world.h"
+#include "engine/package/package_manager.h"
 #include "sema/Graph.hpp"
 #include "sema/Registry.hpp"
 
@@ -12,8 +13,6 @@
 namespace engine::graph
 {
 
-    // A compiled graph loaded from a .lucgraph file, plus the
-    // per-tick scratch its executors use.
     struct LoadedGraph
     {
         // Where the graph came from, for diagnostics.
@@ -41,49 +40,41 @@ namespace engine::graph
     // The graph runtime: loads .lucgraph files referenced by the
     // world's Script table, and ticks them against the world.
     //
-    // Lifetime:
-    //   - Construct after the world has core tables.
-    //   - Call load() after the scene has been applied to the world.
-    //     load() reads the world's Script table.
-    //   - Call tick(dt) once per frame, before the systems.
-    //   - Call clear() before destroying the world.
+    // The runtime reads its node vocabulary from a PackageManager. The
+    // manager provides:
+    //   - registry()        the merged lucid::sema::Registry, for
+    //                       deserializing .lucgraph files.
+    //   - node_executors()  one executor per node type, indexed by
+    //                       NodeId.
+    //   - trigger_modes()   one TriggerMode per node type, indexed by
+    //                       NodeId.
     //
-    // GraphRuntime does not own the world; it holds a reference.
-    // GraphRuntime does not own the registry; node_registry() returns
-    // a process-lifetime reference.
+    // The manager must have been applied (PackageManager::apply()) and
+    // must outlive the GraphRuntime. The runtime holds a reference.
     class GraphRuntime
     {
     public:
         GraphRuntime(engine::ecs::World &world,
-                     const lucid::sema::Registry &registry);
+                     const engine::PackageManager &manager);
 
         GraphRuntime(const GraphRuntime &) = delete;
         GraphRuntime &operator=(const GraphRuntime &) = delete;
         GraphRuntime(GraphRuntime &&) noexcept = default;
         GraphRuntime &operator=(GraphRuntime &&) noexcept = default;
 
-        // Walk the world's Script table and load each referenced
-        // .lucgraph file. Returns false if any load failed; a failed
-        // graph is skipped and the others are loaded. Logs each error.
         bool load();
-
-        // Tick every loaded graph.
         void tick(float dt);
-
-        // Release all loaded graphs and their scratch.
         void clear();
 
         std::size_t graph_count() const { return graphs_.size(); }
         const std::vector<LoadedGraph> &graphs() const { return graphs_; }
 
-        // The asset root used to resolve Script.graph paths. Defaults
-        // to the process's current working directory. Set before load().
         void set_asset_root(const std::filesystem::path &root);
         const std::filesystem::path &asset_root() const { return asset_root_; }
 
     private:
         engine::ecs::World &world_;
-        const lucid::sema::Registry &registry_;
+        const engine::PackageManager &manager_;
         std::filesystem::path asset_root_;
         std::vector<LoadedGraph> graphs_;
     };

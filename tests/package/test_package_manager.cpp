@@ -89,3 +89,16 @@ TEST_CASE("package_manager: duplicate package name is refused",
     REQUIRE_FALSE(mgr.load_package(std::make_unique<CorePackage>()));
     REQUIRE(mgr.has_conflicts());
 }
+
+TEST_CASE("package_manager: executors are parallel to node types",
+          "[package]")
+{
+    engine::ecs::World world;
+    PackageManager mgr;
+    REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
+    REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
+    REQUIRE(mgr.apply(world));
+
+    REQUIRE(mgr.node_executors().size() == mgr.registry().nodeTypes.size());
+    REQUIRE(mgr.trigger_modes().size() == mgr.registry().nodeTypes.size());
+}

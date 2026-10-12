@@ -8,8 +8,11 @@
 #include "engine/core/system_context.h"
 #include "engine/systems/systems.h"
 #include "engine/graph/graph_runtime.h"
-#include "engine/nodes/node_registry.h"
+#include "engine/package/package_manager.h"
+#include "engine/package/core_package.h"
+#include "engine/package/logic_package.h"
 
+#include <filesystem>
 #include <memory>
 
 int main()
@@ -36,6 +39,17 @@ int main()
     engine::ecs::World world;
     engine::setup_core_tables(world);
 
+    // Build the package manager. A real game would also load
+    // game-specific packages here.
+    engine::PackageManager packages;
+    packages.load_package(std::make_unique<engine::CorePackage>());
+    packages.load_package(std::make_unique<engine::LogicPackage>());
+    if (!packages.apply(world))
+    {
+        engine::log_error("Failed to apply packages");
+        return 1;
+    }
+
     engine::Scene scene(world);
     if (!scene.load_from_file("assets/scenes/demo.lscene"))
     {
@@ -43,10 +57,7 @@ int main()
         return 1;
     }
 
-    // The graph runtime loads the .lucgraph files referenced by
-    // the scene's Script components. It must run after the scene
-    // load, because it reads the Script table the scene populates.
-    engine::graph::GraphRuntime runtime(world, engine::node_registry());
+    engine::graph::GraphRuntime runtime(world, packages);
     runtime.set_asset_root(std::filesystem::current_path());
     if (!runtime.load())
     {
@@ -79,8 +90,7 @@ int main()
         input->state().begin_frame();
         input->poll();
 
-        const auto &in = input->state();
-        if (in.key_pressed(engine::Key::Escape))
+        if (input->state().key_pressed(engine::Key::Escape))
         {
             window.request_close();
         }
@@ -90,9 +100,6 @@ int main()
         engine::hierarchy_system(ctx, dt);
         engine::movement_system(ctx, dt);
         engine::hierarchy_system(ctx, dt);
-
-        engine::physics_sync_system(ctx, dt);
-        engine::collision_system(ctx, dt);
 
         renderer->begin_frame(cam_data.clear_color);
         engine::render_system(ctx, dt);

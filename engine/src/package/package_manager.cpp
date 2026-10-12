@@ -1,5 +1,5 @@
 #include "engine/package/package_manager.h"
-#include "engine/graph/node_dispatch.h"
+#include "engine/graph/tick_context.h"
 #include "engine/core/log.h"
 
 #include <cassert>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/ecs/world.h"
-#include "engine/graph/node_dispatch.h"
+#include "engine/graph/tick_context.h"
 #include "engine/nodes/node_runtime.h"
 #include "sema/Registry.hpp"
 
