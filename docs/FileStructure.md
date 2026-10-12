@@ -69,8 +69,7 @@ engine/
 │   │   ├── clock.h
 │   │   ├── format_diagnostics.h
 │   │   ├── linear_allocator.h
-│   │   ├── log.h
-│   │   └── system_context.h
+│   │   └── log.h
 │   ├── graph/
 │   │   ├── graph_runtime.h
 │   │   └── tick_context.h
@@ -98,6 +97,7 @@ engine/
 │   │   ├── scene.h
 │   │   └── scene_schema.h
 │   └── systems/
+│   │   ├── system_context.h
 │       └── systems.h
 ├── src/
 │   ├── core/

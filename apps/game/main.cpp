@@ -5,7 +5,7 @@
 #include "engine/platform/input.h"
 #include "engine/scene/entity.h"
 #include "engine/scene/scene.h"
-#include "engine/core/system_context.h"
+#include "engine/systems/system_context.h"
 #include "engine/systems/systems.h"
 #include "engine/graph/graph_runtime.h"
 #include "engine/package/package_manager.h"

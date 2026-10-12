@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/core/system_context.h"
+#include "engine/systems/system_context.h"
 
 namespace engine
 {
