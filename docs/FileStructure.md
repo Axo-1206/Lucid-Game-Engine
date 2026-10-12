@@ -67,7 +67,7 @@ engine/
 ├── include/engine/
 │   ├── core/
 │   │   ├── clock.h
-│   │   ├── diagnostic_log.h
+│   │   ├── format_diagnostics.h
 │   │   ├── linear_allocator.h
 │   │   ├── log.h
 │   │   └── system_context.h
@@ -75,8 +75,7 @@ engine/
 │   │   ├── graph_runtime.h
 │   │   └── tick_context.h
 │   ├── nodes/
-│   │   ├── default_registry.h
-│   │   └── node_runtime.h
+│   │   └── default_registry.h
 │   ├── package/
 │   │   ├── core_package.h
 │   │   ├── default_manager.h
@@ -104,14 +103,13 @@ engine/
 ├── src/
 │   ├── core/
 │   │   ├── clock.cpp
-│   │   ├── diagnostic_log.cpp
+│   │   ├── format_diagnostics.cpp
 │   │   ├── linear_allocator.cpp
 │   │   └── log.cpp
 │   ├── graph/
 │   │   └── graph_runtime.cpp
 │   ├── nodes/
-│   │   ├── default_registry.cpp
-│   │   └── node_runtime.cpp
+│   │   └── default_registry.cpp
 │   ├── package/
 │   │   ├── core_package.cpp
 │   │   ├── default_package.cpp

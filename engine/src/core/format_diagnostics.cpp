@@ -1,4 +1,4 @@
-#include "engine/core/diagnostic_log.h"
+#include "engine/core/format_diagnostics.h"
 #include "engine/core/log.h"
 
 #include <string>

@@ -1,6 +1,6 @@
 #include "engine/graph/graph_runtime.h"
 #include "engine/graph/tick_context.h" // TickContext, NodeExecutor
-#include "engine/core/diagnostic_log.h"
+#include "engine/core/format_diagnostics.h"
 #include "engine/core/log.h"
 #include "engine/scene/component_tags.h"
 

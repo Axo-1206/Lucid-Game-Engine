@@ -2,7 +2,7 @@ add_library(luc_engine STATIC
     src/core/log.cpp
     src/core/clock.cpp
     src/core/linear_allocator.cpp
-    src/core/diagnostic_log.cpp
+    src/core/format_diagnostics.cpp
 
     src/platform/input_state.cpp
     src/platform/input_glfw.cpp

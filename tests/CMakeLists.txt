@@ -17,7 +17,7 @@ add_executable(lucid_tests
     engine/test_entity.cpp
     engine/test_scene.cpp
     engine/test_systems.cpp
-    engine/test_diagnostic_log.cpp
+    engine/test_format_diagnostics.cpp
 
     nodes/test_default_registry.cpp
 
