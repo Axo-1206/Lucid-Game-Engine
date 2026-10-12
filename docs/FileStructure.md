@@ -73,7 +73,7 @@ engine/
 │   │   └── system_context.h
 │   ├── graph/
 │   │   ├── graph_runtime.h
-│   │   └── node_dispatch.h
+│   │   └── tick_context.h
 │   ├── nodes/
 │   │   ├── node_registry.h
 │   │   └── node_runtime.h
@@ -108,8 +108,7 @@ engine/
 │   │   ├── linear_allocator.cpp
 │   │   └── log.cpp
 │   ├── graph/
-│   │   ├── graph_runtime.cpp
-│   │   └── node_dispatch.cpp
+│   │   └── graph_runtime.cpp
 │   ├── nodes/
 │   │   ├── node_registry.cpp
 │   │   └── node_runtime.cpp
