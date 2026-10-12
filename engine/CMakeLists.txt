@@ -6,6 +6,8 @@ add_library(luc_engine STATIC
     
     src/graph/graph_runtime.cpp
 
+    src/physics/backend_box2d/backend_box2d.cpp
+
     src/platform/input_state.cpp
     src/platform/input_glfw.cpp
     src/platform/window_glfw.cpp
@@ -46,6 +48,7 @@ target_link_libraries(luc_engine
         lucid_sema
         lucid_serialization
     PRIVATE
+        lucid::box2d
         lucid::glfw
         lucid::glm
         lucid::glad
