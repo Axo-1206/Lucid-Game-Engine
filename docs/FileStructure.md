@@ -78,7 +78,6 @@ engine/
 │   │   └── default_registry.h
 │   ├── package/
 │   │   ├── core_package.h
-│   │   ├── default_manager.h
 │   │   ├── logic_package.h
 │   │   ├── package_builder.h
 │   │   ├── package_manager.h

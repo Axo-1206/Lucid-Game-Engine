@@ -29,7 +29,6 @@ add_library(luc_engine STATIC
     src/package/package_manager.cpp
     src/package/core_package.cpp
     src/package/logic_package.cpp
-    src/package/default_manager.cpp
 )
 
 target_include_directories(luc_engine
