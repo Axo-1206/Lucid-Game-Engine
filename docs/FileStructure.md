@@ -90,7 +90,11 @@ engine/
 │   │   ├── render_list.h
 │   │   ├── render_types.h
 │   │   ├── renderer.h
-│   │   └── texture.h
+│   │   ├── texture.h
+│   │   └── backend_gl.h
+│   │     ├── renderer_gl.h
+│   │     ├── shader_gl.h
+│   │     └── sprite_batch_gl.h
 │   ├── scene/
 │   │   ├── component_tags.h
 │   │   ├── entity.h
@@ -120,14 +124,11 @@ engine/
     │       ├── core_package.cpp
     │       └── logic_package.cpp
     ├── render/
-    │   ├── backend_gl/
-    │   │   ├── renderer_gl.cpp
-    │   │   ├── renderer_gl.h
-    │   │   ├── shader_gl.cpp
-    │   │   ├── shader_gl.h
-    │   │   ├── sprite_batch_gl.cpp
-    │   │   └── sprite_batch_gl.h
-    │   └── render_list.cpp
+    │   ├── render_list.cpp
+    │   └── backend_gl/
+    │       ├── renderer_gl.cpp
+    │       ├── shader_gl.cpp
+    │       └── sprite_batch_gl.cpp
     ├── scene/
     │   ├── entity.cpp
     │   ├── scene.cpp
