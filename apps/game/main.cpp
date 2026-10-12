@@ -11,6 +11,7 @@
 #include "engine/registry/package_manager.h"
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
+#include "engine/services.h"
 
 #include <filesystem>
 #include <memory>
@@ -54,7 +55,10 @@ int main()
         return 1;
     }
 
-    engine::graph::GraphRuntime runtime(world, packages);
+    // Services. No physics backend in Step 6a.
+    engine::Services services;
+
+    engine::graph::GraphRuntime runtime(world, packages, services);
     runtime.set_asset_root(std::filesystem::current_path());
     if (!runtime.load())
     {
@@ -77,9 +81,9 @@ int main()
         *input,
         clock,
         render_list,
+        services, // new field
     };
 
-    // Track the window size so we can reset the viewport on resize.
     int last_w = window.width();
     int last_h = window.height();
 
@@ -96,7 +100,6 @@ int main()
             window.request_close();
         }
 
-        // Reset the viewport if the window resized.
         if (window.width() != last_w || window.height() != last_h)
         {
             last_w = window.width();
@@ -112,11 +115,10 @@ int main()
         engine::hierarchy_system(ctx, dt);
         engine::movement_system(ctx, dt);
         engine::hierarchy_system(ctx, dt);
-        engine::render_system(ctx, dt); // fills and submits inside
+        engine::render_system(ctx, dt);
         renderer->end_world_2d();
 
         renderer->begin_ui();
-        // No UI yet. This is where a HUD would draw.
         renderer->end_ui();
 
         renderer->end_frame();

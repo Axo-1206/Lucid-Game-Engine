@@ -15,8 +15,9 @@ namespace engine::graph
 {
 
     GraphRuntime::GraphRuntime(engine::ecs::World &world,
-                               const engine::PackageManager &manager)
-        : world_(world), manager_(manager), asset_root_(std::filesystem::current_path())
+                               const engine::PackageManager &manager,
+                               engine::Services &services)
+        : world_(world), manager_(manager), services_(services), asset_root_(std::filesystem::current_path())
     {
         assert(manager_.applied() && "GraphRuntime: PackageManager must be applied before use");
         assert(manager_.node_executors().size() == manager_.registry().nodeTypes.size() && "GraphRuntime: manager executor count must match node type count");
@@ -144,14 +145,9 @@ namespace engine::graph
             }
         }
 
-    } // namespace
-
-    // =============================================================================
-    // Firing and ticking
-    // =============================================================================
-
-    namespace
-    {
+        // =============================================================================
+        // Firing and ticking
+        // =============================================================================
 
         // One runtime's per-tick state. Bundles the manager-derived tables
         // so fire_node and tick_one_graph don't need to look them up on
@@ -208,64 +204,62 @@ namespace engine::graph
         void tick_one_graph(engine::ecs::World &world,
                             LoadedGraph &lg,
                             float dt,
-                            const TickState &state)
+                            const TickState &state,
+                            engine::Services &services)
         {
-
-            std::fill(lg.fired.begin(), lg.fired.end(), false);
-            std::fill(lg.results.begin(), lg.results.end(),
-                      engine::ecs::CellValue::nil());
-
-            TickContext ctx{world, lg.graph, lg.results, lg.arg_values, dt};
-
-            // 1. Evaluate Value nodes in value_order.
-            for (lucid::sema::NodeIndex node_idx : lg.graph.value_order)
             {
-                const auto &node = lg.graph.nodes[node_idx];
-                if (node.type_id >= state.executor_count)
+
+                std::fill(lg.fired.begin(), lg.fired.end(), false);
+                std::fill(lg.results.begin(), lg.results.end(),
+                          engine::ecs::CellValue::nil());
+
+                TickContext ctx{world, lg.graph, lg.results, lg.arg_values, &services, dt};
+
+                // 1. Evaluate Value nodes in value_order.
+                for (lucid::sema::NodeIndex node_idx : lg.graph.value_order)
                 {
-                    engine::log_error(
-                        "GraphRuntime: node %u type_id %u out of range",
-                        static_cast<unsigned>(node_idx),
-                        static_cast<unsigned>(node.type_id));
-                    continue;
+                    const auto &node = lg.graph.nodes[node_idx];
+                    if (node.type_id >= state.executor_count)
+                    {
+                        engine::log_error(
+                            "GraphRuntime: node %u type_id %u out of range",
+                            static_cast<unsigned>(node_idx),
+                            static_cast<unsigned>(node.type_id));
+                        continue;
+                    }
+                    resolve_args_of(static_cast<std::uint32_t>(node_idx), lg, ctx);
+                    state.executors[node.type_id](ctx, static_cast<std::uint32_t>(node_idx));
                 }
-                resolve_args_of(static_cast<std::uint32_t>(node_idx), lg, ctx);
-                state.executors[node.type_id](ctx, static_cast<std::uint32_t>(node_idx));
-            }
 
-            // 2. Fire source triggers.
-            for (std::uint32_t node_idx = 0;
-                 node_idx < lg.graph.nodes.size();
-                 ++node_idx)
-            {
-                const auto &node = lg.graph.nodes[node_idx];
-                if ((*state.trigger_modes)[node.type_id].mode == engine::TriggerMode::Source)
+                // 2. Fire source triggers.
+                for (std::uint32_t node_idx = 0;
+                     node_idx < lg.graph.nodes.size();
+                     ++node_idx)
                 {
-                    fire_node(lg, ctx, state, node_idx);
+                    const auto &node = lg.graph.nodes[node_idx];
+                    if ((*state.trigger_modes)[node.type_id].mode == engine::TriggerMode::Source)
+                    {
+                        fire_node(lg, ctx, state, node_idx);
+                    }
                 }
-            }
 
-            // 3. Run fired Actions in phase order.
-            for (lucid::sema::NodeIndex node_idx : lg.graph.phase_order)
-            {
-                if (!lg.fired[node_idx])
-                    continue;
-                const auto &node = lg.graph.nodes[node_idx];
-                if (node.type_id >= state.executor_count)
-                    continue;
-                resolve_args_of(static_cast<std::uint32_t>(node_idx), lg, ctx);
-                state.executors[node.type_id](ctx, static_cast<std::uint32_t>(node_idx));
+                // 3. Run fired Actions in phase order.
+                for (lucid::sema::NodeIndex node_idx : lg.graph.phase_order)
+                {
+                    if (!lg.fired[node_idx])
+                        continue;
+                    const auto &node = lg.graph.nodes[node_idx];
+                    if (node.type_id >= state.executor_count)
+                        continue;
+                    resolve_args_of(static_cast<std::uint32_t>(node_idx), lg, ctx);
+                    state.executors[node.type_id](ctx, static_cast<std::uint32_t>(node_idx));
+                }
             }
         }
 
-    } // namespace
-
-    // =============================================================================
-    // File I/O and public API
-    // =============================================================================
-
-    namespace
-    {
+        // =============================================================================
+        // File I/O and public API
+        // =============================================================================
 
         std::vector<std::uint8_t> read_file(const std::filesystem::path &path,
                                             bool &ok)
@@ -343,17 +337,14 @@ namespace engine::graph
 
     void GraphRuntime::tick(float dt)
     {
-        // Build the per-tick state once; every graph uses the same
-        // executors and trigger modes.
         TickState state;
         state.executors = manager_.node_executors().data();
-        state.executor_count = static_cast<std::uint32_t>(
-            manager_.node_executors().size());
+        state.executor_count = static_cast<std::uint32_t>(manager_.node_executors().size());
         state.trigger_modes = &manager_.trigger_modes();
 
         for (auto &lg : graphs_)
         {
-            tick_one_graph(world_, lg, dt, state);
+            tick_one_graph(world_, lg, dt, state, services_);
         }
     }
 

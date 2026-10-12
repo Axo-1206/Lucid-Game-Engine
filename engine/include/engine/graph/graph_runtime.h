@@ -3,6 +3,7 @@
 #include "engine/ecs/cell_value.h"
 #include "engine/ecs/world.h"
 #include "engine/registry/package_manager.h"
+#include "engine/services.h"
 #include "sema/Graph.hpp"
 #include "sema/Registry.hpp"
 
@@ -40,22 +41,19 @@ namespace engine::graph
     // The graph runtime: loads .lucgraph files referenced by the
     // world's Script table, and ticks them against the world.
     //
-    // The runtime reads its node vocabulary from a PackageManager. The
-    // manager provides:
-    //   - registry()        the merged lucid::sema::Registry, for
-    //                       deserializing .lucgraph files.
-    //   - node_executors()  one executor per node type, indexed by
-    //                       NodeId.
-    //   - trigger_modes()   one TriggerMode per node type, indexed by
-    //                       NodeId.
+    // The runtime reads its node vocabulary from a PackageManager.
+    // It reads its services (physics backend, etc.) from a Services
+    // instance, passed to the constructor. The Services instance may
+    // have null fields; an executor that needs a service checks.
     //
-    // The manager must have been applied (PackageManager::apply()) and
-    // must outlive the GraphRuntime. The runtime holds a reference.
+    // The manager and the services must outlive the GraphRuntime.
+    // The runtime holds references.
     class GraphRuntime
     {
     public:
         GraphRuntime(engine::ecs::World &world,
-                     const engine::PackageManager &manager);
+                     const engine::PackageManager &manager,
+                     engine::Services &services);
 
         GraphRuntime(const GraphRuntime &) = delete;
         GraphRuntime &operator=(const GraphRuntime &) = delete;
@@ -75,6 +73,7 @@ namespace engine::graph
     private:
         engine::ecs::World &world_;
         const engine::PackageManager &manager_;
+        engine::Services &services_;
         std::filesystem::path asset_root_;
         std::vector<LoadedGraph> graphs_;
     };

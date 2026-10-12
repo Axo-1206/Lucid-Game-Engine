@@ -71,7 +71,8 @@ TEST_CASE("systems: hierarchy computes world transform for root", "[systems]")
     StubInput i;
     Clock c;
     RenderList rl;
-    SystemContext ctx{world, r, i, c, rl};
+    engine::Services services;
+    engine::SystemContext ctx{world, r, i, c, rl, services};
 
     hierarchy_system(ctx, 0.0f);
 
@@ -101,7 +102,8 @@ TEST_CASE("systems: hierarchy composes parent transforms", "[systems]")
     StubInput i;
     Clock c;
     RenderList rl;
-    SystemContext ctx{world, r, i, c, rl};
+    engine::Services services;
+    engine::SystemContext ctx{world, r, i, c, rl, services};
 
     hierarchy_system(ctx, 0.0f);
 
@@ -131,7 +133,8 @@ TEST_CASE("systems: movement applies velocity to transform", "[systems]")
     StubInput i;
     Clock c;
     RenderList rl;
-    SystemContext ctx{world, r, i, c, rl};
+    engine::Services services;
+    engine::SystemContext ctx{world, r, i, c, rl, services};
 
     movement_system(ctx, 1.0f);
 
@@ -159,7 +162,8 @@ TEST_CASE("systems: render submits draw calls", "[systems]")
     StubInput i;
     Clock c;
     RenderList rl;
-    SystemContext ctx{world, r, i, c, rl};
+    engine::Services services;
+    engine::SystemContext ctx{world, r, i, c, rl, services};
 
     hierarchy_system(ctx, 0.0f);
     render_system(ctx, 0.0f);

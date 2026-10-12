@@ -25,6 +25,7 @@ add_executable(lucid_tests
     
     registry/test_default_registry.cpp
     registry/test_package_manager.cpp
+    physics/test_stub_backend.cpp
 )
 
 target_link_libraries(lucid_tests

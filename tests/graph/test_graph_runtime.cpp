@@ -139,7 +139,8 @@ namespace
 TEST_CASE("graph_runtime: no Script table is not an error", "[graph][runtime]")
 {
     Fixture f;
-    graph::GraphRuntime rt(f.world, test_packages());
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 0);
 }
@@ -159,7 +160,8 @@ TEST_CASE("graph_runtime: loads a graph referenced by a Script component",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "test.lucgraph");
 
-    graph::GraphRuntime rt(f.world, test_packages());
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
@@ -182,7 +184,8 @@ TEST_CASE("graph_runtime: clear releases loaded graphs", "[graph][runtime]")
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "test.lucgraph");
 
-    graph::GraphRuntime rt(f.world, test_packages());
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
@@ -199,7 +202,8 @@ TEST_CASE("graph_runtime: missing file does not throw", "[graph][runtime]")
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "does_not_exist.lucgraph");
 
-    graph::GraphRuntime rt(f.world, test_packages());
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
     rt.set_asset_root(temp_dir());
     REQUIRE_FALSE(rt.load());
     REQUIRE(rt.graph_count() == 0);
@@ -227,7 +231,8 @@ TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "false_gate.lucgraph");
 
-    graph::GraphRuntime rt(f.world, test_packages());
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
 
@@ -270,7 +275,8 @@ TEST_CASE("graph_runtime: IfNode(true) lets its subscriber run",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "true_gate.lucgraph");
 
-    graph::GraphRuntime rt(f.world, test_packages());
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
 
@@ -304,7 +310,8 @@ TEST_CASE("graph_runtime: a node reads a resource field",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "resource.lucgraph");
 
-    graph::GraphRuntime rt(f.world, test_packages());
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
@@ -339,7 +346,8 @@ TEST_CASE("graph_runtime: a resource field with no written default is zero",
     auto s = add_component<ScriptTag>(f.world, e);
     f.world.get_table(ScriptTag::name)->set_string(s, "graph", "zero_resource.lucgraph");
 
-    graph::GraphRuntime rt(f.world, test_packages());
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
     rt.set_asset_root(temp_dir());
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
