@@ -1,7 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "engine/nodes/default_registry.h"
-#include "engine/nodes/node_runtime.h"
 
 #include "sema/Sema.hpp"
 

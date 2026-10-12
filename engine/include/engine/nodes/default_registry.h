@@ -7,6 +7,22 @@
 namespace engine
 {
 
+    // The runtime role of a node type. A Value or Action node is
+    // NotATrigger. A Trigger node is either Source (the engine fires
+    // it directly) or Gating (it fires when a parent fires and its
+    // condition holds). See docs/notes/TriggerModel.md.
+    enum class TriggerMode : std::uint8_t
+    {
+        NotATrigger,
+        Source,
+        Gating,
+    };
+
+    struct NodeTypeRuntimeInfo
+    {
+        TriggerMode mode = TriggerMode::NotATrigger;
+    };
+
     // The engine's node registry, produced by the process-lifetime
     // PackageManager (see default_manager.h).
     //
@@ -30,5 +46,16 @@ namespace engine
     // Append-only. The index of a node type in nodeTypes is its NodeId
     // in every .lucgraph.
     const lucid::sema::Registry &default_registry();
+
+    // The runtime info for the node type at index `id` in
+    // default_registry().nodeTypes. `id` is a NodeId.
+    //
+    // Out-of-range ids return a default-constructed
+    // NodeTypeRuntimeInfo (NotATrigger).
+    const NodeTypeRuntimeInfo &node_runtime_info(std::uint32_t id);
+
+    // The number of node types in the default registry. Equal to
+    // default_registry().nodeTypes.size().
+    std::uint32_t node_runtime_info_count();
 
 } // namespace engine

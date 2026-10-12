@@ -2,7 +2,7 @@
 
 #include "engine/ecs/world.h"
 #include "engine/graph/tick_context.h"
-#include "engine/nodes/node_runtime.h"
+#include "engine/nodes/default_registry.h"
 #include "sema/Registry.hpp"
 
 #include <functional>

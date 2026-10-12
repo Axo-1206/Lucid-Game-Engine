@@ -2,7 +2,7 @@
 #include "engine/package/package_builder.h"
 #include "engine/ecs/cell_value.h"
 #include "engine/graph/tick_context.h"
-#include "engine/nodes/node_runtime.h"
+#include "engine/nodes/default_registry.h"
 
 #include "sema/NodeKind.hpp"
 #include "sema/TypeId.hpp"

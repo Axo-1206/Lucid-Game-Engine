@@ -3,7 +3,7 @@
 #include "engine/ecs/world.h"
 #include "engine/package/package.h"
 #include "engine/package/package_builder.h"
-#include "engine/nodes/node_runtime.h"
+#include "engine/nodes/default_registry.h"
 #include "sema/Registry.hpp"
 
 #include <memory>

@@ -38,4 +38,23 @@ namespace engine
         return default_package_manager().registry();
     }
 
+    const NodeTypeRuntimeInfo &node_runtime_info(std::uint32_t id)
+    {
+        (void)default_registry(); // ensure applied
+        const auto &modes = default_package_manager().trigger_modes();
+        if (id >= modes.size())
+        {
+            static const NodeTypeRuntimeInfo kFallback{};
+            return kFallback;
+        }
+        return modes[id];
+    }
+
+    std::uint32_t node_runtime_info_count()
+    {
+        (void)default_registry();
+        return static_cast<std::uint32_t>(
+            default_package_manager().trigger_modes().size());
+    }
+
 } // namespace engine
