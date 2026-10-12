@@ -262,11 +262,13 @@ docs/
 ├── Decision.md          design decisions, one per phase
 ├── FileStructure.md     this file
 ├── notes/
-│   ├── EditorMetadata.md  The engine exposes metadata about its vocabulary for the editor
-│   ├── PackageNaming.md   defines how the engine names its content
+│   ├── Dataflow.md         States the model the engine runs on
+│   ├── EditorMetadata.md   The engine exposes metadata about its vocabulary for the editor
+│   ├── PackageNaming.md    defines how the engine names its content
+│   ├── PhysicsPlan.md      describes how physics is designed in Lucid 
 │   ├── RenderPasses.md
-│   ├── TriggerModel.md    how a Lucid graph expresses control flow
-│   └── SceneFormat.md     the .lscene format spec and evolution rules
+│   ├── TriggerModel.md     how a Lucid graph expresses control flow
+│   └── SceneFormat.md      the .lscene format spec and evolution rules
 ├── implementationPlans/
 │   └── kernelImplementationPlan.md
 └── archive/             older design documents, kept for history
