@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 namespace engine
 {
 
@@ -18,23 +20,27 @@ namespace engine
     // Naming: every node type, enum type, handle type, and table name
     // the package registers starts with `<prefix>_`. The manager
     // enforces this. See docs/notes/PackageNaming.md.
-    //
-    // Two packages from the same provider may share a prefix
-    // (alice.physics and alice.render both use `Alice`). Two packages
-    // from different providers must have different prefixes.
     class Package
     {
     public:
         virtual ~Package() = default;
 
-        // The package's full name: `<provider>.<thing>`.
+        // Identity and metadata.
+        //
+        // `name` is the package's full name: `<provider>.<thing>`.
         // E.g. "engine.core", "alice.physics".
+        //
+        // `prefix` matches `[A-Za-z][A-Za-z0-9]*`. E.g. "Engine",
+        // "Alice", "Physics2D". The engine reserves "Engine" for its
+        // own packages.
+        //
+        // `version`, `description`, and `author` are informational;
+        // the editor displays them.
         virtual const char *name() const = 0;
-
-        // The package's prefix. Matches `[A-Za-z][A-Za-z0-9]*`.
-        // E.g. "Engine", "Alice", "Physics2D".
-        // The engine reserves "Engine" for its own packages.
         virtual const char *prefix() const = 0;
+        virtual const char *version() const { return "0.0.0"; }
+        virtual const char *description() const { return ""; }
+        virtual const char *author() const { return ""; }
 
         // Register this package's content. Called exactly once, in
         // package load order, before any compile() call.

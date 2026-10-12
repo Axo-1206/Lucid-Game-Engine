@@ -95,6 +95,15 @@ namespace engine
             }
         }
 
+        // Record metadata.
+        PackageInfo info;
+        info.name = name;
+        info.prefix = prefix;
+        info.version = pkg->version();
+        info.description = pkg->description();
+        info.author = pkg->author();
+        package_infos_.push_back(info);
+
         engine::log_info("PackageManager: loading '%s' (prefix '%s')",
                          name.c_str(), prefix.c_str());
 
@@ -168,11 +177,119 @@ namespace engine
             return false;
         }
 
+        // Fill package counts.
+        const auto &counts = builder_.package_counts();
+        for (std::size_t i = 0; i < package_infos_.size() && i < counts.size(); ++i)
+        {
+            package_infos_[i].node_type_count = counts[i].node_types;
+            package_infos_[i].table_count = counts[i].tables;
+            package_infos_[i].enum_count = counts[i].enums;
+            package_infos_[i].handle_count = counts[i].handles;
+        }
+
         builder_.seal();
         applied_ = true;
 
         engine::log_info("PackageManager: %zu node types registered", n);
         return true;
+    }
+
+    std::string PackageManager::base_name_of(const std::string &type_name,
+                                             const std::string &prefix)
+    {
+        if (prefix.empty())
+            return type_name;
+        const std::string prefix_underscore = prefix + "_";
+        if (type_name.size() > prefix_underscore.size() &&
+            type_name.compare(0, prefix_underscore.size(), prefix_underscore) == 0)
+        {
+            return type_name.substr(prefix_underscore.size());
+        }
+        return type_name;
+    }
+
+    const NodeEditorInfo *PackageManager::node_editor_info(
+        const std::string &type_name) const
+    {
+
+        // Explicit info?
+        const auto &explicit_infos = builder_.node_editor_infos();
+        auto it = explicit_infos.find(type_name);
+        if (it != explicit_infos.end())
+        {
+            return &it->second;
+        }
+
+        // Verify the type exists in the registry. A node type that
+        // isn't registered has no editor info at all.
+        bool exists = false;
+        for (const auto &nt : registry_.nodeTypes)
+        {
+            if (std::string(nt.name) == type_name)
+            {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists)
+            return nullptr;
+
+        // Construct a default and cache it.
+        auto &slot = default_node_infos_[type_name];
+        if (slot.display_name.empty())
+        {
+            // Find the package's prefix by matching the node type's
+            // name against each package's prefix.
+            std::string prefix;
+            for (const auto &info : package_infos_)
+            {
+                const std::string prefix_underscore = info.prefix + "_";
+                if (type_name.size() > prefix_underscore.size() &&
+                    type_name.compare(0, prefix_underscore.size(),
+                                      prefix_underscore) == 0)
+                {
+                    prefix = info.prefix;
+                    break;
+                }
+            }
+            slot.display_name = base_name_of(type_name, prefix);
+            // doc_summary, icon_id, example left empty.
+        }
+        return &slot;
+    }
+
+    const TableEditorInfo *PackageManager::table_editor_info(
+        const std::string &table_name) const
+    {
+
+        const auto &explicit_infos = builder_.table_editor_infos();
+        auto it = explicit_infos.find(table_name);
+        if (it != explicit_infos.end())
+        {
+            return &it->second;
+        }
+
+        // Verify the table exists in the world? The manager doesn't
+        // hold a World. Skip the check; the caller knows what tables
+        // exist.
+        auto &slot = default_table_infos_[table_name];
+        if (slot.display_name.empty())
+        {
+            std::string prefix;
+            for (const auto &info : package_infos_)
+            {
+                const std::string prefix_underscore = info.prefix + "_";
+                if (table_name.size() > prefix_underscore.size() &&
+                    table_name.compare(0, prefix_underscore.size(),
+                                       prefix_underscore) == 0)
+                {
+                    prefix = info.prefix;
+                    break;
+                }
+            }
+            slot.display_name = base_name_of(table_name, prefix);
+        }
+        return &slot;
     }
 
 } // namespace engine

@@ -138,6 +138,7 @@ namespace engine
 
     void CorePackage::register_into(PackageBuilder &b)
     {
+        // Node types, executors, trigger modes (existing loop).
         for (std::size_t i = 0; i < kNodeTypes.size(); ++i)
         {
             b.add_node_type(kNodeTypes[i]);
@@ -145,14 +146,41 @@ namespace engine
             b.add_trigger_mode(kTriggerModes[i]);
         }
 
+        // Enums and handles (existing).
         for (const auto &e : kEnums)
-        {
             b.add_enum(e);
-        }
         for (const auto &h : kHandles)
-        {
             b.add_handle(h);
-        }
+
+        // Editor metadata.
+        b.add_node_editor_info("Engine_Float32Node", NodeEditorInfo{
+                                                         "Float32",
+                                                         "A 32-bit floating-point constant.",
+                                                         "",
+                                                         "float",
+                                                         "node v = Engine_Float32Node(2.5)",
+                                                     });
+        b.add_node_editor_info("Engine_Int32Node", NodeEditorInfo{
+                                                       "Int32",
+                                                       "A 32-bit integer constant.",
+                                                       "",
+                                                       "int",
+                                                       "node v = Engine_Int32Node(7)",
+                                                   });
+        b.add_node_editor_info("Engine_EveryFrame", NodeEditorInfo{
+                                                        "Every Frame",
+                                                        "Fires once per tick. A source trigger.",
+                                                        "",
+                                                        "clock",
+                                                        "node frame = Engine_EveryFrame()",
+                                                    });
+        b.add_node_editor_info("Engine_PrintNode", NodeEditorInfo{
+                                                       "Print",
+                                                       "Print a value to the engine log.",
+                                                       "",
+                                                       "print",
+                                                       "node p = Engine_PrintNode(v) on frame",
+                                                   });
     }
 
 } // namespace engine

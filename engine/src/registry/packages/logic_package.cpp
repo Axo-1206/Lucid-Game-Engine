@@ -114,6 +114,28 @@ namespace engine
             b.add_node_executor(kExecutors[i]);
             b.add_trigger_mode(kTriggerModes[i]);
         }
+
+        b.add_node_editor_info("Engine_BoolNode", NodeEditorInfo{
+                                                      "Bool",
+                                                      "A boolean constant.",
+                                                      "",
+                                                      "bool",
+                                                      "node c = Engine_BoolNode(true)",
+                                                  });
+        b.add_node_editor_info("Engine_LessThanNode", NodeEditorInfo{
+                                                          "Less Than",
+                                                          "True if a < b.",
+                                                          "",
+                                                          "less",
+                                                          "node c = Engine_LessThanNode(a, b)",
+                                                      });
+        b.add_node_editor_info("Engine_IfNode", NodeEditorInfo{
+                                                    "If",
+                                                    "Fires its subscribers when the condition is true.",
+                                                    "",
+                                                    "if",
+                                                    "node gate = Engine_IfNode(cond) on parent",
+                                                });
     }
 
 } // namespace engine

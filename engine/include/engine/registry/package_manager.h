@@ -1,9 +1,10 @@
 #pragma once
 
 #include "engine/ecs/world.h"
+#include "engine/registry/default_registry.h"
+#include "engine/registry/editor_info.h"
 #include "engine/registry/package.h"
 #include "engine/registry/package_builder.h"
-#include "engine/registry/default_registry.h"
 #include "sema/Registry.hpp"
 
 #include <memory>
@@ -31,10 +32,6 @@ namespace engine
         PackageManager(const PackageManager &) = delete;
         PackageManager &operator=(const PackageManager &) = delete;
 
-        // Add a package. Must be called before apply(). The manager
-        // takes ownership. Returns false if the package's name or
-        // prefix conflicts with an already-loaded package; the
-        // conflict is recorded.
         bool load_package(std::unique_ptr<Package> pkg);
 
         // Apply the registered content: create the packages' tables in
@@ -63,6 +60,25 @@ namespace engine
             return builder_.node_executors();
         }
 
+        // --- Editor metadata ---
+
+        // One PackageInfo per loaded package. The list is in load
+        // order. Valid after load_package() calls; the counts are
+        // populated after apply().
+        const std::vector<PackageInfo> &package_infos() const
+        {
+            return package_infos_;
+        }
+
+        // The editor info for one node type. If the type has no
+        // explicit editor info, returns a default: display_name is
+        // the base name, everything else empty. Returns nullptr if
+        // the type name is not in the registry.
+        const NodeEditorInfo *node_editor_info(const std::string &type_name) const;
+
+        // The editor info for one table. Same fallback semantics.
+        const TableEditorInfo *table_editor_info(const std::string &table_name) const;
+
         bool has_conflicts() const { return builder_.has_conflicts(); }
         const std::vector<std::string> &conflicts() const { return builder_.conflicts(); }
 
@@ -71,6 +87,14 @@ namespace engine
     private:
         PackageBuilder builder_;
         std::vector<std::unique_ptr<Package>> packages_;
+        std::vector<PackageInfo> package_infos_;
+
+        // Storage for default editor infos. When a caller asks for
+        // editor info on a node without explicit info, we construct a
+        // default and store it here so we can return a stable pointer.
+        // Mutable because node_editor_info() is const.
+        mutable std::unordered_map<std::string, NodeEditorInfo> default_node_infos_;
+        mutable std::unordered_map<std::string, TableEditorInfo> default_table_infos_;
 
         bool applied_ = false;
 
@@ -81,6 +105,9 @@ namespace engine
 
         static std::string provider_of(const std::string &package_name);
         static std::string last_segment_of(const std::string &package_name);
+
+        static std::string base_name_of(const std::string &type_name,
+                                        const std::string &prefix);
     };
 
 } // namespace engine

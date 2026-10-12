@@ -3,10 +3,12 @@
 #include "engine/ecs/world.h"
 #include "engine/graph/tick_context.h"
 #include "engine/registry/default_registry.h"
+#include "engine/registry/editor_info.h"
 #include "sema/Registry.hpp"
 
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace engine
@@ -35,11 +37,6 @@ namespace engine
         PackageBuilder &operator=(const PackageBuilder &) = delete;
 
         // --- Package boundaries ---
-        //
-        // The manager calls begin_package() before register_into() and
-        // end_package() after. Between the two calls, the builder
-        // knows which package is registering, and can validate names
-        // against the package's prefix.
 
         void begin_package(std::string package_name, std::string prefix);
         void end_package();
@@ -53,9 +50,20 @@ namespace engine
         void add_enum(const lucid::sema::EnumTypeInfo &info);
         void add_handle(const lucid::sema::HandleTypeInfo &info);
 
-        // Record a conflict. Called by the manager for package-level
-        // conflicts (duplicate package name, duplicate prefix) that
-        // the builder does not see directly.
+        // --- Editor metadata ---
+        //
+        // Optional. A node type without editor info gets defaults at
+        // lookup time (see NodeEditorInfo). A table without table
+        // editor info gets a default display name.
+
+        void add_node_editor_info(const std::string &type_name,
+                                  NodeEditorInfo info);
+
+        void add_table_editor_info(const std::string &table_name,
+                                   TableEditorInfo info);
+
+        // --- Conflicts ---
+
         void add_conflict(std::string message);
 
         // --- Queries ---
@@ -73,15 +81,38 @@ namespace engine
         const std::vector<lucid::sema::EnumTypeInfo> &enums() const { return enums_; }
         const std::vector<lucid::sema::HandleTypeInfo> &handles() const { return handles_; }
 
-        // The backing arrays for the Registry's ArenaSpans. Valid
-        // after all packages have registered.
+        const std::unordered_map<std::string, NodeEditorInfo> &node_editor_infos() const
+        {
+            return node_editor_infos_;
+        }
+        const std::unordered_map<std::string, TableEditorInfo> &table_editor_infos() const
+        {
+            return table_editor_infos_;
+        }
+
+        // Per-package counts, filled by end_package().
+        struct PackageCounts
+        {
+            std::size_t node_types = 0;
+            std::size_t tables = 0;
+            std::size_t enums = 0;
+            std::size_t handles = 0;
+        };
+        const std::vector<PackageCounts> &package_counts() const { return package_counts_; }
+
         void seal();
         bool is_sealed() const { return sealed_; }
 
     private:
-        // The package currently registering. Empty between packages.
         std::string current_package_name_;
         std::string current_prefix_;
+
+        // Counts at the moment begin_package() was called, so
+        // end_package() can compute the delta.
+        std::size_t begin_node_types_ = 0;
+        std::size_t begin_tables_ = 0;
+        std::size_t begin_enums_ = 0;
+        std::size_t begin_handles_ = 0;
 
         std::vector<std::string> table_names_;
         std::vector<TableCreator> table_creators_;
@@ -93,13 +124,15 @@ namespace engine
         std::vector<lucid::sema::EnumTypeInfo> enums_;
         std::vector<lucid::sema::HandleTypeInfo> handles_;
 
+        std::unordered_map<std::string, NodeEditorInfo> node_editor_infos_;
+        std::unordered_map<std::string, TableEditorInfo> table_editor_infos_;
+
+        std::vector<PackageCounts> package_counts_;
+
         std::vector<std::string> conflicts_;
 
         bool sealed_ = false;
 
-        // Validate a name against the current package's prefix.
-        // Returns true if the name is acceptable; otherwise records
-        // a conflict and returns false.
         bool check_name(const std::string &name, const char *kind);
     };
 

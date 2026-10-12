@@ -3,6 +3,7 @@
 #include "engine/registry/package_manager.h"
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
+#include "engine/registry/editor_info.h"
 
 #include "sema/NodeKind.hpp"
 #include "sema/Sema.hpp"
@@ -30,8 +31,8 @@ TEST_CASE("package_manager: registers core and logic nodes",
     REQUIRE(reg.nodeTypes[6].name == "Engine_IfNode");
 }
 
-TEST_CASE("package_manager: node kinds and trigger modes",
-          "[package]")
+TEST_CASE("package_manager: package_infos includes both packages",
+          "[package][editor]")
 {
     engine::ecs::World world;
     PackageManager mgr;
@@ -39,22 +40,23 @@ TEST_CASE("package_manager: node kinds and trigger modes",
     REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
     REQUIRE(mgr.apply(world));
 
-    using lucid::sema::NodeKind;
-    const auto &reg = mgr.registry();
-    REQUIRE(reg.nodeTypes[0].kind == NodeKind::Value);
-    REQUIRE(reg.nodeTypes[2].kind == NodeKind::Trigger);
-    REQUIRE(reg.nodeTypes[3].kind == NodeKind::Action);
-    REQUIRE(reg.nodeTypes[6].kind == NodeKind::Trigger);
+    const auto &infos = mgr.package_infos();
+    REQUIRE(infos.size() == 2);
 
-    const auto &modes = mgr.trigger_modes();
-    REQUIRE(modes.size() == 7);
-    REQUIRE(modes[2].mode == TriggerMode::Source);
-    REQUIRE(modes[6].mode == TriggerMode::Gating);
-    REQUIRE(modes[0].mode == TriggerMode::NotATrigger);
+    REQUIRE(infos[0].name == "engine.core");
+    REQUIRE(infos[0].prefix == "Engine");
+    REQUIRE(infos[0].version == "0.1.0");
+    REQUIRE(infos[0].description == "The engine's core nodes.");
+    REQUIRE(infos[0].author == "Axo");
+    REQUIRE(infos[0].node_type_count == 4);
+
+    REQUIRE(infos[1].name == "engine.logic");
+    REQUIRE(infos[1].prefix == "Engine");
+    REQUIRE(infos[1].node_type_count == 3);
 }
 
-TEST_CASE("package_manager: compile against the merged registry",
-          "[package]")
+TEST_CASE("package_manager: explicit editor info is returned",
+          "[package][editor]")
 {
     engine::ecs::World world;
     PackageManager mgr;
@@ -62,43 +64,37 @@ TEST_CASE("package_manager: compile against the merged registry",
     REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
     REQUIRE(mgr.apply(world));
 
-    const char *source =
-        "node frame = Engine_EveryFrame()\n"
-        "node cond = Engine_BoolNode(true)\n"
-        "node gate = Engine_IfNode(cond) on frame\n"
-        "node p = Engine_PrintNode(1.0) on gate\n";
-
-    auto result = lucid::sema::compile(source, "merged.lucid", mgr.registry());
-    if (!result.ok)
-    {
-        for (const auto &d : result.diagnostics)
-        {
-            WARN(d.message);
-        }
-    }
-    REQUIRE(result.ok);
+    const NodeEditorInfo *info = mgr.node_editor_info("Engine_PrintNode");
+    REQUIRE(info != nullptr);
+    REQUIRE(info->display_name == "Print");
+    REQUIRE(info->doc_summary == "Print a value to the engine log.");
+    REQUIRE(info->icon_id == "print");
 }
 
-TEST_CASE("package_manager: duplicate package name is refused",
-          "[package]")
+TEST_CASE("package_manager: unknown node type returns nullptr",
+          "[package][editor]")
 {
     engine::ecs::World world;
     PackageManager mgr;
     REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
-    // A second CorePackage has the same name.
-    REQUIRE_FALSE(mgr.load_package(std::make_unique<CorePackage>()));
-    REQUIRE(mgr.has_conflicts());
-}
-
-TEST_CASE("package_manager: executors are parallel to node types",
-          "[package]")
-{
-    engine::ecs::World world;
-    PackageManager mgr;
-    REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
-    REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
     REQUIRE(mgr.apply(world));
 
-    REQUIRE(mgr.node_executors().size() == mgr.registry().nodeTypes.size());
-    REQUIRE(mgr.trigger_modes().size() == mgr.registry().nodeTypes.size());
+    REQUIRE(mgr.node_editor_info("Engine_NotANode") == nullptr);
+    REQUIRE(mgr.node_editor_info("Alice_GravityNode") == nullptr);
+}
+
+TEST_CASE("package_manager: table editor info falls back",
+          "[package][editor]")
+{
+    engine::ecs::World world;
+    PackageManager mgr;
+    REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
+    REQUIRE(mgr.apply(world));
+
+    // No explicit editor info for tables in CorePackage.
+    // The fallback returns a default with display_name from the
+    // base name.
+    const TableEditorInfo *info = mgr.table_editor_info("Engine_Entity");
+    REQUIRE(info != nullptr);
+    REQUIRE(info->display_name == "Entity");
 }

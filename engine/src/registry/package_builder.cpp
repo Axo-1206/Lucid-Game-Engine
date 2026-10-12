@@ -14,10 +14,23 @@ namespace engine
     {
         current_package_name_ = std::move(package_name);
         current_prefix_ = std::move(prefix);
+
+        // Snapshot counts so end_package() can compute the delta.
+        begin_node_types_ = node_types_.size();
+        begin_tables_ = table_names_.size();
+        begin_enums_ = enums_.size();
+        begin_handles_ = handles_.size();
     }
 
     void PackageBuilder::end_package()
     {
+        PackageCounts counts;
+        counts.node_types = node_types_.size() - begin_node_types_;
+        counts.tables = table_names_.size() - begin_tables_;
+        counts.enums = enums_.size() - begin_enums_;
+        counts.handles = handles_.size() - begin_handles_;
+        package_counts_.push_back(counts);
+
         current_package_name_.clear();
         current_prefix_.clear();
     }
@@ -127,6 +140,22 @@ namespace engine
         if (!check_name(name, "handle"))
             return;
         handles_.push_back(info);
+    }
+
+    void PackageBuilder::add_node_editor_info(const std::string &type_name,
+                                              NodeEditorInfo info)
+    {
+        // No uniqueness check; two registrations for the same type
+        // overwrite. A package that registers editor info twice for
+        // the same node is a package authoring mistake, not a conflict
+        // the builder should catch.
+        node_editor_infos_[type_name] = std::move(info);
+    }
+
+    void PackageBuilder::add_table_editor_info(const std::string &table_name,
+                                               TableEditorInfo info)
+    {
+        table_editor_infos_[table_name] = std::move(info);
     }
 
     void PackageBuilder::add_conflict(std::string message)
