@@ -1,7 +1,7 @@
-#include "engine/nodes/default_registry.h"
-#include "engine/package/package_manager.h"
-#include "engine/package/core_package.h"
-#include "engine/package/logic_package.h"
+#include "engine/registry/default_registry.h"
+#include "engine/registry/package_manager.h"
+#include "engine/registry/packages/core_package.h"
+#include "engine/registry/packages/logic_package.h"
 #include "engine/core/log.h"
 
 namespace engine

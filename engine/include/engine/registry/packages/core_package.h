@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/package/package.h"
+#include "engine/registry/package.h"
 
 namespace engine
 {

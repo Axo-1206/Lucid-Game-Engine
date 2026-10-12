@@ -73,17 +73,17 @@ engine/
 │   ├── graph/
 │   │   ├── graph_runtime.h
 │   │   └── tick_context.h
-│   ├── nodes/
-│   │   └── default_registry.h
-│   ├── package/
-│   │   ├── core_package.h
-│   │   ├── logic_package.h
-│   │   ├── package_builder.h
-│   │   ├── package_manager.h
-│   │   └── package.h
 │   ├── platform/
 │   │   ├── input.h
 │   │   └── window.h
+│   ├── registry/
+│   │   ├── default_registry.h
+│   │   ├── package.h
+│   │   ├── package_builder.h
+│   │   ├── package_manager.h
+│   │   └── packages/
+│   │       ├── core_package.h
+│   │       └── logic_package.h
 │   ├── render/
 │   │   ├── camera.h
 │   │   ├── camera2d.h
@@ -97,47 +97,46 @@ engine/
 │   │   ├── scene.h
 │   │   └── scene_schema.h
 │   └── systems/
-│   │   ├── system_context.h
+│       ├── system_context.h
 │       └── systems.h
-├── src/
-│   ├── core/
-│   │   ├── clock.cpp
-│   │   ├── format_diagnostics.cpp
-│   │   ├── linear_allocator.cpp
-│   │   └── log.cpp
-│   ├── graph/
-│   │   └── graph_runtime.cpp
-│   ├── nodes/
-│   │   └── default_registry.cpp
-│   ├── package/
-│   │   ├── core_package.cpp
-│   │   ├── default_package.cpp
-│   │   ├── logic_package.cpp
-│   │   ├── package_builder.cpp
-│   │   └── package_manager.cpp
-│   ├── platform/
-│   │   ├── input_glfw.h      (private header)
-│   │   ├── input_glfw.cpp
-│   │   ├── input_state.cpp
-│   │   └── window_glfw.cpp
-│   ├── render/
-│   │   ├── backend_gl/
-│   │   │   ├── renderer_gl.h
-│   │   │   ├── renderer_gl.cpp
-│   │   │   ├── shader_gl.h
-│   │   │   ├── shader_gl.cpp
-│   │   │   ├── sprite_batch_gl.h
-│   │   │   └── sprite_batch_gl.cpp
-│   │   └── render_list.cpp
-│   ├── scene/
-│   │   ├── entity.cpp
-│   │   ├── scene.cpp
-│   │   ├── scene_loader.cpp
-│   │   └── scene_saver.cpp
-│   └── systems/
-│       ├── hierarchy_system.cpp
-│       ├── movement_system.cpp
-│       └── render_system.cpp
+└── src/
+    ├── core/
+    │   ├── clock.cpp
+    │   ├── format_diagnostics.cpp
+    │   ├── linear_allocator.cpp
+    │   └── log.cpp
+    ├── graph/
+    │   └── graph_runtime.cpp
+    ├── platform/
+    │   ├── input_glfw.cpp
+    │   ├── input_glfw.h
+    │   ├── input_state.cpp
+    │   └── window_glfw.cpp
+    ├── registry/
+    │   ├── default_registry.cpp
+    │   ├── package_builder.cpp
+    │   ├── package_manager.cpp
+    │   └── packages/
+    │       ├── core_package.cpp
+    │       └── logic_package.cpp
+    ├── render/
+    │   ├── backend_gl/
+    │   │   ├── renderer_gl.cpp
+    │   │   ├── renderer_gl.h
+    │   │   ├── shader_gl.cpp
+    │   │   ├── shader_gl.h
+    │   │   ├── sprite_batch_gl.cpp
+    │   │   └── sprite_batch_gl.h
+    │   └── render_list.cpp
+    ├── scene/
+    │   ├── entity.cpp
+    │   ├── scene.cpp
+    │   ├── scene_loader.cpp
+    │   └── scene_saver.cpp
+    └── systems/
+        ├── hierarchy_system.cpp
+        ├── movement_system.cpp
+        └── render_system.cpp
 └── CMakeLists.txt       target: luc_engine, alias lucid::engine
 ```
 
@@ -198,9 +197,8 @@ tests/
 │   └── test_systems.cpp
 ├── graph/
 │   └── test_graph_runtime.cpp
-├── nodes/
-│   └── test_default_registry.cpp
-├── package/
+├── registry/
+│   ├── test_default_registry.cpp
 │   └── test_package_manager.cpp
 └── CMakeLists.txt
 ```

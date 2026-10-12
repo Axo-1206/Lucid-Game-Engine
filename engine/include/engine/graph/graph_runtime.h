@@ -2,7 +2,7 @@
 
 #include "engine/ecs/cell_value.h"
 #include "engine/ecs/world.h"
-#include "engine/package/package_manager.h"
+#include "engine/registry/package_manager.h"
 #include "sema/Graph.hpp"
 #include "sema/Registry.hpp"
 

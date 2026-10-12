@@ -19,12 +19,12 @@ add_executable(lucid_tests
     engine/test_systems.cpp
     engine/test_format_diagnostics.cpp
 
-    nodes/test_default_registry.cpp
-
     ecs/test_world.cpp
-
+    
     graph/test_graph_runtime.cpp
-    package/test_package_manager.cpp
+    
+    registry/test_default_registry.cpp
+    registry/test_package_manager.cpp
 )
 
 target_link_libraries(lucid_tests

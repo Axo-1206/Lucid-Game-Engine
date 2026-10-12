@@ -3,10 +3,19 @@ add_library(luc_engine STATIC
     src/core/clock.cpp
     src/core/linear_allocator.cpp
     src/core/format_diagnostics.cpp
+    
+    src/graph/graph_runtime.cpp
 
     src/platform/input_state.cpp
     src/platform/input_glfw.cpp
     src/platform/window_glfw.cpp
+
+    src/registry/default_registry.cpp
+    src/registry/package_builder.cpp
+    src/registry/package_manager.cpp
+
+    src/registry/packages/core_package.cpp
+    src/registry/packages/logic_package.cpp
 
     src/render/backend_gl/shader_gl.cpp
     src/render/backend_gl/sprite_batch_gl.cpp
@@ -21,14 +30,6 @@ add_library(luc_engine STATIC
     src/systems/hierarchy_system.cpp
     src/systems/movement_system.cpp
     src/systems/render_system.cpp
-
-    src/nodes/default_registry.cpp
-    src/graph/graph_runtime.cpp
-    
-    src/package/package_builder.cpp
-    src/package/package_manager.cpp
-    src/package/core_package.cpp
-    src/package/logic_package.cpp
 )
 
 target_include_directories(luc_engine

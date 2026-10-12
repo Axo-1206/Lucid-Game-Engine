@@ -1,9 +1,9 @@
 #pragma once
 
 #include "engine/ecs/world.h"
-#include "engine/package/package.h"
-#include "engine/package/package_builder.h"
-#include "engine/nodes/default_registry.h"
+#include "engine/registry/package.h"
+#include "engine/registry/package_builder.h"
+#include "engine/registry/default_registry.h"
 #include "sema/Registry.hpp"
 
 #include <memory>

@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "engine/graph/graph_runtime.h"
-#include "engine/package/package_manager.h"
-#include "engine/package/core_package.h"
-#include "engine/package/logic_package.h"
+#include "engine/registry/package_manager.h"
+#include "engine/registry/packages/core_package.h"
+#include "engine/registry/packages/logic_package.h"
 #include "engine/scene/entity.h"
 #include "engine/scene/scene.h"
 #include "engine/scene/component_tags.h"

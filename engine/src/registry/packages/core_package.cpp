@@ -1,9 +1,9 @@
-#include "engine/package/core_package.h"
-#include "engine/package/package_builder.h"
+#include "engine/registry/packages/core_package.h"
+#include "engine/registry/package_builder.h"
 #include "engine/core/log.h"
 #include "engine/ecs/cell_value.h"
 #include "engine/graph/tick_context.h"
-#include "engine/nodes/default_registry.h"
+#include "engine/registry/default_registry.h"
 
 #include "sema/NodeKind.hpp"
 #include "sema/TypeId.hpp"
