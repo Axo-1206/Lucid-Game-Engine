@@ -20,19 +20,32 @@ namespace
         void begin_frame(Color) override {}
         void end_frame() override {}
         void present() override {}
-        void set_camera_2d(const Camera2D &) override {}
-        Camera2D get_camera_2d() const override { return {}; }
-        void set_viewport(int, int) override {}
+
+        void begin_world_2d() override {}
+        void end_world_2d() override {}
+        void begin_ui() override {}
+        void end_ui() override {}
+
+        void set_viewport(int, int, int, int) override {}
+        void set_full_viewport() override {}
+        int viewport_x() const override { return 0; }
+        int viewport_y() const override { return 0; }
         int viewport_width() const override { return 0; }
         int viewport_height() const override { return 0; }
+
+        void set_camera_2d(const Camera2D &) override {}
+        Camera2D get_camera_2d() const override { return {}; }
+
         TextureHandle load_texture(const std::string &) override { return {}; }
         void free_texture(TextureHandle) override {}
         TextureHandle white_texture() const override { return {}; }
+
         void draw_rect(float, float, float, float, Color, int) override { ++rect_count; }
         void draw_rect_outline(float, float, float, float, float, Color, int) override {}
         void draw_circle(float, float, float, Color, int, int) override {}
         void draw_line(float, float, float, float, float, Color, int) override {}
         void draw_sprite(TextureHandle, float, float, float, float, float, Color, float, float, int) override { ++sprite_count; }
+
         RenderStats stats() const override { return {}; }
         void reset_stats() override {}
     };

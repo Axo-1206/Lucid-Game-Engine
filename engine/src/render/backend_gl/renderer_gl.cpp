@@ -1,4 +1,4 @@
-#include "render/backend_gl/renderer_gl.h"
+#include "engine/render/backend_gl/renderer_gl.h"
 #include "engine/core/log.h"
 
 #include <glad/glad.h>
@@ -83,25 +83,19 @@ void main() {
         log_info("OpenGL version: %s", glGetString(GL_VERSION));
         log_info("GPU renderer:   %s", glGetString(GL_RENDERER));
 
-        // Enable blending for alpha.
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        // Enable depth testing (harmless for 2D; needed later for 3D).
-        // glEnable(GL_DEPTH_TEST);
-
-        // Compile the sprite shader.
         if (!shader_.compile(kSpriteVertexShader, kSpriteFragmentShader))
         {
             log_error("RendererGL: failed to compile sprite shader");
             return false;
         }
 
-        // Init the batch.
         batch_.init();
         batch_.set_shader(&shader_);
 
-        // Create the white texture.
+        // Create the white texture and cache its GL id.
         {
             std::uint32_t gl_tex = 0;
             glGenTextures(1, &gl_tex);
@@ -116,8 +110,23 @@ void main() {
             glBindTexture(GL_TEXTURE_2D, 0);
 
             white_texture_.id = next_texture_id_++;
+            white_gl_id_ = gl_tex;
             textures_[white_texture_.id] = gl_tex;
         }
+
+        // Sync the window size.
+        int ww = 0, wh = 0;
+        glfwGetFramebufferSize(window_, &ww, &wh);
+        window_w_ = ww;
+        window_h_ = wh;
+        viewport_x_ = 0;
+        viewport_y_ = 0;
+        viewport_w_ = ww;
+        viewport_h_ = wh;
+
+        // Set the initial world camera's viewport in sync.
+        camera_.viewport_w = static_cast<float>(ww);
+        camera_.viewport_h = static_cast<float>(wh);
 
         initialized_ = true;
         return true;
@@ -134,6 +143,7 @@ void main() {
             glDeleteTextures(1, &t);
         }
         textures_.clear();
+        white_gl_id_ = 0;
 
         batch_.destroy();
         shader_.destroy();
@@ -142,31 +152,24 @@ void main() {
         window_ = nullptr;
     }
 
+    // =============================================================================
+    // Frame
+    // =============================================================================
+
     void RendererGL::begin_frame(Color clear_color)
     {
-        glViewport(0, 0, viewport_w_, viewport_h_);
+        // Clear the whole window, regardless of the current viewport.
+        // The default framebuffer's full extent is what we clear.
+        glViewport(0, 0, window_w_, window_h_);
         glClearColor(clear_color.r, clear_color.g, clear_color.b, clear_color.a);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         reset_stats();
-
-        // Compute and upload the projection matrix.
-        float proj[16];
-        compute_projection(proj);
-        shader_.bind();
-        shader_.set_mat4("u_projection", proj);
-
-        batch_.begin();
     }
 
     void RendererGL::end_frame()
     {
-        batch_.end();
-
-        // Accumulate the batch's stats into the frame stats.
-        frame_stats_.draw_calls += batch_.draw_calls();
-        frame_stats_.quads_drawn += batch_.quads_drawn();
-        frame_stats_.triangles_drawn += batch_.triangles_drawn();
+        // The batch's per-pass end handles flushing. Nothing to do here.
     }
 
     void RendererGL::present()
@@ -175,14 +178,105 @@ void main() {
             glfwSwapBuffers(window_);
     }
 
+    // =============================================================================
+    // Passes
+    // =============================================================================
+
+    void RendererGL::begin_world_2d()
+    {
+        // Bind the viewport.
+        glViewport(viewport_x_, viewport_y_, viewport_w_, viewport_h_);
+
+        // The world camera's viewport in the projection is the current
+        // viewport's size, not the camera's stored viewport. This lets a
+        // sub-viewport render the world correctly.
+        Camera2D cam = camera_;
+        cam.viewport_w = static_cast<float>(viewport_w_);
+        cam.viewport_h = static_cast<float>(viewport_h_);
+
+        float proj[16];
+        {
+            const float half_w = cam.viewport_w * 0.5f / cam.zoom;
+            const float half_h = cam.viewport_h * 0.5f / cam.zoom;
+            const float left = cam.x - half_w;
+            const float right = cam.x + half_w;
+            const float bottom = cam.y + half_h;
+            const float top = cam.y - half_h;
+            glm::mat4 m = glm::ortho(left, right, bottom, top, -1.0f, 1.0f);
+            std::memcpy(proj, &m[0][0], sizeof(float) * 16);
+        }
+
+        shader_.bind();
+        shader_.set_mat4("u_projection", proj);
+        shader_.set_int("u_texture", 0);
+
+        batch_.begin();
+    }
+
+    void RendererGL::end_world_2d()
+    {
+        batch_.end();
+        frame_stats_.draw_calls += batch_.draw_calls();
+        frame_stats_.quads_drawn += batch_.quads_drawn();
+        frame_stats_.triangles_drawn += batch_.triangles_drawn();
+    }
+
+    void RendererGL::begin_ui()
+    {
+        glViewport(viewport_x_, viewport_y_, viewport_w_, viewport_h_);
+
+        // Screen-space orthographic: (0, 0) top-left, (w, h) bottom-right,
+        // +y down. The viewport's dimensions define the coordinate space.
+        float proj[16];
+        {
+            const float w = static_cast<float>(viewport_w_);
+            const float h = static_cast<float>(viewport_h_);
+            glm::mat4 m = glm::ortho(0.0f, w, h, 0.0f, -1.0f, 1.0f);
+            std::memcpy(proj, &m[0][0], sizeof(float) * 16);
+        }
+
+        shader_.bind();
+        shader_.set_mat4("u_projection", proj);
+        shader_.set_int("u_texture", 0);
+
+        batch_.begin();
+    }
+
+    void RendererGL::end_ui()
+    {
+        batch_.end();
+        frame_stats_.draw_calls += batch_.draw_calls();
+        frame_stats_.quads_drawn += batch_.quads_drawn();
+        frame_stats_.triangles_drawn += batch_.triangles_drawn();
+    }
+
+    // =============================================================================
+    // Viewport
+    // =============================================================================
+
+    void RendererGL::set_viewport(int x, int y, int w, int h)
+    {
+        viewport_x_ = x;
+        viewport_y_ = y;
+        viewport_w_ = w;
+        viewport_h_ = h;
+    }
+
+    void RendererGL::set_full_viewport()
+    {
+        viewport_x_ = 0;
+        viewport_y_ = 0;
+        viewport_w_ = window_w_;
+        viewport_h_ = window_h_;
+    }
+
+    // =============================================================================
+    // Camera
+    // =============================================================================
+
     void RendererGL::set_camera_2d(const Camera2D &camera)
     {
         camera_ = camera;
-        // Sync viewport to camera's viewport if the caller set it.
-        if (camera_.viewport_w > 0.0f)
-            viewport_w_ = static_cast<int>(camera_.viewport_w);
-        if (camera_.viewport_h > 0.0f)
-            viewport_h_ = static_cast<int>(camera_.viewport_h);
     }
 
     Camera2D RendererGL::get_camera_2d() const
@@ -190,36 +284,9 @@ void main() {
         return camera_;
     }
 
-    void RendererGL::set_viewport(int width, int height)
-    {
-        viewport_w_ = width;
-        viewport_h_ = height;
-        camera_.viewport_w = static_cast<float>(width);
-        camera_.viewport_h = static_cast<float>(height);
-    }
-
-    void RendererGL::compute_projection(float *out_mat4) const
-    {
-        // Orthographic projection in screen space:
-        //   (0, 0) is top-left, +y down.
-        //
-        // The camera's (x, y) is the center of the view.
-        // zoom scales the view.
-        const float half_w = camera_.viewport_w * 0.5f / camera_.zoom;
-        const float half_h = camera_.viewport_h * 0.5f / camera_.zoom;
-
-        const float left = camera_.x - half_w;
-        const float right = camera_.x + half_w;
-        const float bottom = camera_.y + half_h; // +y down: bottom > top
-        const float top = camera_.y - half_h;
-
-        glm::mat4 proj = glm::ortho(left, right, bottom, top, -1.0f, 1.0f);
-        std::memcpy(out_mat4, &proj[0][0], sizeof(float) * 16);
-    }
-
-    // -----------------------------------------------------------------------------
+    // =============================================================================
     // Textures
-    // -----------------------------------------------------------------------------
+    // =============================================================================
 
     TextureHandle RendererGL::load_texture(const std::string &path)
     {
@@ -228,7 +295,8 @@ void main() {
         unsigned char *data = stbi_load(path.c_str(), &w, &h, &channels, 4);
         if (!data)
         {
-            log_error("Failed to load texture '%s': %s", path.c_str(), stbi_failure_reason());
+            log_error("Failed to load texture '%s': %s",
+                      path.c_str(), stbi_failure_reason());
             return TextureHandle{};
         }
 
@@ -250,7 +318,8 @@ void main() {
         handle.id = next_texture_id_++;
         textures_[handle.id] = gl_tex;
 
-        log_info("Loaded texture '%s' (%dx%d, %d channels)", path.c_str(), w, h, channels);
+        log_info("Loaded texture '%s' (%dx%d, %d channels)",
+                 path.c_str(), w, h, channels);
         return handle;
     }
 
@@ -265,18 +334,15 @@ void main() {
         textures_.erase(it);
     }
 
-    // -----------------------------------------------------------------------------
+    // =============================================================================
     // Draw
-    // -----------------------------------------------------------------------------
+    // =============================================================================
 
     void RendererGL::draw_rect(float x, float y, float w, float h,
                                Color color, int layer)
     {
         (void)layer;
-        GLuint white = textures_[white_texture_.id];
-
-        // For draw_rect, (x, y) is the top-left corner. Use anchor (0, 0).
-        batch_.submit_quad(white,
+        batch_.submit_quad(white_gl_id_,
                            x, y, w, h,
                            0.0f,
                            0.0f, 0.0f,
@@ -288,11 +354,10 @@ void main() {
                                        float thickness, Color color,
                                        int layer)
     {
-        // Four thin rectangles.
-        draw_rect(x, y, w, thickness, color, layer);                                             // top
-        draw_rect(x, y + h - thickness, w, thickness, color, layer);                             // bottom
-        draw_rect(x, y + thickness, thickness, h - 2 * thickness, color, layer);                 // left
-        draw_rect(x + w - thickness, y + thickness, thickness, h - 2 * thickness, color, layer); // right
+        draw_rect(x, y, w, thickness, color, layer);
+        draw_rect(x, y + h - thickness, w, thickness, color, layer);
+        draw_rect(x, y + thickness, thickness, h - 2 * thickness, color, layer);
+        draw_rect(x + w - thickness, y + thickness, thickness, h - 2 * thickness, color, layer);
     }
 
     void RendererGL::draw_circle(float cx, float cy, float radius,
@@ -302,21 +367,18 @@ void main() {
         (void)layer;
         if (segments < 3)
             segments = 3;
-        GLuint white = textures_[white_texture_.id];
 
-        // Center vertex at (cx, cy). Triangle fan around it.
-        // UVs are irrelevant (white texture); use (0.5, 0.5).
         const float tau = 6.28318530718f;
         for (int i = 0; i < segments; ++i)
         {
-            float a0 = (static_cast<float>(i) / segments) * tau;
-            float a1 = (static_cast<float>(i + 1) / segments) * tau;
-            float x0 = cx + std::cos(a0) * radius;
-            float y0 = cy + std::sin(a0) * radius;
-            float x1 = cx + std::cos(a1) * radius;
-            float y1 = cy + std::sin(a1) * radius;
+            const float a0 = (static_cast<float>(i) / segments) * tau;
+            const float a1 = (static_cast<float>(i + 1) / segments) * tau;
+            const float x0 = cx + std::cos(a0) * radius;
+            const float y0 = cy + std::sin(a0) * radius;
+            const float x1 = cx + std::cos(a1) * radius;
+            const float y1 = cy + std::sin(a1) * radius;
 
-            batch_.submit_triangle(white,
+            batch_.submit_triangle(white_gl_id_,
                                    cx, cy, 0.5f, 0.5f,
                                    x0, y0, 0.5f, 0.5f,
                                    x1, y1, 0.5f, 0.5f,
@@ -335,14 +397,11 @@ void main() {
         if (len < 1e-6f)
             return;
 
-        // Midpoint and angle.
         const float mx = (x1 + x2) * 0.5f;
         const float my = (y1 + y2) * 0.5f;
         const float angle = std::atan2(dy, dx);
 
-        // A quad of size (len, thickness), anchored at center, rotated.
-        GLuint white = textures_[white_texture_.id];
-        batch_.submit_quad(white,
+        batch_.submit_quad(white_gl_id_,
                            mx, my, len, thickness,
                            angle,
                            0.5f, 0.5f,
@@ -360,12 +419,12 @@ void main() {
         auto it = textures_.find(tex.id);
         if (it == textures_.end())
         {
-            // Unknown handle: use white.
+            // Unknown handle: substitute the white texture.
             it = textures_.find(white_texture_.id);
             if (it == textures_.end())
                 return;
         }
-        GLuint gl_tex = it->second;
+        const GLuint gl_tex = it->second;
 
         batch_.submit_quad(gl_tex,
                            x, y, w, h,
@@ -377,9 +436,9 @@ void main() {
         frame_stats_.sprites_drawn++;
     }
 
-    // -----------------------------------------------------------------------------
+    // =============================================================================
     // Stats
-    // -----------------------------------------------------------------------------
+    // =============================================================================
 
     RenderStats RendererGL::stats() const
     {
@@ -391,9 +450,9 @@ void main() {
         frame_stats_ = RenderStats{};
     }
 
-    // -----------------------------------------------------------------------------
+    // =============================================================================
     // Factory
-    // -----------------------------------------------------------------------------
+    // =============================================================================
 
     Renderer *create_renderer_gl()
     {

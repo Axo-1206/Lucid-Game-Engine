@@ -31,7 +31,6 @@ int main()
         engine::log_error("Failed to initialize renderer");
         return 1;
     }
-    renderer->set_viewport(1280, 720);
 
     std::unique_ptr<engine::Input> input(
         engine::create_input_glfw(window.native_handle()));
@@ -39,8 +38,6 @@ int main()
     engine::ecs::World world;
     engine::setup_core_tables(world);
 
-    // Build the package manager. A real game would also load
-    // game-specific packages here.
     engine::PackageManager packages;
     packages.load_package(std::make_unique<engine::CorePackage>());
     packages.load_package(std::make_unique<engine::LogicPackage>());
@@ -69,8 +66,8 @@ int main()
     camera.x = cam_data.pos_x;
     camera.y = cam_data.pos_y;
     camera.zoom = 1.0f / cam_data.ortho_size;
-    camera.viewport_w = 1280.0f;
-    camera.viewport_h = 720.0f;
+    camera.viewport_w = static_cast<float>(window.width());
+    camera.viewport_h = static_cast<float>(window.height());
     renderer->set_camera_2d(camera);
 
     engine::RenderList render_list;
@@ -81,6 +78,10 @@ int main()
         clock,
         render_list,
     };
+
+    // Track the window size so we can reset the viewport on resize.
+    int last_w = window.width();
+    int last_h = window.height();
 
     while (!window.should_close())
     {
@@ -95,14 +96,29 @@ int main()
             window.request_close();
         }
 
+        // Reset the viewport if the window resized.
+        if (window.width() != last_w || window.height() != last_h)
+        {
+            last_w = window.width();
+            last_h = window.height();
+            renderer->set_full_viewport();
+        }
+
         runtime.tick(dt);
 
+        renderer->begin_frame(cam_data.clear_color);
+
+        renderer->begin_world_2d();
         engine::hierarchy_system(ctx, dt);
         engine::movement_system(ctx, dt);
         engine::hierarchy_system(ctx, dt);
+        engine::render_system(ctx, dt); // fills and submits inside
+        renderer->end_world_2d();
 
-        renderer->begin_frame(cam_data.clear_color);
-        engine::render_system(ctx, dt);
+        renderer->begin_ui();
+        // No UI yet. This is where a HUD would draw.
+        renderer->end_ui();
+
         renderer->end_frame();
         renderer->present();
     }

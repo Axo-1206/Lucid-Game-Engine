@@ -1,5 +1,5 @@
-#include "render/backend_gl/sprite_batch_gl.h"
-#include "render/backend_gl/shader_gl.h"
+#include "engine/render/backend_gl/sprite_batch_gl.h"
+#include "engine/render/backend_gl/shader_gl.h"
 #include "engine/core/log.h"
 
 #include <cmath>
