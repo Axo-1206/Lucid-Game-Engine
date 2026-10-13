@@ -4,6 +4,7 @@ add_library(lucid_ecs STATIC
     src/column.cpp
     src/table.cpp
     src/world.cpp
+    src/core/entity.cpp
 )
 
 target_include_directories(lucid_ecs

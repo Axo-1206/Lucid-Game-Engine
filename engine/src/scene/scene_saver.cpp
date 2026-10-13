@@ -1,7 +1,7 @@
 #include "engine/scene/scene.h"
 #include "engine/scene/scene_schema.h"
-#include "engine/scene/component_tags.h"
-#include "engine/scene/entity.h"
+#include "engine/ecs/core/component_tags.h"
+#include "engine/ecs/core/entity.h"
 #include "engine/core/log.h"
 
 #include <nlohmann/json.hpp>
@@ -116,7 +116,7 @@ namespace engine
         // --- Cameras ---
         {
             json cameras = json::array();
-            const auto *cam_tbl = world.get_table(kCameraTable);
+            const auto *cam_tbl = world.get_table(kCameraTableName);
             if (cam_tbl)
             {
                 cam_tbl->each([&](engine::ecs::RowRef r)

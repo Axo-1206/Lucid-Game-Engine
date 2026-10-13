@@ -40,6 +40,9 @@ section for the distinction.
 ```
 ecs/
 ├── include/engine/ecs/
+│   ├── core/
+│   │   ├── component_tags.h
+│   │   └── entity.h
 │   ├── types.h          RowIndex, Generation, RowId, ColumnType
 │   ├── row_ref.h        RowRef
 │   ├── callback.h       CallbackHandle
@@ -48,6 +51,8 @@ ecs/
 │   ├── table.h          Table
 │   └── world.h          World
 ├── src/
+│   ├── core/
+│   │   └── entity.cpp
 │   ├── types.cpp
 │   ├── cell_value.cpp
 │   ├── column.cpp
@@ -99,8 +104,6 @@ engine/
 │   │     ├── shader_gl.h
 │   │     └── sprite_batch_gl.h
 │   ├── scene/
-│   │   ├── component_tags.h
-│   │   ├── entity.h
 │   │   ├── scene.h
 │   │   └── scene_schema.h
 │   └── systems/
@@ -137,7 +140,6 @@ engine/
     │       ├── shader_gl.cpp
     │       └── sprite_batch_gl.cpp
     ├── scene/
-    │   ├── entity.cpp
     │   ├── scene.cpp
     │   ├── scene_loader.cpp
     │   └── scene_saver.cpp

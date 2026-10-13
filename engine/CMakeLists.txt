@@ -28,7 +28,6 @@ add_library(luc_engine STATIC
     src/scene/scene.cpp
     src/scene/scene_loader.cpp
     src/scene/scene_saver.cpp
-    src/scene/entity.cpp
 
     src/systems/hierarchy_system.cpp
     src/systems/movement_system.cpp

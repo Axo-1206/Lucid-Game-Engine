@@ -1,5 +1,6 @@
 #include "engine/render/camera.h"
 #include "engine/core/log.h"
+#include "engine/ecs/core/component_tags.h"
 
 #include <string>
 
@@ -9,7 +10,7 @@ namespace engine
     engine::ecs::RowRef find_camera(const engine::ecs::World &world,
                                     const std::string &name)
     {
-        const auto *tbl = world.get_table(kCameraTable);
+        const auto *tbl = world.get_table(kCameraTableName);
         if (tbl == nullptr || name.empty())
         {
             return engine::ecs::RowRef{};
@@ -23,7 +24,7 @@ namespace engine
     {
         CameraDesc desc;
 
-        const auto *tbl = world.get_table(kCameraTable);
+        const auto *tbl = world.get_table(kCameraTableName);
         if (tbl == nullptr || !tbl->is_valid(ref))
         {
             return desc;
@@ -52,7 +53,7 @@ namespace engine
     engine::ecs::RowRef write_camera_row(engine::ecs::World &world,
                                          const CameraDesc &desc)
     {
-        auto *tbl = world.get_table(kCameraTable);
+        auto *tbl = world.get_table(kCameraTableName);
         if (tbl == nullptr)
         {
             return engine::ecs::RowRef{};

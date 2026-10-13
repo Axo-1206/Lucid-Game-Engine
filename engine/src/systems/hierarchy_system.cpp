@@ -1,5 +1,5 @@
 #include "engine/systems/systems.h"
-#include "engine/scene/component_tags.h"
+#include "engine/ecs/core/component_tags.h"
 
 #include <cstddef>
 

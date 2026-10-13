@@ -6,7 +6,7 @@
 #include "engine/render/camera.h"
 #include "engine/render/renderer.h"
 #include "engine/platform/input.h"
-#include "engine/scene/entity.h"
+#include "engine/ecs/core/entity.h"
 #include "engine/scene/scene.h"
 #include "engine/systems/system_context.h"
 #include "engine/systems/systems.h"

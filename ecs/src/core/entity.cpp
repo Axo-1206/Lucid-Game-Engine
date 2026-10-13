@@ -1,9 +1,8 @@
-#include "engine/scene/entity.h"
-#include "engine/core/log.h"
-#include "engine/scene/component_tags.h"
-#include "engine/render/camera.h"
+#include "engine/ecs/core/entity.h"
 
+#include <cstdint>
 #include <stdexcept>
+#include <string>
 
 namespace engine
 {
@@ -14,28 +13,30 @@ namespace engine
         constexpr const char *kEngineStateTable = "Engine_EngineState";
         constexpr const char *kNextEntityIdKey = "next_entity_id";
 
-        // Reads the value_u64 of the Engine_EngineState row with the given name.
-        // Throws if the row doesn't exist.
         std::uint64_t read_engine_state_u64(engine::ecs::World &world, const std::string &name)
         {
             auto *tbl = world.get_table(kEngineStateTable);
             if (!tbl)
                 throw std::runtime_error("Engine_EngineState table not set up");
 
-            engine::ecs::RowRef row = tbl->find_by_primary("name", engine::ecs::CellValue::from_string(name));
+            engine::ecs::RowRef row = tbl->find_by_primary(
+                "name", engine::ecs::CellValue::from_string(name));
             if (row.is_nil())
                 throw std::runtime_error("Engine_EngineState key not found: " + name);
 
             return tbl->get_uint64(row, "value_u64");
         }
 
-        void write_engine_state_u64(engine::ecs::World &world, const std::string &name, std::uint64_t value)
+        void write_engine_state_u64(engine::ecs::World &world,
+                                    const std::string &name,
+                                    std::uint64_t value)
         {
             auto *tbl = world.get_table(kEngineStateTable);
             if (!tbl)
                 throw std::runtime_error("Engine_EngineState table not set up");
 
-            engine::ecs::RowRef row = tbl->find_by_primary("name", engine::ecs::CellValue::from_string(name));
+            engine::ecs::RowRef row = tbl->find_by_primary(
+                "name", engine::ecs::CellValue::from_string(name));
             if (row.is_nil())
                 throw std::runtime_error("Engine_EngineState key not found: " + name);
 
@@ -54,7 +55,10 @@ namespace engine
 
         if (current == UINT64_MAX)
         {
-            log_fatal("Entity id counter exhausted");
+            // The counter is exhausted. There is no recovery; throw.
+            // The previous version called log_fatal; lucid_ecs does not
+            // depend on the log library, so it throws instead.
+            throw std::runtime_error("Entity id counter exhausted");
         }
 
         write_engine_state_u64(world, kNextEntityIdKey, current + 1);
@@ -90,15 +94,12 @@ namespace engine
         if (!is_alive(world, e))
             return;
 
-        // Remove components in reverse dependency order.
-        // (Nothing depends on WorldTransform or Sprite, but be tidy.)
         remove_component<VelocityTag>(world, e);
         remove_component<SpriteTag>(world, e);
         remove_component<ScriptTag>(world, e);
         remove_component<WorldTransformTag>(world, e);
         remove_component<TransformTag>(world, e);
 
-        // Remove the entity row itself.
         auto *tbl = world.get_table(EntityTag::name);
         if (tbl)
             tbl->remove(e);
@@ -132,7 +133,8 @@ namespace engine
         return tbl->get_string(e, "name");
     }
 
-    void set_entity_name(engine::ecs::World &world, EntityRef e, const std::string &name)
+    void set_entity_name(engine::ecs::World &world, EntityRef e,
+                         const std::string &name)
     {
         auto *tbl = world.get_table(EntityTag::name);
         if (!tbl || !tbl->is_valid(e))
@@ -166,9 +168,7 @@ namespace engine
 
     void setup_core_tables(engine::ecs::World &world)
     {
-        // Engine_EngineState is engine-lifetime: World::clear() preserves it,
-        // so the entity-id allocator survives a scene unload. See
-        // docs/Decision.md, Decision 7.
+        // Engine_EngineState is engine-lifetime: World::clear() preserves it.
         world.mark_preserved(kEngineStateTable);
 
         // Engine_EngineState
@@ -234,10 +234,6 @@ namespace engine
         }
 
         // Script
-        //
-        // A Script component references a .lucgraph file by path. The
-        // scene loader stores the path; the runtime loads the graph.
-        // The scene itself never compiles or loads the graph.
         {
             auto *t = world.create_table(ScriptTag::name);
             t->add_column("entity", engine::ecs::ColumnType::RowRef, /*primary=*/true);
@@ -245,8 +241,10 @@ namespace engine
         }
 
         // Camera. Not an entity component: keyed by name, not by entity.
+        // The name string comes from component_tags.h's kCameraTableName;
+        // camera.h uses the same constant.
         {
-            auto *t = world.create_table(engine::kCameraTable);
+            auto *t = world.create_table(kCameraTableName);
             t->add_column("name", engine::ecs::ColumnType::String, /*primary=*/true);
             t->add_column("pos_x", engine::ecs::ColumnType::Float32);
             t->add_column("pos_y", engine::ecs::ColumnType::Float32);
@@ -264,8 +262,6 @@ namespace engine
             t->add_column("clear_b", engine::ecs::ColumnType::Float32);
             t->add_column("clear_a", engine::ecs::ColumnType::Float32);
         }
-
-        log_info("Core tables created");
     }
 
 } // namespace engine

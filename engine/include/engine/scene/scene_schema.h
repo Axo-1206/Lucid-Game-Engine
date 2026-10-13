@@ -47,7 +47,7 @@ namespace engine
     //
     // To add a component:
     //   1. Add its tag to component_tags.h.
-    //   2. Add its table to setup_core_tables in engine/src/scene/entity.cpp.
+    //   2. Add its table to setup_core_tables in ecs/src/core/entity.cpp.
     //   3. Add a load_<component> function to scene_loader.cpp and a
     //      dispatch line in load_component.
     //   4. Add a save_<component> function to scene_saver.cpp and a

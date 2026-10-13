@@ -1,7 +1,7 @@
 #include "engine/scene/scene.h"
 #include "engine/scene/scene_schema.h"
-#include "engine/scene/component_tags.h"
-#include "engine/scene/entity.h"
+#include "engine/ecs/core/component_tags.h"
+#include "engine/ecs/core/entity.h"
 #include "engine/core/log.h"
 
 #include <nlohmann/json.hpp>
@@ -121,7 +121,7 @@ namespace engine
         engine::ecs::RowRef load_camera(engine::ecs::World &world, const json &j)
         {
             const std::string name = j.value("name", std::string("camera"));
-            auto *tbl = world.get_table(kCameraTable);
+            auto *tbl = world.get_table(kCameraTableName);
             if (tbl && !tbl->find_by_primary(
                                "name", engine::ecs::CellValue::from_string(name))
                             .is_nil())

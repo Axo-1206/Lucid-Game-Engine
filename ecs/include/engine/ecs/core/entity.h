@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/scene/component_tags.h"
+#include "engine/ecs/core/component_tags.h"
 #include "engine/ecs/world.h"
 
 #include <cstdint>
@@ -44,6 +44,10 @@ namespace engine
 
     // -----------------------------------------------------------------------------
     // Components (template API)
+    //
+    // Every TableT here must name a table whose primary column is
+    // `entity`. The camera table does not; it has no tag and no
+    // add_component<...> instantiation.
     // -----------------------------------------------------------------------------
 
     template <typename TableT>

@@ -2,7 +2,7 @@
 #include "engine/graph/tick_context.h" // TickContext, NodeExecutor
 #include "engine/core/format_diagnostics.h"
 #include "engine/core/log.h"
-#include "engine/scene/component_tags.h"
+#include "engine/ecs/core/component_tags.h"
 
 #include "sema/Literal.hpp"
 #include "serialization/Deserializer.hpp"

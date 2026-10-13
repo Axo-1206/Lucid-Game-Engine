@@ -1,16 +1,12 @@
 #pragma once
 
 #include "engine/ecs/world.h"
+#include "engine/ecs/core/component_tags.h"
 
 #include <string>
 
 namespace engine
 {
-
-    // The camera table's name. The camera is not an entity component:
-    // its rows are keyed by `name`, not by `entity`. See
-    // docs/Decision.md, Decision 3.
-    inline constexpr const char *kCameraTable = "Engine_Camera";
 
     // A camera description. The schema type: what is serialized, what
     // a Scene carries, what a camera table row mirrors. It is not the

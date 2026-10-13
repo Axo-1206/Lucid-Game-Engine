@@ -4,9 +4,9 @@
 #include "engine/registry/package_manager.h"
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
-#include "engine/scene/entity.h"
+#include "engine/ecs/core/entity.h"
 #include "engine/scene/scene.h"
-#include "engine/scene/component_tags.h"
+#include "engine/ecs/core/component_tags.h"
 #include "engine/core/log.h"
 
 #include "sema/Sema.hpp"
