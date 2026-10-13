@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include "engine/ecs/core/entity.h"
 #include "engine/ecs/world.h"
+#include "engine/scene/component_registry.h"
+#include "engine/scene/scene.h"
 
 using namespace engine;
 
@@ -179,4 +181,48 @@ TEST_CASE("entity: component defaults after destroy and re-add",
     auto t2 = add_component<TransformTag>(f.world, e);
     REQUIRE(f.world.get_table("Engine_Transform")->get_float32(t2, "x") == 0.0f);
     REQUIRE(f.world.get_table("Engine_Transform")->get_float32(t2, "y") == 0.0f);
+}
+
+TEST_CASE("entity: id allocator after a scene apply", "[entity]")
+{
+    engine::ecs::World world;
+    setup_core_tables(world);
+
+    engine::ComponentRegistry components;
+    register_core_components(components);
+
+    // A scene with entities 5 and 9.
+    engine::Scene s;
+    s.set_json_text(R"({
+        "version": 1,
+        "name": "ids",
+        "entities": [
+            { "id": 5, "name": "A", "parent": 0, "components": {} },
+            { "id": 9, "name": "B", "parent": 0, "components": {} }
+        ]
+    })");
+    s.apply_to(world, components, engine::ApplyMode::Clear);
+
+    // The scene did not carry engine_state; apply computed max + 1.
+    REQUIRE(allocate_entity_id(world) == 10);
+}
+
+TEST_CASE("entity: scene's next_entity_id is used after apply", "[entity]")
+{
+    engine::ecs::World world;
+    setup_core_tables(world);
+
+    engine::ComponentRegistry components;
+    register_core_components(components);
+
+    engine::Scene s;
+    s.set_json_text(R"({
+        "version": 1,
+        "name": "ids",
+        "entities": [],
+        "engine_state": { "next_entity_id": 42 }
+    })");
+    s.apply_to(world, components, engine::ApplyMode::Clear);
+
+    REQUIRE(allocate_entity_id(world) == 42);
 }

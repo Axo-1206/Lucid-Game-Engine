@@ -201,3 +201,91 @@ TEST_CASE("scene: loading a scene with cameras sets active camera name",
 
     std::filesystem::remove(path);
 }
+
+TEST_CASE("scene: apply_to with Additive keeps existing entities",
+          "[scene]")
+{
+    Fixture f;
+
+    // Pre-populate with one entity.
+    create_entity(f.world, 100, "Existing");
+    REQUIRE(f.world.get_table("Engine_Entity")->count() == 1);
+
+    // A scene with one new entity.
+    const std::string json =
+        R"({
+            "version": 1,
+            "name": "additive",
+            "entities": [
+                { "id": 200, "name": "New", "parent": 0, "components": {} }
+            ]
+        })";
+    Scene s;
+    s.set_json_text(json);
+    s.apply_to(f.world, f.components, ApplyMode::Additive);
+
+    // Both entities exist.
+    REQUIRE(f.world.get_table("Engine_Entity")->count() == 2);
+    auto existing = f.world.get_table("Engine_Entity")->find_by_primary("id", engine::ecs::CellValue::from_uint64(100));
+    REQUIRE_FALSE(existing.is_nil());
+    auto added = f.world.get_table("Engine_Entity")->find_by_primary("id", engine::ecs::CellValue::from_uint64(200));
+    REQUIRE_FALSE(added.is_nil());
+}
+
+TEST_CASE("scene: an unknown component is logged and skipped", "[scene]")
+{
+    Fixture f;
+
+    const std::string json =
+        R"({
+            "version": 1,
+            "name": "unknown",
+            "entities": [
+                {
+                    "id": 1, "name": "E", "parent": 0,
+                    "components": { "Alice_Nonexistent": { "foo": 1 } }
+                }
+            ]
+        })";
+    Scene s;
+    s.set_json_text(json);
+    s.apply_to(f.world, f.components, ApplyMode::Clear);
+
+    // The entity exists; the unknown component did not crash the load.
+    REQUIRE(f.world.get_table("Engine_Entity")->count() == 1);
+}
+
+TEST_CASE("scene: a scene with no cameras has no active camera", "[scene]")
+{
+    Fixture f;
+
+    const std::string json =
+        R"({ "version": 1, "name": "no-camera", "entities": [] })";
+    Scene s;
+    s.set_json_text(json);
+    s.apply_to(f.world, f.components, ApplyMode::Clear);
+
+    REQUIRE(s.active_camera_name().empty());
+    REQUIRE(f.world.get_table(kCameraTableName)->count() == 0);
+}
+
+TEST_CASE("scene: a duplicate camera name is skipped", "[scene]")
+{
+    Fixture f;
+
+    const std::string json =
+        R"({
+            "version": 1,
+            "name": "dup",
+            "cameras": [
+                { "name": "main", "pos": [0, 0, 0] },
+                { "name": "main", "pos": [10, 10, 0] }
+            ],
+            "entities": []
+        })";
+    Scene s;
+    s.set_json_text(json);
+    s.apply_to(f.world, f.components, ApplyMode::Clear);
+
+    REQUIRE(f.world.get_table(kCameraTableName)->count() == 1);
+}

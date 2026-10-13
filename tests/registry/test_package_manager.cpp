@@ -4,6 +4,7 @@
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
 #include "engine/registry/editor_info.h"
+#include "engine/ecs/core/entity.h"
 
 #include "sema/NodeKind.hpp"
 #include "sema/Sema.hpp"
@@ -71,10 +72,9 @@ TEST_CASE("package_manager: explicit editor info is returned",
 TEST_CASE("package_manager: unknown node type returns nullptr",
           "[package][editor]")
 {
-    engine::ecs::World world;
     PackageManager mgr;
     REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
-    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.apply_registration_only());
 
     REQUIRE(mgr.node_editor_info("Engine_NotANode") == nullptr);
     REQUIRE(mgr.node_editor_info("Alice_GravityNode") == nullptr);
@@ -83,15 +83,83 @@ TEST_CASE("package_manager: unknown node type returns nullptr",
 TEST_CASE("package_manager: table editor info falls back",
           "[package][editor]")
 {
-    engine::ecs::World world;
     PackageManager mgr;
     REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
-    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.apply_registration_only());
 
-    // No explicit editor info for tables in CorePackage.
-    // The fallback returns a default with display_name from the
-    // base name.
     const TableEditorInfo *info = mgr.table_editor_info("Engine_Entity");
     REQUIRE(info != nullptr);
     REQUIRE(info->display_name == "Entity");
+}
+
+TEST_CASE("package_manager: apply_registration_only twice is a no-op",
+          "[package]")
+{
+    PackageManager mgr;
+    REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
+    REQUIRE(mgr.apply_registration_only());
+    REQUIRE(mgr.applied());
+
+    // Second call: logs a warning, does not corrupt state.
+    REQUIRE(mgr.apply_registration_only());
+    REQUIRE(mgr.applied());
+
+    // The registry is unchanged.
+    REQUIRE(mgr.registry().nodeTypes.size() == 4);
+}
+
+TEST_CASE("package_manager: apply twice is a no-op",
+          "[package]")
+{
+    engine::ecs::World world;
+    engine::setup_core_tables(world);
+
+    PackageManager mgr;
+    REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
+    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.applied());
+
+    // Second call: logs a warning, does not corrupt state, does not
+    // throw (the world already has the core tables; a real re-apply
+    // would try to create them again and throw).
+    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.applied());
+
+    REQUIRE(mgr.registry().nodeTypes.size() == 4);
+}
+
+TEST_CASE("package_manager: apply after apply_registration_only is a no-op",
+          "[package]")
+{
+    PackageManager mgr;
+    REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
+    REQUIRE(mgr.apply_registration_only());
+    REQUIRE(mgr.applied());
+
+    engine::ecs::World world;
+    engine::setup_core_tables(world);
+
+    // The manager is already applied; this call is refused. It must
+    // not throw (a real apply would try to create the package's
+    // tables, and CorePackage registers zero tables, so this is not
+    // observed).
+    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.applied());
+    REQUIRE(mgr.registry().nodeTypes.size() == 4);
+}
+
+TEST_CASE("package_manager: apply_registration_only after apply is a no-op",
+          "[package]")
+{
+    engine::ecs::World world;
+    engine::setup_core_tables(world);
+
+    PackageManager mgr;
+    REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
+    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.applied());
+
+    REQUIRE(mgr.apply_registration_only());
+    REQUIRE(mgr.applied());
+    REQUIRE(mgr.registry().nodeTypes.size() == 4);
 }

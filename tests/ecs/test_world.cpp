@@ -138,3 +138,42 @@ TEST_CASE("world: mark_preserved is idempotent and order-independent",
         REQUIRE_FALSE(w.has_table("Never"));
     }
 }
+
+TEST_CASE("world: each_table after clear visits only survivors",
+          "[ecs][world]")
+{
+    World w;
+    w.mark_preserved("Keep");
+    w.create_table("A");
+    w.create_table("Keep");
+    w.create_table("B");
+
+    w.clear();
+
+    std::vector<std::string> names;
+    w.each_table([&](Table &t)
+                 { names.push_back(t.name()); });
+
+    REQUIRE(names == std::vector<std::string>{"Keep"});
+}
+
+TEST_CASE("world: clear preserves the order of surviving tables",
+          "[ecs][world]")
+{
+    World w;
+    w.mark_preserved("P1");
+    w.mark_preserved("P2");
+    w.create_table("A");
+    w.create_table("P1");
+    w.create_table("B");
+    w.create_table("P2");
+    w.create_table("C");
+
+    w.clear();
+
+    std::vector<std::string> names;
+    w.each_table([&](Table &t)
+                 { names.push_back(t.name()); });
+
+    REQUIRE(names == std::vector<std::string>{"P1", "P2"});
+}

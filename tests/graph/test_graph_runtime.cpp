@@ -263,6 +263,8 @@ TEST_CASE("graph_runtime: load picks up a changed Script row",
     // Reload picks up the change.
     REQUIRE(rt.load());
     REQUIRE(rt.graph_count() == 1);
+
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "b.lucgraph");
 }
 
 TEST_CASE("graph_runtime: missing file does not throw", "[graph][runtime]")
@@ -278,6 +280,82 @@ TEST_CASE("graph_runtime: missing file does not throw", "[graph][runtime]")
     rt.set_asset_root(temp_dir());
     REQUIRE_FALSE(rt.load());
     REQUIRE(rt.graph_count() == 0);
+}
+
+TEST_CASE("graph_runtime: empty Script table loads zero graphs",
+          "[graph][runtime]")
+{
+    Fixture f;
+    // setup_core_tables creates Engine_Script. It is empty.
+    REQUIRE(f.world.get_table(ScriptTag::name) != nullptr);
+    REQUIRE(f.world.get_table(ScriptTag::name)->count() == 0);
+
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
+    rt.set_asset_root(temp_dir());
+
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 0);
+}
+
+TEST_CASE("graph_runtime: an empty Script path is skipped",
+          "[graph][runtime]")
+{
+    Fixture f;
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    // graph column left at default "".
+
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
+    rt.set_asset_root(temp_dir());
+
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 0);
+}
+
+TEST_CASE("graph_runtime: a partial load keeps the graphs that succeeded",
+          "[graph][runtime]")
+{
+    Fixture f;
+
+    const auto good1 = temp_dir() / "good1.lucgraph";
+    const auto good2 = temp_dir() / "good2.lucgraph";
+    REQUIRE(compile_to_file(
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(1.0) on frame\n",
+        good1));
+    REQUIRE(compile_to_file(
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(2.0) on frame\n",
+        good2));
+
+    // Three entities, three Script rows.
+    {
+        EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "A");
+        auto s = add_component<ScriptTag>(f.world, e);
+        f.world.get_table(ScriptTag::name)->set_string(s, "graph", "good1.lucgraph");
+    }
+    {
+        EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "B");
+        auto s = add_component<ScriptTag>(f.world, e);
+        f.world.get_table(ScriptTag::name)->set_string(s, "graph", "missing.lucgraph");
+    }
+    {
+        EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "C");
+        auto s = add_component<ScriptTag>(f.world, e);
+        f.world.get_table(ScriptTag::name)->set_string(s, "graph", "good2.lucgraph");
+    }
+
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
+    rt.set_asset_root(temp_dir());
+
+    // One of three failed; the call reports false.
+    REQUIRE_FALSE(rt.load());
+    // But two loaded and remain.
+    REQUIRE(rt.graph_count() == 2);
 }
 
 TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
