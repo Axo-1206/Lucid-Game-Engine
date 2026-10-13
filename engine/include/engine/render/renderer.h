@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/render/camera2d.h"
+#include "engine/render/camera.h"
 #include "engine/render/render_types.h"
 #include "engine/render/texture.h"
 

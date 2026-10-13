@@ -90,7 +90,6 @@ engine/
 │   │       └── logic_package.h
 │   ├── render/
 │   │   ├── camera.h
-│   │   ├── camera2d.h
 │   │   ├── render_list.h
 │   │   ├── render_types.h
 │   │   ├── renderer.h
@@ -132,6 +131,7 @@ engine/
     │       └── logic_package.cpp
     ├── render/
     │   ├── render_list.cpp
+    │   ├── camera.cpp
     │   └── backend_gl/
     │       ├── renderer_gl.cpp
     │       ├── shader_gl.cpp

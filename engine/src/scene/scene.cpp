@@ -120,63 +120,50 @@ namespace engine
 
         engine::ecs::RowRef load_camera(engine::ecs::World &world, const json &j)
         {
-            auto *tbl = world.get_table(CameraTag::name);
-            if (!tbl)
-                return engine::ecs::RowRef{};
-
             const std::string name = j.value("name", std::string("camera"));
-            if (!tbl->find_by_primary("name", engine::ecs::CellValue::from_string(name)).is_nil())
+            auto *tbl = world.get_table(kCameraTable);
+            if (tbl && !tbl->find_by_primary(
+                               "name", engine::ecs::CellValue::from_string(name))
+                            .is_nil())
             {
                 log_warn("Duplicate camera name in scene: %s", name.c_str());
                 return engine::ecs::RowRef{};
             }
+            CameraDesc desc;
+            desc.name = name;
 
-            float pos_x = 0.0f, pos_y = 0.0f, pos_z = 0.0f;
             if (j.contains("pos") && j["pos"].is_array() && j["pos"].size() >= 2)
             {
-                pos_x = j["pos"][0].get<float>();
-                pos_y = j["pos"][1].get<float>();
+                desc.pos_x = j["pos"][0].get<float>();
+                desc.pos_y = j["pos"][1].get<float>();
                 if (j["pos"].size() >= 3)
-                    pos_z = j["pos"][2].get<float>();
+                    desc.pos_z = j["pos"][2].get<float>();
             }
 
-            float target_x = 0.0f, target_y = 0.0f, target_z = 0.0f;
             if (j.contains("target") && j["target"].is_array() && j["target"].size() >= 2)
             {
-                target_x = j["target"][0].get<float>();
-                target_y = j["target"][1].get<float>();
+                desc.target_x = j["target"][0].get<float>();
+                desc.target_y = j["target"][1].get<float>();
                 if (j["target"].size() >= 3)
-                    target_z = j["target"][2].get<float>();
+                    desc.target_z = j["target"][2].get<float>();
             }
 
-            float clear_r = 0.0f, clear_g = 0.0f, clear_b = 0.0f, clear_a = 1.0f;
             if (j.contains("clear_color") && j["clear_color"].is_array() && j["clear_color"].size() >= 3)
             {
-                clear_r = j["clear_color"][0].get<float>();
-                clear_g = j["clear_color"][1].get<float>();
-                clear_b = j["clear_color"][2].get<float>();
+                desc.clear_r = j["clear_color"][0].get<float>();
+                desc.clear_g = j["clear_color"][1].get<float>();
+                desc.clear_b = j["clear_color"][2].get<float>();
                 if (j["clear_color"].size() >= 4)
-                    clear_a = j["clear_color"][3].get<float>();
+                    desc.clear_a = j["clear_color"][3].get<float>();
             }
 
-            auto ref = tbl->add_partial("name", engine::ecs::CellValue::from_string(name));
-            tbl->set_float32(ref, "pos_x", pos_x);
-            tbl->set_float32(ref, "pos_y", pos_y);
-            tbl->set_float32(ref, "pos_z", pos_z);
-            tbl->set_float32(ref, "target_x", target_x);
-            tbl->set_float32(ref, "target_y", target_y);
-            tbl->set_float32(ref, "target_z", target_z);
-            tbl->set_float32(ref, "fov", j.value("fov", 60.0f));
-            tbl->set_float32(ref, "near", j.value("near", 0.1f));
-            tbl->set_float32(ref, "far", j.value("far", 1000.0f));
-            tbl->set_bool(ref, "is_orthographic", j.value("is_orthographic", true));
-            tbl->set_float32(ref, "ortho_size", j.value("ortho_size", 1.0f));
-            tbl->set_float32(ref, "clear_r", clear_r);
-            tbl->set_float32(ref, "clear_g", clear_g);
-            tbl->set_float32(ref, "clear_b", clear_b);
-            tbl->set_float32(ref, "clear_a", clear_a);
+            desc.fov = j.value("fov", 60.0f);
+            desc.near_plane = j.value("near", 0.1f);
+            desc.far_plane = j.value("far", 1000.0f);
+            desc.is_orthographic = j.value("is_orthographic", true);
+            desc.ortho_size = j.value("ortho_size", 1.0f);
 
-            return ref;
+            return write_camera_row(world, desc);
         }
 
         // ---- Apply the parsed JSON to the world ----

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/ecs/world.h"
+#include "engine/render/camera.h"
 #include "engine/scene/scene_schema.h"
 
 #include <cstdint>
@@ -9,30 +10,6 @@
 
 namespace engine
 {
-
-    // A camera description. The schema type: what is serialized. The
-    // runtime state is a row in the Engine_Camera table; the renderer's
-    // view is a Camera2D. See docs/Decision.md, Decision 3 and
-    // Decision 4.
-    struct CameraDesc
-    {
-        std::string name;
-        float pos_x = 0.0f;
-        float pos_y = 0.0f;
-        float pos_z = 0.0f;
-        float target_x = 0.0f;
-        float target_y = 0.0f;
-        float target_z = 0.0f;
-        float fov = 60.0f;
-        float near_plane = 0.1f;
-        float far_plane = 1000.0f;
-        bool is_orthographic = true;
-        float ortho_size = 1.0f;
-        float clear_r = 0.0f;
-        float clear_g = 0.0f;
-        float clear_b = 0.0f;
-        float clear_a = 1.0f;
-    };
 
     // The scene's schema. A description of entities, components, and
     // cameras read from a .lscene file.

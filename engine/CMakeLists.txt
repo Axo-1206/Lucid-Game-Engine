@@ -23,6 +23,7 @@ add_library(luc_engine STATIC
     src/render/backend_gl/sprite_batch_gl.cpp
     src/render/backend_gl/renderer_gl.cpp
     src/render/render_list.cpp
+    src/render/camera.cpp
 
     src/scene/scene.cpp
     src/scene/scene_loader.cpp

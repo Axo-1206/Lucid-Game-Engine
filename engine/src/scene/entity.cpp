@@ -1,6 +1,7 @@
 #include "engine/scene/entity.h"
 #include "engine/core/log.h"
 #include "engine/scene/component_tags.h"
+#include "engine/render/camera.h"
 
 #include <stdexcept>
 
@@ -243,9 +244,9 @@ namespace engine
             t->add_column("graph", engine::ecs::ColumnType::String);
         }
 
-        // Camera
+        // Camera. Not an entity component: keyed by name, not by entity.
         {
-            auto *t = world.create_table(CameraTag::name);
+            auto *t = world.create_table(engine::kCameraTable);
             t->add_column("name", engine::ecs::ColumnType::String, /*primary=*/true);
             t->add_column("pos_x", engine::ecs::ColumnType::Float32);
             t->add_column("pos_y", engine::ecs::ColumnType::Float32);

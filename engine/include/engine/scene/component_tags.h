@@ -38,9 +38,5 @@ namespace engine
     {
         static constexpr const char *name = "Engine_Script";
     };
-    struct CameraTag
-    {
-        static constexpr const char *name = "Engine_Camera";
-    }; // not an entity component
 
 } // namespace engine

@@ -116,28 +116,23 @@ namespace engine
         // --- Cameras ---
         {
             json cameras = json::array();
-            const auto *cam_tbl = world.get_table(CameraTag::name);
+            const auto *cam_tbl = world.get_table(kCameraTable);
             if (cam_tbl)
             {
                 cam_tbl->each([&](engine::ecs::RowRef r)
                               {
+                    const CameraDesc desc = read_camera_row(world, r);
+
                     json cj;
-                    cj["name"]            = cam_tbl->get_string(r, "name");
-                    cj["pos"]             = { cam_tbl->get_float32(r, "pos_x"),
-                                              cam_tbl->get_float32(r, "pos_y"),
-                                              cam_tbl->get_float32(r, "pos_z") };
-                    cj["target"]          = { cam_tbl->get_float32(r, "target_x"),
-                                              cam_tbl->get_float32(r, "target_y"),
-                                              cam_tbl->get_float32(r, "target_z") };
-                    cj["fov"]             = cam_tbl->get_float32(r, "fov");
-                    cj["near"]            = cam_tbl->get_float32(r, "near");
-                    cj["far"]             = cam_tbl->get_float32(r, "far");
-                    cj["is_orthographic"] = cam_tbl->get_bool   (r, "is_orthographic");
-                    cj["ortho_size"]      = cam_tbl->get_float32(r, "ortho_size");
-                    cj["clear_color"]     = { cam_tbl->get_float32(r, "clear_r"),
-                                              cam_tbl->get_float32(r, "clear_g"),
-                                              cam_tbl->get_float32(r, "clear_b"),
-                                              cam_tbl->get_float32(r, "clear_a") };
+                    cj["name"]            = desc.name;
+                    cj["pos"]             = { desc.pos_x, desc.pos_y, desc.pos_z };
+                    cj["target"]          = { desc.target_x, desc.target_y, desc.target_z };
+                    cj["fov"]             = desc.fov;
+                    cj["near"]            = desc.near_plane;
+                    cj["far"]             = desc.far_plane;
+                    cj["is_orthographic"] = desc.is_orthographic;
+                    cj["ortho_size"]      = desc.ortho_size;
+                    cj["clear_color"]     = { desc.clear_r, desc.clear_g, desc.clear_b, desc.clear_a };
                     cameras.push_back(cj); });
             }
             root["cameras"] = cameras;
