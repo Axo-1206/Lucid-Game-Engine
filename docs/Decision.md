@@ -269,6 +269,37 @@ evolution rules.
 
 ---
 
+## Decision 9 — Three operations for emptying a world
+
+`World::clear()` removes non-preserved tables and keeps preserved
+ones with their rows. `World::clear_rows()` empties every table and
+keeps every schema. `Scene::apply_to(world, ApplyMode::Clear)`
+calls `clear_rows()` and re-seeds `Engine_EngineState.next_entity_id`
+from the scene.
+
+The three exist because three different things are needed:
+
+- A session-level reset that keeps the engine's counters
+  (`clear()`). The entity-id allocator must not repeat an id within
+  a session.
+- A scene-level reset that keeps the engine's schema so a new scene
+  can populate it (`clear_rows()`).
+- A scene load that does the scene-level reset and then writes the
+  scene's entities and cameras (`apply_to(Clear)`).
+
+`clear()` is not a synonym for `clear_rows()`. Calling `clear()`
+before populating a scene removes `Engine_Entity` and the next
+`create_entity` throws. Calling `clear_rows()` and then
+`allocate_entity_id` throws unless the state row is re-seeded.
+
+The arrangement holds while there is exactly one engine-lifetime
+table and one engine-lifetime row. If a second appears, the right
+shape is a `World::clear_for_scene(callback)` that re-seeds
+engine-lifetime state through a callback. See
+`docs/notes/WorldLifecycle.md` for the full note.
+
+---
+
 ## Gap table
 
 The fourteen gaps identified in Phase 0, with resolution status.

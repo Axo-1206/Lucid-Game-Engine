@@ -194,6 +194,7 @@ Executables land in `build/bin/`: `lucid_game.exe`, `lucid_editor.exe`.
 ```
 tests/
 ├── ecs/
+│   ├── test_table.cpp
 │   └── test_world.cpp
 ├── engine/
 │   ├── test_clock.cpp
@@ -279,7 +280,8 @@ docs/
 │   ├── PhysicsPlan.md      describes how physics is designed in Lucid 
 │   ├── RenderPasses.md
 │   ├── TriggerModel.md     how a Lucid graph expresses control flow
-│   └── SceneFormat.md      the .lscene format spec and evolution rules
+│   ├── SceneFormat.md      the .lscene format spec and evolution rules
+│   └── WorldLifecycle.md   clear, clear_rows, and apply_to
 ├── implementationPlans/
 │   └── kernelImplementationPlan.md
 └── archive/             older design documents, kept for history
