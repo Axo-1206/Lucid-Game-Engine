@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace engine::ecs
@@ -45,12 +46,25 @@ namespace engine::ecs
 
         bool has_table(const std::string &name) const;
 
-        // Remove every table. After clear(), has_table() is false for every
-        // name, and the world is as it was before the first create_table().
+        // Mark a table as engine-lifetime: clear() preserves it, clear_rows()
+        // does not. The flag is keyed by name and is order-independent: it may
+        // be set before or after the table is created. Idempotent.
+        //
+        // The engine's core tables (Engine_EngineState) use this. A package's
+        // tables do not; a package's tables are scene data.
+        void mark_preserved(const std::string &table_name);
+
+        // True if the named table is preserved across clear().
+        bool is_preserved(const std::string &table_name) const;
+
+        // Remove every non-preserved table. Preserved tables keep their rows.
+        // After clear(), has_table() is false for every non-preserved name,
+        // and is true for every preserved name that was created.
         void clear();
 
-        // Clear every table's rows, but keep the tables themselves. After
-        // clear_rows(), each table's count() is 0 and its columns remain.
+        // Clear every table's rows, but keep the tables themselves. Preserved
+        // tables are cleared too. After clear_rows(), each table's count() is
+        // 0 and its columns remain.
         void clear_rows();
 
         // Iterate tables in creation order.
@@ -77,6 +91,7 @@ namespace engine::ecs
     private:
         std::unordered_map<std::string, std::unique_ptr<Table>> tables_;
         std::vector<std::string> table_order_;
+        std::unordered_set<std::string> preserved_tables_;
     };
 
 } // namespace engine::ecs

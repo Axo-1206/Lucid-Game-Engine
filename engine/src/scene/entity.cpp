@@ -164,6 +164,11 @@ namespace engine
 
     void setup_core_tables(engine::ecs::World &world)
     {
+        // Engine_EngineState is engine-lifetime: World::clear() preserves it,
+        // so the entity-id allocator survives a scene unload. See
+        // docs/Decision.md, Decision 7.
+        world.mark_preserved(kEngineStateTable);
+
         // Engine_EngineState
         {
             auto *t = world.create_table(kEngineStateTable);

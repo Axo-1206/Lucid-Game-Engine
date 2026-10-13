@@ -137,3 +137,46 @@ TEST_CASE("entity: iterate all entities", "[entity]")
                                              { ++count; });
     REQUIRE(count == 5);
 }
+
+TEST_CASE("entity: id allocator survives world clear", "[entity]")
+{
+    engine::ecs::World world;
+    setup_core_tables(world);
+
+    const auto id1 = allocate_entity_id(world);
+    const auto id2 = allocate_entity_id(world);
+    const auto id3 = allocate_entity_id(world);
+    REQUIRE(id1 == 1);
+    REQUIRE(id2 == 2);
+    REQUIRE(id3 == 3);
+
+    world.clear();
+
+    // The state table survives; the entity table does not.
+    REQUIRE(world.has_table("Engine_EngineState"));
+    REQUIRE_FALSE(world.has_table("Engine_Entity"));
+
+    // The counter keeps counting.
+    const auto id4 = allocate_entity_id(world);
+    REQUIRE(id4 == 4);
+}
+
+TEST_CASE("entity: component defaults after destroy and re-add",
+          "[entity]")
+{
+    // A component row that is removed and re-added for the same entity
+    // must start at default values. This exercises the reset in
+    // Table::add_partial.
+    Fixture f;
+    EntityRef e = f.create("E");
+
+    auto t1 = add_component<TransformTag>(f.world, e);
+    f.world.get_table("Engine_Transform")->set_float32(t1, "x", 123.0f);
+    f.world.get_table("Engine_Transform")->set_float32(t1, "y", 456.0f);
+
+    remove_component<TransformTag>(f.world, e);
+
+    auto t2 = add_component<TransformTag>(f.world, e);
+    REQUIRE(f.world.get_table("Engine_Transform")->get_float32(t2, "x") == 0.0f);
+    REQUIRE(f.world.get_table("Engine_Transform")->get_float32(t2, "y") == 0.0f);
+}

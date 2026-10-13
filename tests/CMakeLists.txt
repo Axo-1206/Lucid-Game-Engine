@@ -20,6 +20,7 @@ add_executable(lucid_tests
     engine/test_format_diagnostics.cpp
 
     ecs/test_world.cpp
+    ecs/test_table.cpp
     
     graph/test_graph_runtime.cpp
     

@@ -38,10 +38,38 @@ namespace engine::ecs
         return tables_.count(name) != 0;
     }
 
+    void World::mark_preserved(const std::string &table_name)
+    {
+        preserved_tables_.insert(table_name);
+    }
+
+    bool World::is_preserved(const std::string &table_name) const
+    {
+        return preserved_tables_.count(table_name) != 0;
+    }
+
     void World::clear()
     {
-        tables_.clear();
-        table_order_.clear();
+        // Erase every non-preserved table.
+        for (const auto &name : table_order_)
+        {
+            if (preserved_tables_.count(name) == 0)
+            {
+                tables_.erase(name);
+            }
+        }
+
+        // Rebuild table_order_ from the survivors, in the original order.
+        std::vector<std::string> survivors;
+        survivors.reserve(table_order_.size());
+        for (const auto &name : table_order_)
+        {
+            if (tables_.count(name) != 0)
+            {
+                survivors.push_back(name);
+            }
+        }
+        table_order_ = std::move(survivors);
     }
 
     void World::clear_rows()

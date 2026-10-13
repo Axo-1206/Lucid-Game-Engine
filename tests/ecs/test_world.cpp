@@ -69,3 +69,72 @@ TEST_CASE("world: clear_rows keeps tables but empties them", "[ecs][world]")
     REQUIRE(w.has_table("T"));
     REQUIRE(t->column_count() == 1);
 }
+
+TEST_CASE("world: clear preserves marked tables", "[ecs][world]")
+{
+    World w;
+    w.mark_preserved("Keep");
+    w.create_table("Keep");
+    w.create_table("Drop");
+
+    REQUIRE(w.has_table("Keep"));
+    REQUIRE(w.has_table("Drop"));
+    REQUIRE(w.is_preserved("Keep"));
+    REQUIRE_FALSE(w.is_preserved("Drop"));
+
+    w.clear();
+
+    REQUIRE(w.has_table("Keep"));
+    REQUIRE_FALSE(w.has_table("Drop"));
+    REQUIRE(w.table_count() == 1);
+}
+
+TEST_CASE("world: clear_rows clears marked tables too", "[ecs][world]")
+{
+    World w;
+    w.mark_preserved("Keep");
+    Table *t = w.create_table("Keep");
+    t->add_column("x", ColumnType::Float32, /*primary=*/false);
+    t->add_partial("x", CellValue::from_float(1.0));
+
+    REQUIRE(t->count() == 1);
+
+    w.clear_rows();
+
+    REQUIRE(t->count() == 0);
+    REQUIRE(w.has_table("Keep"));
+    REQUIRE(t->column_count() == 1);
+}
+
+TEST_CASE("world: mark_preserved is idempotent and order-independent",
+          "[ecs][world]")
+{
+    // Mark before create.
+    {
+        World w;
+        w.mark_preserved("A");
+        w.mark_preserved("A"); // idempotent
+        w.create_table("A");
+        w.clear();
+        REQUIRE(w.has_table("A"));
+    }
+
+    // Mark after create.
+    {
+        World w;
+        w.create_table("A");
+        w.mark_preserved("A");
+        w.clear();
+        REQUIRE(w.has_table("A"));
+    }
+
+    // Mark a name that is never created: no effect, no crash.
+    {
+        World w;
+        w.mark_preserved("Never");
+        w.create_table("A");
+        w.clear();
+        REQUIRE_FALSE(w.has_table("A"));
+        REQUIRE_FALSE(w.has_table("Never"));
+    }
+}

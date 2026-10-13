@@ -142,7 +142,12 @@ namespace engine::ecs
         for (auto &col : columns_)
             col.ensure_size(slots_.size());
 
-        // Only the named column is set; others keep their default.
+        // Reset every column for this row to its type's default, so a
+        // reused slot does not inherit the previous occupant's values.
+        // Then set the named column.
+        for (auto &col : columns_)
+            reset_column(slot_idx, col);
+
         set_column_from_value(slot_idx, columns_[idx], value);
 
         ++live_count_;
@@ -494,6 +499,58 @@ namespace engine::ecs
             return;
         case ColumnType::Callback:
             col.set_callback(row, v.as_callback());
+            return;
+        }
+    }
+
+    void Table::reset_column(std::size_t row, Column &col)
+    {
+        switch (col.type())
+        {
+        case ColumnType::Bool:
+            col.set_bool(row, false);
+            return;
+        case ColumnType::Int8:
+            col.set_int8(row, 0);
+            return;
+        case ColumnType::Int16:
+            col.set_int16(row, 0);
+            return;
+        case ColumnType::Int32:
+            col.set_int32(row, 0);
+            return;
+        case ColumnType::Int64:
+            col.set_int64(row, 0);
+            return;
+        case ColumnType::Uint8:
+            col.set_uint8(row, 0);
+            return;
+        case ColumnType::Uint16:
+            col.set_uint16(row, 0);
+            return;
+        case ColumnType::Uint32:
+            col.set_uint32(row, 0);
+            return;
+        case ColumnType::Uint64:
+            col.set_uint64(row, 0);
+            return;
+        case ColumnType::Float32:
+            col.set_float32(row, 0.0f);
+            return;
+        case ColumnType::Float64:
+            col.set_float64(row, 0.0);
+            return;
+        case ColumnType::Char:
+            col.set_char(row, '\0');
+            return;
+        case ColumnType::String:
+            col.set_string(row, "");
+            return;
+        case ColumnType::RowRef:
+            col.set_row_ref(row, RowRef{});
+            return;
+        case ColumnType::Callback:
+            col.set_callback(row, CallbackHandle{});
             return;
         }
     }

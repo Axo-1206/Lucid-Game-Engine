@@ -121,6 +121,11 @@ namespace engine::ecs
         bool has_primary() const { return primary_column_index_ != SIZE_MAX; }
         std::size_t primary_column_index() const;
         void set_column_from_value(std::size_t row, Column &col, const CellValue &v);
+
+        // Reset every column of `row` to its type's default. Used by
+        // add_partial() so a reused slot does not inherit the previous
+        // occupant's values.
+        void reset_column(std::size_t row, Column &col);
     };
 
 } // namespace engine::ecs
