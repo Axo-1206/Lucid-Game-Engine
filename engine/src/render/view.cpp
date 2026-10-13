@@ -49,6 +49,12 @@ namespace engine
     {
         renderer.set_viewport(view.x, view.y, view.w, view.h);
 
+        // Make the view visible to the systems. Save and restore so a
+        // caller that nests render_view (or has already set
+        // current_view) does not have it clobbered.
+        const View *saved_view = ctx.current_view;
+        ctx.current_view = &view;
+
         switch (view.pass)
         {
         case View::Pass::World2D:
@@ -60,11 +66,12 @@ namespace engine
 
         case View::Pass::UI:
             renderer.begin_ui();
-            // V2: ui_system(ctx, dt);
+            engine::ui_system(ctx, dt);
             renderer.end_ui();
             break;
         }
 
+        ctx.current_view = saved_view;
         renderer.set_full_viewport();
     }
 

@@ -16,6 +16,7 @@
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
 #include "engine/services.h"
+#include "engine/registry/packages/ui_package.h"
 
 #include <vector>
 #include <filesystem>
@@ -47,6 +48,7 @@ int main()
     engine::PackageManager packages;
     packages.load_package(std::make_unique<engine::CorePackage>());
     packages.load_package(std::make_unique<engine::LogicPackage>());
+    packages.load_package(std::make_unique<engine::UIPackage>());
     if (!packages.apply(world))
     {
         engine::log_error("Failed to apply packages");
@@ -60,6 +62,23 @@ int main()
         return 1;
     }
     scene.apply_to(world, packages.component_registry(), engine::ApplyMode::Clear);
+
+    // A demo UI element: a red rectangle in the top-left corner.
+    if (auto *ui_tbl = world.get_table("Engine_UIElement"))
+    {
+        auto r = ui_tbl->add_partial("x", engine::ecs::CellValue::from_float(10.0f));
+        ui_tbl->set_float32(r, "y", 10.0f);
+        ui_tbl->set_float32(r, "w", 200.0f);
+        ui_tbl->set_float32(r, "h", 40.0f);
+        ui_tbl->set_int32(r, "anchor", 0); // top-left
+        ui_tbl->set_int32(r, "layer", 0);
+        ui_tbl->set_string(r, "texture_path", "");
+        ui_tbl->set_float32(r, "tint_r", 0.8f);
+        ui_tbl->set_float32(r, "tint_g", 0.1f);
+        ui_tbl->set_float32(r, "tint_b", 0.1f);
+        ui_tbl->set_float32(r, "tint_a", 1.0f);
+        ui_tbl->set_bool(r, "visible", true);
+    }
 
     // Services. No physics backend yet.
     engine::Services services;
@@ -84,6 +103,11 @@ int main()
         world,
         scene.active_camera_name(),
         0, 0, window.width(), window.height()));
+
+    // The UI view covers the window. It draws after the world
+    // views, on top.
+    views.push_back(engine::make_ui_view(&world,
+                                         0, 0, window.width(), window.height()));
 
     // The clear color comes from the scene's active camera.
     engine::Color clear_color{0.0f, 0.0f, 0.0f, 1.0f};

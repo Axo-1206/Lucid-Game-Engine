@@ -3,6 +3,10 @@
 #include "engine/render/renderer.h"
 #include "engine/render/camera.h"
 #include "engine/ecs/core/entity.h"
+#include "engine/platform/input.h"
+#include "engine/core/clock.h"
+#include "engine/services.h"
+#include "engine/systems/system_context.h"
 
 #include <array>
 

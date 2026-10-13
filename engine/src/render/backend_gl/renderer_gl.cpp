@@ -143,6 +143,7 @@ void main() {
             glDeleteTextures(1, &t);
         }
         textures_.clear();
+        texture_cache_.clear();
         white_gl_id_ = 0;
 
         batch_.destroy();
@@ -290,6 +291,10 @@ void main() {
 
     TextureHandle RendererGL::load_texture(const std::string &path)
     {
+        auto it = texture_cache_.find(path);
+        if (it != texture_cache_.end())
+            return it->second;
+
         int w = 0, h = 0, channels = 0;
         stbi_set_flip_vertically_on_load(0);
         unsigned char *data = stbi_load(path.c_str(), &w, &h, &channels, 4);
@@ -317,6 +322,7 @@ void main() {
         TextureHandle handle;
         handle.id = next_texture_id_++;
         textures_[handle.id] = gl_tex;
+        texture_cache_[path] = handle;
 
         log_info("Loaded texture '%s' (%dx%d, %d channels)",
                  path.c_str(), w, h, channels);
@@ -328,6 +334,17 @@ void main() {
         auto it = textures_.find(tex.id);
         if (it == textures_.end())
             return;
+
+        // Drop any path that maps to this handle, so a later
+        // load_texture(path) reloads instead of returning a stale
+        // handle.
+        for (auto path_it = texture_cache_.begin(); path_it != texture_cache_.end();)
+        {
+            if (path_it->second == tex)
+                path_it = texture_cache_.erase(path_it);
+            else
+                ++path_it;
+        }
 
         GLuint gl_tex = it->second;
         glDeleteTextures(1, &gl_tex);

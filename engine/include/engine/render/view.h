@@ -3,7 +3,6 @@
 
 #include "engine/ecs/world.h"
 #include "engine/render/camera.h"
-#include "engine/systems/system_context.h"
 #include "engine/render/render_list.h"
 
 #include <string>
@@ -11,6 +10,7 @@
 
 namespace engine
 {
+    struct SystemContext;
 
     // A view: a scope of draws that share a world, a camera, a
     // viewport, and a pass.

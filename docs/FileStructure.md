@@ -92,7 +92,8 @@ engine/
 │   │   ├── package_manager.h
 │   │   └── packages/
 │   │       ├── core_package.h
-│   │       └── logic_package.h
+│   │       ├── logic_package.h
+│   │       └── ui_package.h
 │   ├── render/
 │   │   ├── camera.h
 │   │   ├── render_list.h
@@ -133,7 +134,8 @@ engine/
     │   ├── package_manager.cpp
     │   └── packages/
     │       ├── core_package.cpp
-    │       └── logic_package.cpp
+    │       ├── logic_package.cpp
+    │       └── ui_package.cpp
     ├── render/
     │   ├── render_list.cpp
     │   ├── camera.cpp

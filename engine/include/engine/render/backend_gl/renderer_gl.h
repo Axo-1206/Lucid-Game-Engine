@@ -98,6 +98,10 @@ namespace engine
         std::unordered_map<std::uint32_t, std::uint32_t> textures_;
         std::uint32_t next_texture_id_ = 1;
 
+        // Path -> handle. The reverse of textures_, so load_texture
+        // can return the existing handle for a path already loaded.
+        std::unordered_map<std::string, TextureHandle> texture_cache_;
+
         // Stats accumulated across all batches in the current frame.
         RenderStats frame_stats_;
 

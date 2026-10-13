@@ -6,6 +6,7 @@
 #include "engine/render/render_list.h"
 #include "engine/render/renderer.h"
 #include "engine/services.h"
+#include "engine/render/view.h"
 
 namespace engine
 {
@@ -29,6 +30,11 @@ namespace engine
         Clock &clock;
         RenderList &render_list;
         Services &services;
+
+        // The view currently being rendered, or nullptr if a system is
+        // called outside a view loop (a test, a tool). A system that
+        // needs the view's size or camera reads it here.
+        const View *current_view = nullptr;
     };
 
 } // namespace engine

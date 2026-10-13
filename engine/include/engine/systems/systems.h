@@ -14,4 +14,9 @@ namespace engine
     void physics_sync_system(SystemContext &ctx, float dt);
     void collision_system(SystemContext &ctx, float dt);
 
+    // Draw the UI pass. Walks Engine_UIElement and submits draw
+    // items to the render list. Reads the view's size from
+    // ctx.current_view for anchor resolution.
+    void ui_system(SystemContext &ctx, float dt);
+
 } // namespace engine

@@ -29,6 +29,7 @@ add_executable(lucid_tests
     physics/test_stub_backend.cpp
     physics/test_backend_box2d.cpp
     engine/test_view.cpp
+    engine/test_ui_system.cpp
 )
 
 target_link_libraries(lucid_tests
