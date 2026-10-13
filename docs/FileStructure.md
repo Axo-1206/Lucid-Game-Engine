@@ -278,6 +278,7 @@ docs/
 ├── notes/
 │   ├── Dataflow.md         States the model the engine runs on
 │   ├── EditorMetadata.md   The engine exposes metadata about its vocabulary for the editor
+│   ├── PackageComposition.md what a package contributes and how packages compose
 │   ├── PackageNaming.md    defines how the engine names its content
 │   ├── PhysicsPlan.md      describes how physics is designed in Lucid 
 │   ├── RenderPasses.md
