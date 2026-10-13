@@ -5,6 +5,8 @@
 #include "engine/registry/editor_info.h"
 #include "engine/registry/package.h"
 #include "engine/registry/package_builder.h"
+#include "engine/scene/component_registry.h"
+
 #include "sema/Registry.hpp"
 
 #include <memory>
@@ -84,10 +86,20 @@ namespace engine
 
         bool applied() const { return applied_; }
 
+        // The component registry: the codecs the scene loader and saver
+        // use. Populated during apply(): the engine's core components
+        // first, then each package's components in load order. Valid
+        // after apply().
+        const engine::ComponentRegistry &component_registry() const
+        {
+            return component_registry_;
+        }
+
     private:
         PackageBuilder builder_;
         std::vector<std::unique_ptr<Package>> packages_;
         std::vector<PackageInfo> package_infos_;
+        engine::ComponentRegistry component_registry_;
 
         // Storage for default editor infos. When a caller asks for
         // editor info on a node without explicit info, we construct a

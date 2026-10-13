@@ -11,6 +11,8 @@
 namespace engine
 {
 
+    class ComponentRegistry;
+
     // The scene's schema. A description of entities, components, and
     // cameras read from a .lscene file.
     //
@@ -53,10 +55,12 @@ namespace engine
 
         // Apply this description to a world.
         void apply_to(engine::ecs::World &world,
+                      const ComponentRegistry &components,
                       ApplyMode mode = ApplyMode::Clear) const;
 
         // Read the current world state into a description.
-        static Scene extract_from(const engine::ecs::World &world);
+        static Scene extract_from(const engine::ecs::World &world,
+                                  const ComponentRegistry &components);
 
     private:
         std::string name_;
@@ -79,6 +83,7 @@ namespace engine
     // Equivalent to SceneLoader_load(path).apply_to(world, mode).
     // Returns false if the file could not be read or parsed.
     bool SceneLoader_load_into(engine::ecs::World &world,
+                               const ComponentRegistry &components,
                                const std::string &path,
                                ApplyMode mode = ApplyMode::Clear);
 
@@ -88,6 +93,7 @@ namespace engine
     bool SceneSaver_save(const Scene &scene, const std::string &path);
 
     // Read a world's current state into a Scene.
-    Scene SceneSaver_from_world(const engine::ecs::World &world);
+    Scene SceneSaver_from_world(const engine::ecs::World &world,
+                                const ComponentRegistry &components);
 
 } // namespace engine

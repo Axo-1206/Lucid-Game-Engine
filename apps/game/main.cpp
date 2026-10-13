@@ -57,7 +57,7 @@ int main()
         engine::log_error("Failed to load scene");
         return 1;
     }
-    scene.apply_to(world, engine::ApplyMode::Clear);
+    scene.apply_to(world, packages.component_registry(), engine::ApplyMode::Clear);
 
     // Services. No physics backend yet.
     engine::Services services;

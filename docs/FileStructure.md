@@ -104,6 +104,7 @@ engine/
 │   │     ├── shader_gl.h
 │   │     └── sprite_batch_gl.h
 │   ├── scene/
+│   │   ├── component_registry.h
 │   │   ├── scene.h
 │   │   └── scene_schema.h
 │   └── systems/
@@ -140,6 +141,7 @@ engine/
     │       ├── shader_gl.cpp
     │       └── sprite_batch_gl.cpp
     ├── scene/
+    │   ├── component_registry.cpp
     │   ├── scene.cpp
     │   ├── scene_loader.cpp
     │   └── scene_saver.cpp

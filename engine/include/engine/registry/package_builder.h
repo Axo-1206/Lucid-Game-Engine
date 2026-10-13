@@ -4,6 +4,8 @@
 #include "engine/graph/tick_context.h"
 #include "engine/registry/default_registry.h"
 #include "engine/registry/editor_info.h"
+#include "engine/scene/component_registry.h"
+
 #include "sema/Registry.hpp"
 
 #include <functional>
@@ -49,6 +51,20 @@ namespace engine
         void add_trigger_mode(TriggerMode mode);
         void add_enum(const lucid::sema::EnumTypeInfo &info);
         void add_handle(const lucid::sema::HandleTypeInfo &info);
+
+        // Register a component table and its codec. The table creator
+        // runs at apply time to create the table in the world. The
+        // codec tells the scene loader and saver how to move the
+        // component between JSON and a table row.
+        //
+        // A table that is not a component (the camera table, a
+        // package's internal table) uses add_table instead.
+        //
+        // The name must start with the package's prefix. The codec's
+        // table name must not already be registered.
+        void add_component(std::string table_name,
+                           TableCreator table_creator,
+                           ComponentCodec codec);
 
         // --- Editor metadata ---
         //
@@ -103,9 +119,17 @@ namespace engine
         void seal();
         bool is_sealed() const { return sealed_; }
 
+        struct ComponentEntry
+        {
+            std::string table_name;
+            ComponentCodec codec;
+        };
+        const std::vector<ComponentEntry> &component_codecs() const { return component_codecs_; }
+
     private:
         std::string current_package_name_;
         std::string current_prefix_;
+        std::vector<ComponentEntry> component_codecs_;
 
         // Counts at the moment begin_package() was called, so
         // end_package() can compute the delta.

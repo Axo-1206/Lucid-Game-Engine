@@ -140,6 +140,26 @@ namespace engine
         }
         engine::log_info("PackageManager: %zu tables created", creators.size());
 
+        // 1.5. Build the ComponentRegistry: core components first, then
+        //      each package's components in load order.
+        engine::register_core_components(component_registry_);
+
+        for (const auto &entry : builder_.component_codecs())
+        {
+            try
+            {
+                component_registry_.register_component(entry.table_name, entry.codec);
+            }
+            catch (const std::exception &ex)
+            {
+                engine::log_error("PackageManager: %s", ex.what());
+                return false;
+            }
+        }
+
+        engine::log_info("PackageManager: %zu component codecs registered",
+                         component_registry_.size());
+
         // 2. Declare the engine's phases. Phases are the engine's,
         //    not a package's.
         phases_ = {

@@ -1,7 +1,9 @@
 #include "engine/scene/scene.h"
 #include "engine/scene/scene_schema.h"
+#include "engine/scene/component_registry.h"
 #include "engine/ecs/core/component_tags.h"
 #include "engine/ecs/core/entity.h"
+#include "engine/render/camera.h"
 #include "engine/core/log.h"
 
 #include <nlohmann/json.hpp>
@@ -18,99 +20,15 @@ namespace engine
 
         using json = nlohmann::json;
 
-        // ---- Component savers ----
-
-        json save_transform(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
-        {
-            json j;
-            j["x"] = tbl->get_float32(c, "x");
-            j["y"] = tbl->get_float32(c, "y");
-            j["z"] = tbl->get_float32(c, "z");
-            j["rot_z"] = tbl->get_float32(c, "rot_z");
-            return j;
-        }
-
-        json save_world_transform(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
-        {
-            json j;
-            j["x"] = tbl->get_float32(c, "x");
-            j["y"] = tbl->get_float32(c, "y");
-            j["z"] = tbl->get_float32(c, "z");
-            j["rot_z"] = tbl->get_float32(c, "rot_z");
-            return j;
-        }
-
-        json save_velocity(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
-        {
-            json j;
-            j["dx"] = tbl->get_float32(c, "dx");
-            j["dy"] = tbl->get_float32(c, "dy");
-            j["dz"] = tbl->get_float32(c, "dz");
-            return j;
-        }
-
-        json save_sprite(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
-        {
-            json j;
-            j["texture_path"] = tbl->get_string(c, "texture_path");
-            j["w"] = tbl->get_float32(c, "w");
-            j["h"] = tbl->get_float32(c, "h");
-            j["tint_r"] = tbl->get_float32(c, "tint_r");
-            j["tint_g"] = tbl->get_float32(c, "tint_g");
-            j["tint_b"] = tbl->get_float32(c, "tint_b");
-            j["tint_a"] = tbl->get_float32(c, "tint_a");
-            j["layer"] = tbl->get_int32(c, "layer");
-            return j;
-        }
-
-        json save_script(const engine::ecs::Table *tbl, engine::ecs::RowRef c)
-        {
-            json j;
-            j["graph"] = tbl->get_string(c, "graph");
-            return j;
-        }
-
-        json save_component_by_name(const engine::ecs::World &world,
-                                    EntityRef e,
-                                    const std::string &table_name)
-        {
-            const auto *tbl = world.get_table(table_name);
-            if (!tbl)
-                return json();
-
-            auto comp = tbl->find_by_primary("entity", engine::ecs::CellValue::from_row_ref(e));
-            if (comp.is_nil())
-                return json();
-
-            if (table_name == "Engine_Transform")
-                return save_transform(tbl, comp);
-            else if (table_name == "Engine_WorldTransform")
-                return save_world_transform(tbl, comp);
-            else if (table_name == "Engine_Velocity")
-                return save_velocity(tbl, comp);
-            else if (table_name == "Engine_Sprite")
-                return save_sprite(tbl, comp);
-            else if (table_name == "Engine_Script")
-                return save_script(tbl, comp);
-            else
-            {
-                log_warn("No saver for component table: %s", table_name.c_str());
-                return json();
-            }
-        }
-
     } // namespace
 
-    Scene SceneSaver_from_world(const engine::ecs::World &world)
+    Scene SceneSaver_from_world(const engine::ecs::World &world,
+                                const ComponentRegistry &component_registry)
     {
         Scene s;
 
         json root;
         root["version"] = kSceneSchemaVersion;
-
-        // --- Name ---
-        // A World has no name. Leave the scene name empty; the caller
-        // can set it before saving.
         root["name"] = "";
 
         // --- Cameras ---
@@ -139,8 +57,9 @@ namespace engine
         }
 
         // --- Entities ---
-        // Discover component tables: any table with an `entity` column
-        // that is not the Entity table itself.
+        // Component tables: any table with an `entity` column, except
+        // the Entity table itself. The codec determines whether the
+        // component is serialized.
         std::vector<std::string> component_tables;
         world.each_table([&](const engine::ecs::Table &t)
                          {
@@ -171,14 +90,18 @@ namespace engine
                     json components = json::object();
                     for (const auto &table_name : component_tables)
                     {
-                        json cj = save_component_by_name(world, r, table_name);
+                        const ComponentCodec *codec = component_registry.codec(table_name);
+                        if (codec == nullptr || !codec->save)
+                        {
+                            continue;
+                        }
+                        json cj = codec->save(world, r);
                         if (!cj.is_null())
                         {
                             components[table_name] = cj;
                         }
                     }
                     ej["components"] = components;
-
                     entities.push_back(ej); });
             }
             root["entities"] = entities;

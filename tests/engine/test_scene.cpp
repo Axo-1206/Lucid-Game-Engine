@@ -2,6 +2,7 @@
 #include "engine/scene/scene.h"
 #include "engine/ecs/core/entity.h"
 #include "engine/ecs/world.h"
+#include "engine/scene/component_registry.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -22,7 +23,13 @@ namespace
     struct Fixture
     {
         engine::ecs::World world;
-        Fixture() { setup_core_tables(world); }
+        engine::ComponentRegistry components;
+
+        Fixture()
+        {
+            setup_core_tables(world);
+            register_core_components(components);
+        }
     };
 
 } // namespace
@@ -45,7 +52,7 @@ TEST_CASE("scene: save and load round-trip", "[scene]")
     set_parent(f.world, b, a);
 
     // Extract, name, save.
-    Scene out = Scene::extract_from(f.world);
+    Scene out = Scene::extract_from(f.world, f.components);
     out.set_name("test");
 
     const std::string path = make_temp_path("lucid_test_scene.lscene");
@@ -59,7 +66,7 @@ TEST_CASE("scene: save and load round-trip", "[scene]")
     // Load and apply.
     Scene in = SceneLoader_load(path);
     REQUIRE_FALSE(in.json_text().empty());
-    in.apply_to(f.world, ApplyMode::Clear);
+    in.apply_to(f.world, f.components, ApplyMode::Clear);
 
     REQUIRE(f.world.get_table("Engine_Entity")->count() == 2);
 
@@ -89,7 +96,7 @@ TEST_CASE("scene: script component round-trip", "[scene]")
     auto sa = add_component<ScriptTag>(f.world, a);
     f.world.get_table("Engine_Script")->set_string(sa, "graph", "scripts/player.lucgraph");
 
-    Scene out = Scene::extract_from(f.world);
+    Scene out = Scene::extract_from(f.world, f.components);
     out.set_name("scripts");
 
     const std::string path = make_temp_path("lucid_test_scene_script.lscene");
@@ -99,7 +106,7 @@ TEST_CASE("scene: script component round-trip", "[scene]")
 
     Scene in = SceneLoader_load(path);
     REQUIRE_FALSE(in.json_text().empty());
-    in.apply_to(f.world, ApplyMode::Clear);
+    in.apply_to(f.world, f.components, ApplyMode::Clear);
 
     auto a_id = f.world.get_table("Engine_Entity")->find_by_primary("id", engine::ecs::CellValue::from_uint64(1));
     REQUIRE_FALSE(a_id.is_nil());
@@ -123,7 +130,7 @@ TEST_CASE("scene: refuses a newer version", "[scene]")
 
     Scene s = SceneLoader_load(path);
     REQUIRE(s.json_text().empty()); // refused
-    REQUIRE_FALSE(SceneLoader_load_into(f.world, path));
+    REQUIRE_FALSE(SceneLoader_load_into(f.world, f.components, path));
 
     std::filesystem::remove(path);
 }
@@ -141,7 +148,7 @@ TEST_CASE("scene: apply_to with empty JSON clears the world's rows",
     Scene s = SceneLoader_load("nonexistent_scene.lscene");
     REQUIRE(s.json_text().empty());
 
-    s.apply_to(f.world, ApplyMode::Clear);
+    s.apply_to(f.world, f.components, ApplyMode::Clear);
 
     // The rows are gone, the schema is not.
     REQUIRE(f.world.has_table("Engine_Entity"));
@@ -156,7 +163,7 @@ TEST_CASE("scene: SceneLoader_load_into on a missing file does not clear",
     create_entity(f.world, 1, "A");
     REQUIRE(f.world.get_table("Engine_Entity")->count() == 1);
 
-    REQUIRE_FALSE(SceneLoader_load_into(f.world, "nonexistent_scene.lscene"));
+    REQUIRE_FALSE(SceneLoader_load_into(f.world, f.components, "nonexistent_scene.lscene"));
 
     // The world is untouched.
     REQUIRE(f.world.get_table("Engine_Entity")->count() == 1);
@@ -176,7 +183,7 @@ TEST_CASE("scene: loading a scene with cameras sets active camera name",
         cam->set_bool(ref, "is_orthographic", true);
     }
 
-    Scene out = Scene::extract_from(f.world);
+    Scene out = Scene::extract_from(f.world, f.components);
     const std::string path = make_temp_path("lucid_test_scene_cams.lscene");
     REQUIRE(SceneSaver_save(out, path));
 
@@ -184,7 +191,7 @@ TEST_CASE("scene: loading a scene with cameras sets active camera name",
 
     Scene in = SceneLoader_load(path);
     REQUIRE(in.active_camera_name() == "main");
-    in.apply_to(f.world, ApplyMode::Clear);
+    in.apply_to(f.world, f.components, ApplyMode::Clear);
 
     // The camera row exists.
     REQUIRE(f.world.get_table("Engine_Camera")->count() == 1);

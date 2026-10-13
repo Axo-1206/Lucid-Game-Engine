@@ -163,6 +163,33 @@ namespace engine
         conflicts_.push_back(std::move(message));
     }
 
+    void PackageBuilder::add_component(std::string table_name,
+                                       TableCreator table_creator,
+                                       ComponentCodec codec)
+    {
+        // The table name is checked the same way add_table checks it:
+        // prefix rule and table-name uniqueness.
+        if (!check_name(table_name, "table"))
+            return;
+
+        // The codec must not already exist for this table.
+        for (const auto &entry : component_codecs_)
+        {
+            if (entry.table_name == table_name)
+            {
+                conflicts_.push_back(
+                    "component codec for table '" + table_name +
+                    "' already registered");
+                return;
+            }
+        }
+
+        table_names_.push_back(table_name);
+        table_creators_.push_back(std::move(table_creator));
+
+        component_codecs_.push_back({std::move(table_name), std::move(codec)});
+    }
+
     void PackageBuilder::seal()
     {
         sealed_ = true;

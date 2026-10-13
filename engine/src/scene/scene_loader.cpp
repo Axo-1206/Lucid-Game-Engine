@@ -1,5 +1,6 @@
 #include "engine/scene/scene.h"
 #include "engine/scene/scene_schema.h"
+#include "engine/scene/component_registry.h"
 #include "engine/core/log.h"
 
 #include <nlohmann/json.hpp>
@@ -44,7 +45,6 @@ namespace engine
             return s;
         }
 
-        // Version check.
         const int version = j.value("version", 1);
         if (version > kSceneSchemaVersion)
         {
@@ -62,14 +62,12 @@ namespace engine
         s.set_path(path);
         s.set_json_text(text);
 
-        // The active camera name: the first camera's name, if any.
         if (j.contains("cameras") && j["cameras"].is_array() && !j["cameras"].empty())
         {
             const auto &first = j["cameras"][0];
             s.set_active_camera_name(first.value("name", std::string("")));
         }
 
-        // The entity-id allocator value.
         if (j.contains("engine_state") && j["engine_state"].is_object())
         {
             s.set_next_entity_id(j["engine_state"].value("next_entity_id", std::uint64_t(0)));
@@ -80,17 +78,16 @@ namespace engine
     }
 
     bool SceneLoader_load_into(engine::ecs::World &world,
+                               const ComponentRegistry &components,
                                const std::string &path,
                                ApplyMode mode)
     {
         Scene s = SceneLoader_load(path);
         if (s.json_text().empty())
         {
-            // The file could not be read or parsed. Do not clear the
-            // world; a failed load should not leave an empty world.
             return false;
         }
-        s.apply_to(world, mode);
+        s.apply_to(world, components, mode);
         return true;
     }
 

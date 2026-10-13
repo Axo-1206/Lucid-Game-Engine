@@ -25,6 +25,7 @@ add_library(luc_engine STATIC
     src/render/render_list.cpp
     src/render/camera.cpp
 
+    src/scene/component_registry.cpp
     src/scene/scene.cpp
     src/scene/scene_loader.cpp
     src/scene/scene_saver.cpp
@@ -47,13 +48,13 @@ target_link_libraries(luc_engine
         lucid::ecs
         lucid_sema
         lucid_serialization
+        lucid::nlohmann
     PRIVATE
         lucid::box2d
         lucid::glfw
         lucid::glm
         lucid::glad
         lucid::stb
-        lucid::nlohmann
         lucid_serialization
 )
 
