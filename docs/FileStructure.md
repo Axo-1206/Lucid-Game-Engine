@@ -73,6 +73,10 @@ engine/
 │   ├── graph/
 │   │   ├── graph_runtime.h
 │   │   └── tick_context.h
+│   ├── physics/
+│   │   ├── backend_box2d/
+│   │   │   └── backend_box2d.h
+│   │   └── backend.h
 │   ├── platform/
 │   │   ├── input.h
 │   │   └── window.h
@@ -111,6 +115,9 @@ engine/
     │   └── log.cpp
     ├── graph/
     │   └── graph_runtime.cpp
+    ├── physics/
+    │   └── backend_box2d/
+    │       └── backend_box2d.h
     ├── platform/
     │   ├── input_glfw.cpp
     │   ├── input_glfw.h
@@ -198,6 +205,10 @@ tests/
 │   └── test_systems.cpp
 ├── graph/
 │   └── test_graph_runtime.cpp
+├── physics/
+│   ├── test_backend.h
+│   ├── test_backend_box2d.cpp
+│   └── test_stub_backend.cpp
 ├── registry/
 │   ├── test_default_registry.cpp
 │   └── test_package_manager.cpp
