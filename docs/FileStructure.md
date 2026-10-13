@@ -99,6 +99,7 @@ engine/
 │   │   ├── render_types.h
 │   │   ├── renderer.h
 │   │   ├── texture.h
+│   │   ├── view.h
 │   │   └── backend_gl.h
 │   │     ├── renderer_gl.h
 │   │     ├── shader_gl.h
@@ -136,6 +137,7 @@ engine/
     ├── render/
     │   ├── render_list.cpp
     │   ├── camera.cpp
+    │   ├── view.cpp
     │   └── backend_gl/
     │       ├── renderer_gl.cpp
     │       ├── shader_gl.cpp

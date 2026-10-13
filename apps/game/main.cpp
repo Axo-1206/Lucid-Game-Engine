@@ -5,6 +5,7 @@
 #include "engine/core/log.h"
 #include "engine/render/camera.h"
 #include "engine/render/renderer.h"
+#include "engine/render/view.h"
 #include "engine/platform/input.h"
 #include "engine/ecs/core/entity.h"
 #include "engine/scene/scene.h"
@@ -16,6 +17,7 @@
 #include "engine/registry/packages/logic_package.h"
 #include "engine/services.h"
 
+#include <vector>
 #include <filesystem>
 #include <memory>
 
@@ -74,22 +76,25 @@ int main()
         engine::log_warn("Some graphs failed to load; continuing without them.");
     }
 
-    // Camera bridge: read the active camera row, convert to Camera2D,
-    // hand it to the renderer. The World never talks to the renderer;
-    // the renderer never reads the World. The loop is the bridge.
-    // See docs/Decision.md, Decision 3.
-    engine::CameraDesc cam_desc;
+    // Build the view list. A one-view game: one World2D view of the
+    // scene's active camera, filling the window. An editor would
+    // build more.
+    std::vector<engine::View> views;
+    views.push_back(engine::make_world_2d_view(
+        world,
+        scene.active_camera_name(),
+        0, 0, window.width(), window.height()));
+
+    // The clear color comes from the scene's active camera.
     engine::Color clear_color{0.0f, 0.0f, 0.0f, 1.0f};
     {
         const auto cam_ref =
             engine::find_camera(world, scene.active_camera_name());
         if (!cam_ref.is_nil())
         {
-            cam_desc = engine::read_camera_row(world, cam_ref);
-            renderer->set_camera_2d(
-                engine::to_camera2d(cam_desc, window.width(), window.height()));
+            const engine::CameraDesc desc = engine::read_camera_row(world, cam_ref);
             clear_color = engine::Color{
-                cam_desc.clear_r, cam_desc.clear_g, cam_desc.clear_b, cam_desc.clear_a};
+                desc.clear_r, desc.clear_g, desc.clear_b, desc.clear_a};
         }
     }
 
@@ -124,21 +129,36 @@ int main()
             last_w = window.width();
             last_h = window.height();
             renderer->set_full_viewport();
+
+            // Resize the views that cover the full window.
+            // A view with a fixed viewport (a minimap, a preview
+            // panel) keeps its rectangle; a full-window view is
+            // resized to the new window.
+            for (auto &view : views)
+            {
+                if (view.resize_with_window)
+                {
+                    view.w = window.width();
+                    view.h = window.height();
+                }
+            }
         }
 
         runtime.tick(dt);
 
-        renderer->begin_frame(clear_color);
-
-        renderer->begin_world_2d();
+        // Systems that produce world state run once per frame.
         engine::hierarchy_system(ctx, dt);
         engine::movement_system(ctx, dt);
         engine::hierarchy_system(ctx, dt);
-        engine::render_system(ctx, dt);
-        renderer->end_world_2d();
 
-        renderer->begin_ui();
-        renderer->end_ui();
+        renderer->begin_frame(clear_color);
+
+        // Views that draw the world run once per view. A one-view
+        // game draws once; an editor draws once per panel.
+        for (const auto &view : views)
+        {
+            engine::render_view(view, ctx, dt, *renderer);
+        }
 
         renderer->end_frame();
         renderer->present();

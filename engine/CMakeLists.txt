@@ -24,6 +24,7 @@ add_library(luc_engine STATIC
     src/render/backend_gl/renderer_gl.cpp
     src/render/render_list.cpp
     src/render/camera.cpp
+    src/render/view.cpp
 
     src/scene/component_registry.cpp
     src/scene/scene.cpp
