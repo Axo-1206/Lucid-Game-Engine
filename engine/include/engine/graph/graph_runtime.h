@@ -39,7 +39,7 @@ namespace engine::graph
     };
 
     // The graph runtime: loads .lucgraph files referenced by the
-    // world's Script table, and ticks them against the world.
+    // world's Engine_Script table, and ticks them against the world.
     //
     // The runtime reads its node vocabulary from a PackageManager.
     // It reads its services (physics backend, etc.) from a Services

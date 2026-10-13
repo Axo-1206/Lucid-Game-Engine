@@ -28,9 +28,9 @@ namespace
     // -----------------------------------------------------------------------------
     //
     // A process-lifetime PackageManager holding CorePackage and
-    // LogicPackage. Applied once, on first use, against a throwaway
-    // World (CorePackage and LogicPackage register no tables). All
-    // tests share it.
+    // LogicPackage. Applied once, on first use, via
+    // apply_registration_only(). All tests share it. No World is
+    // involved; CorePackage and LogicPackage register no tables.
 
     engine::PackageManager &test_packages()
     {
@@ -114,6 +114,9 @@ namespace
         return std::filesystem::temp_directory_path() / "lucid_graph_runtime_tests";
     }
 
+    // Per-test world. setup_core_tables creates the core schema and
+    // an empty Engine_Script table. Tests that need a graph add a
+    // Script row and call GraphRuntime::load().
     struct Fixture
     {
         engine::ecs::World world;

@@ -24,7 +24,7 @@ namespace engine
     };
 
     // The engine's node registry, produced by the process-lifetime
-    // PackageManager (see default_manager.h).
+    // PackageManager (see default_registry.cpp).
     //
     // Constructed once, on first call, from CorePackage and
     // LogicPackage. Returns a reference valid for the process's

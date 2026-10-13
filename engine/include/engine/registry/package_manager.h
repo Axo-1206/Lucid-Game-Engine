@@ -16,15 +16,19 @@
 namespace engine
 {
 
-    // The package manager: loads packages, produces one Registry,
-    // and populates one World.
+    // The package manager: loads packages, produces one Registry, and
+    // optionally populates one World (via apply) or skips the world
+    // (via apply_registration_only).
     //
     // Lifetime:
     //   - Construct an empty manager.
     //   - load_package(...) for each package, in order.
     //   - apply(World&) once, after all packages are loaded and the
     //     World's core tables have been created.
-    //   - registry() and trigger_modes() are valid after apply().
+    //   - Either apply(World&) or apply_registration_only(), once, after
+    //     all packages are loaded. apply(World&) also requires the World's
+    //     core tables to have been created.
+    //   - registry() and trigger_modes() are valid after either.
     class PackageManager
     {
     public:
@@ -61,18 +65,18 @@ namespace engine
         // Returns false if any conflict was recorded.
         bool apply_registration_only();
 
-        // The merged registry. Valid only after apply().
+        // The merged registry. Valid only after apply() or apply_registration_only().
         const lucid::sema::Registry &registry() const { return registry_; }
 
         // The per-node-type runtime metadata, parallel to
-        // registry().nodeTypes. Valid only after apply().
+        // registry().nodeTypes. Valid only after apply() or apply_registration_only().
         const std::vector<NodeTypeRuntimeInfo> &trigger_modes() const
         {
             return builder_.trigger_modes();
         }
 
         // The node executors, parallel to registry().nodeTypes. Valid
-        // only after apply().
+        // after apply() or apply_registration_only.
         const std::vector<engine::graph::NodeExecutor> &node_executors() const
         {
             return builder_.node_executors();

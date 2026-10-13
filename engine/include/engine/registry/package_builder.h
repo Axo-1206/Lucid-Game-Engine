@@ -45,6 +45,11 @@ namespace engine
 
         // --- Registration ---
 
+        // Register a table. No codec: the scene loader and saver do
+        // not know how to move the table's rows to or from JSON. Use
+        // this for the camera table (handled separately) and for a
+        // package's internal tables. Use add_component for a table
+        // that is an entity component.
         void add_table(std::string name, TableCreator creator);
         void add_node_type(const lucid::sema::NodeTypeInfo &info);
         void add_node_executor(engine::graph::NodeExecutor exec);

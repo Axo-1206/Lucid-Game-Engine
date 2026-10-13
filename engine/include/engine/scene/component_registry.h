@@ -39,9 +39,9 @@ namespace engine
     };
 
     // The set of component types the scene loader and saver know
-    // about. Populated at startup: the engine's core components are
-    // registered by register_core_components; a package's components
-    // are registered via PackageBuilder::add_component.
+    // about. Populated at startup by register_core_components (the
+    // engine's five core components) and by PackageBuilder::add_component
+    // (each package's components, in package load order).
     //
     // Registration order is preserved. A codec's table name is unique;
     // registering the same name twice is a conflict caught at

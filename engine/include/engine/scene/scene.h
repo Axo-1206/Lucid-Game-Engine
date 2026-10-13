@@ -54,6 +54,13 @@ namespace engine
         void set_json_text(std::string t) { json_text_ = std::move(t); }
 
         // Apply this description to a world.
+        //
+        // Clear:    world.clear_rows() first, then add the scene's
+        //           entities and cameras. The default.
+        //
+        // Additive: leave the world's rows; add the scene's entities
+        //           and cameras. Entity ids in the scene must not
+        //           collide with existing ones.
         void apply_to(engine::ecs::World &world,
                       const ComponentRegistry &components,
                       ApplyMode mode = ApplyMode::Clear) const;
