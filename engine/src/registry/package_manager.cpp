@@ -115,6 +115,91 @@ namespace engine
         return true;
     }
 
+    namespace
+    {
+
+        // Build the Registry, the ComponentRegistry, and the package
+        // counts from the builder's content. Shared by apply() and
+        // apply_registration_only(). Does not seal the builder; the
+        // caller does that.
+        //
+        // Returns false if the executor or trigger-mode counts do not
+        // match the node-type count.
+        bool build_registries(
+            PackageBuilder &builder,
+            std::vector<lucid::sema::PhaseInfo> &phases,
+            lucid::sema::Registry &registry,
+            engine::ComponentRegistry &component_registry,
+            std::vector<engine::PackageInfo> &package_infos)
+        {
+            // Phases. The engine's, not a package's.
+            phases = {
+                lucid::sema::PhaseInfo{"update"},
+                lucid::sema::PhaseInfo{"physics"},
+                lucid::sema::PhaseInfo{"render"},
+            };
+
+            registry.phases = ArenaSpan<lucid::sema::PhaseInfo>(
+                phases.data(), phases.size());
+            registry.enums = ArenaSpan<lucid::sema::EnumTypeInfo>(
+                builder.enums().data(), builder.enums().size());
+            registry.handles = ArenaSpan<lucid::sema::HandleTypeInfo>(
+                builder.handles().data(), builder.handles().size());
+            registry.nodeTypes = ArenaSpan<lucid::sema::NodeTypeInfo>(
+                builder.node_types().data(), builder.node_types().size());
+
+            // Executor and trigger-mode counts must match node types.
+            const std::size_t n = builder.node_types().size();
+            if (builder.node_executors().size() != n)
+            {
+                engine::log_error(
+                    "PackageManager: node executor count (%zu) does not match "
+                    "node type count (%zu)",
+                    builder.node_executors().size(), n);
+                return false;
+            }
+            if (builder.trigger_modes().size() != n)
+            {
+                engine::log_error(
+                    "PackageManager: trigger mode count (%zu) does not match "
+                    "node type count (%zu)",
+                    builder.trigger_modes().size(), n);
+                return false;
+            }
+
+            // Component registry: core first, then each package's.
+            engine::register_core_components(component_registry);
+            for (const auto &entry : builder.component_codecs())
+            {
+                try
+                {
+                    component_registry.register_component(entry.table_name, entry.codec);
+                }
+                catch (const std::exception &ex)
+                {
+                    engine::log_error("PackageManager: %s", ex.what());
+                    return false;
+                }
+            }
+
+            // Package counts.
+            const auto &counts = builder.package_counts();
+            for (std::size_t i = 0; i < package_infos.size() && i < counts.size(); ++i)
+            {
+                package_infos[i].node_type_count = counts[i].node_types;
+                package_infos[i].table_count = counts[i].tables;
+                package_infos[i].enum_count = counts[i].enums;
+                package_infos[i].handle_count = counts[i].handles;
+            }
+
+            engine::log_info("PackageManager: %zu node types registered, "
+                             "%zu component codecs registered",
+                             n, component_registry.size());
+            return true;
+        }
+
+    } // namespace
+
     bool PackageManager::apply(engine::ecs::World &world)
     {
         if (applied_)
@@ -140,77 +225,45 @@ namespace engine
         }
         engine::log_info("PackageManager: %zu tables created", creators.size());
 
-        // 1.5. Build the ComponentRegistry: core components first, then
-        //      each package's components in load order.
-        engine::register_core_components(component_registry_);
-
-        for (const auto &entry : builder_.component_codecs())
+        // 2. Build the registries.
+        if (!build_registries(builder_, phases_, registry_,
+                              component_registry_, package_infos_))
         {
-            try
-            {
-                component_registry_.register_component(entry.table_name, entry.codec);
-            }
-            catch (const std::exception &ex)
-            {
-                engine::log_error("PackageManager: %s", ex.what());
-                return false;
-            }
-        }
-
-        engine::log_info("PackageManager: %zu component codecs registered",
-                         component_registry_.size());
-
-        // 2. Declare the engine's phases. Phases are the engine's,
-        //    not a package's.
-        phases_ = {
-            lucid::sema::PhaseInfo{"update"},
-            lucid::sema::PhaseInfo{"physics"},
-            lucid::sema::PhaseInfo{"render"},
-        };
-
-        // 3. Build the Registry from the builder's content.
-        registry_.phases = ArenaSpan<lucid::sema::PhaseInfo>(
-            phases_.data(), phases_.size());
-        registry_.enums = ArenaSpan<lucid::sema::EnumTypeInfo>(
-            builder_.enums().data(), builder_.enums().size());
-        registry_.handles = ArenaSpan<lucid::sema::HandleTypeInfo>(
-            builder_.handles().data(), builder_.handles().size());
-        registry_.nodeTypes = ArenaSpan<lucid::sema::NodeTypeInfo>(
-            builder_.node_types().data(), builder_.node_types().size());
-
-        // 4. Verify executor and trigger-mode counts match node types.
-        const std::size_t n = builder_.node_types().size();
-        if (builder_.node_executors().size() != n)
-        {
-            engine::log_error(
-                "PackageManager: node executor count (%zu) does not match "
-                "node type count (%zu)",
-                builder_.node_executors().size(), n);
             return false;
-        }
-        if (builder_.trigger_modes().size() != n)
-        {
-            engine::log_error(
-                "PackageManager: trigger mode count (%zu) does not match "
-                "node type count (%zu)",
-                builder_.trigger_modes().size(), n);
-            return false;
-        }
-
-        // Fill package counts.
-        const auto &counts = builder_.package_counts();
-        for (std::size_t i = 0; i < package_infos_.size() && i < counts.size(); ++i)
-        {
-            package_infos_[i].node_type_count = counts[i].node_types;
-            package_infos_[i].table_count = counts[i].tables;
-            package_infos_[i].enum_count = counts[i].enums;
-            package_infos_[i].handle_count = counts[i].handles;
         }
 
         builder_.seal();
         applied_ = true;
+        return true;
+    }
 
-        engine::log_info("PackageManager: %zu node types registered", n);
+    bool PackageManager::apply_registration_only()
+    {
+        if (applied_)
+        {
+            engine::log_warn(
+                "PackageManager: apply_registration_only() called twice; ignored");
+            return !builder_.has_conflicts();
+        }
+
+        if (builder_.has_conflicts())
+        {
+            for (const auto &c : builder_.conflicts())
+            {
+                engine::log_error("PackageManager: %s", c.c_str());
+            }
+            return false;
+        }
+
+        // No world; no tables. Build the registries directly.
+        if (!build_registries(builder_, phases_, registry_,
+                              component_registry_, package_infos_))
+        {
+            return false;
+        }
+
+        builder_.seal();
+        applied_ = true;
         return true;
     }
 

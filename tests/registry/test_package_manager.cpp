@@ -13,11 +13,10 @@ using namespace engine;
 TEST_CASE("package_manager: registers core and logic nodes",
           "[package]")
 {
-    engine::ecs::World world;
     PackageManager mgr;
     REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
     REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
-    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.apply_registration_only());
     REQUIRE_FALSE(mgr.has_conflicts());
 
     const auto &reg = mgr.registry();
@@ -34,11 +33,10 @@ TEST_CASE("package_manager: registers core and logic nodes",
 TEST_CASE("package_manager: package_infos includes both packages",
           "[package][editor]")
 {
-    engine::ecs::World world;
     PackageManager mgr;
     REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
     REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
-    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.apply_registration_only());
 
     const auto &infos = mgr.package_infos();
     REQUIRE(infos.size() == 2);
@@ -58,11 +56,10 @@ TEST_CASE("package_manager: package_infos includes both packages",
 TEST_CASE("package_manager: explicit editor info is returned",
           "[package][editor]")
 {
-    engine::ecs::World world;
     PackageManager mgr;
     REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
     REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
-    REQUIRE(mgr.apply(world));
+    REQUIRE(mgr.apply_registration_only());
 
     const NodeEditorInfo *info = mgr.node_editor_info("Engine_PrintNode");
     REQUIRE(info != nullptr);

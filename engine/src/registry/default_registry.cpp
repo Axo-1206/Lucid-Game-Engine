@@ -17,38 +17,22 @@ namespace engine
                 auto m = std::make_unique<PackageManager>();
                 m->load_package(std::make_unique<CorePackage>());
                 m->load_package(std::make_unique<LogicPackage>());
-                return m;
-            }();
-            return *mgr;
-        }
-
-        // The default manager needs a World to apply() against. Core and
-        // logic packages in Phase 10 do not register tables, so a
-        // throwaway World is fine. When packages register tables, callers
-        // will move to their own PackageManager.
-        bool ensure_default_applied()
-        {
-            static const bool ok = []
-            {
-                static engine::ecs::World scratch;
-                if (!default_package_manager().apply(scratch))
+                if (!m->apply_registration_only())
                 {
-                    for (const auto &c : default_package_manager().conflicts())
+                    for (const auto &c : m->conflicts())
                     {
                         engine::log_error("default_registry: %s", c.c_str());
                     }
-                    return false;
                 }
-                return true;
+                return m;
             }();
-            return ok;
+            return *mgr;
         }
 
     } // namespace
 
     const lucid::sema::Registry &default_registry()
     {
-        ensure_default_applied();
         return default_package_manager().registry();
     }
 

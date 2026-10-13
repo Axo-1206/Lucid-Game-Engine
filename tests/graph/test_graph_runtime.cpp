@@ -45,8 +45,7 @@ namespace
 
         static const bool applied = [&]
         {
-            static engine::ecs::World scratch;
-            return mgr.apply(scratch);
+            return mgr.apply_registration_only();
         }();
         (void)applied;
 

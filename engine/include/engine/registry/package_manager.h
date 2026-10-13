@@ -37,13 +37,29 @@ namespace engine
         bool load_package(std::unique_ptr<Package> pkg);
 
         // Apply the registered content: create the packages' tables in
-        // the World, seal the builder, build the Registry.
+        // the World, seal the builder, build the Registry and the
+        // ComponentRegistry.
         //
         // Must be called exactly once, after all load_package() calls
         // and after the World's core tables have been created.
         //
         // Returns false if any conflict was recorded.
         bool apply(engine::ecs::World &world);
+
+        // Apply the registered content without creating tables in a
+        // World. Seals the builder, builds the Registry and the
+        // ComponentRegistry. The packages' table creators are not run.
+        //
+        // Use this when the caller only needs the registry (the
+        // default_registry() shim, a test that checks the node
+        // vocabulary). Use apply(World&) when the caller wants the
+        // packages' tables.
+        //
+        // Must be called exactly once, after all load_package() calls.
+        // Mutually exclusive with apply(World&).
+        //
+        // Returns false if any conflict was recorded.
+        bool apply_registration_only();
 
         // The merged registry. Valid only after apply().
         const lucid::sema::Registry &registry() const { return registry_; }
