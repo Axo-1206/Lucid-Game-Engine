@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <string>
 
 using namespace engine;
 
@@ -30,10 +31,7 @@ TEST_CASE("scene: save and load round-trip", "[scene]")
 {
     Fixture f;
 
-    // Create a scene.
-    Scene scene(f.world);
-    scene.set_name("test");
-
+    // Build a world.
     EntityRef a = create_entity(f.world, allocate_entity_id(f.world), "A");
     auto ta = add_component<TransformTag>(f.world, a);
     f.world.get_table("Engine_Transform")->set_float32(ta, "x", 100.0f);
@@ -46,14 +44,23 @@ TEST_CASE("scene: save and load round-trip", "[scene]")
     EntityRef b = create_entity(f.world, allocate_entity_id(f.world), "B");
     set_parent(f.world, b, a);
 
-    std::string path = make_temp_path("lucid_test_scene.lscene");
-    REQUIRE(scene.save_to_file(path));
+    // Extract, name, save.
+    Scene out = Scene::extract_from(f.world);
+    out.set_name("test");
 
-    // Clear and reload.
-    scene.clear();
+    const std::string path = make_temp_path("lucid_test_scene.lscene");
+    REQUIRE(SceneSaver_save(out, path));
+
+    // Clear the world's rows. The schema stays.
+    f.world.clear_rows();
+    REQUIRE(f.world.has_table("Engine_Entity"));
     REQUIRE(f.world.get_table("Engine_Entity")->count() == 0);
 
-    REQUIRE(scene.load_from_file(path));
+    // Load and apply.
+    Scene in = SceneLoader_load(path);
+    REQUIRE_FALSE(in.json_text().empty());
+    in.apply_to(f.world, ApplyMode::Clear);
+
     REQUIRE(f.world.get_table("Engine_Entity")->count() == 2);
 
     // Verify entity A.
@@ -77,18 +84,22 @@ TEST_CASE("scene: save and load round-trip", "[scene]")
 TEST_CASE("scene: script component round-trip", "[scene]")
 {
     Fixture f;
-    Scene scene(f.world);
-    scene.set_name("scripts");
 
     EntityRef a = create_entity(f.world, allocate_entity_id(f.world), "A");
     auto sa = add_component<ScriptTag>(f.world, a);
     f.world.get_table("Engine_Script")->set_string(sa, "graph", "scripts/player.lucgraph");
 
-    std::string path = make_temp_path("lucid_test_scene_script.lscene");
-    REQUIRE(scene.save_to_file(path));
+    Scene out = Scene::extract_from(f.world);
+    out.set_name("scripts");
 
-    scene.clear();
-    REQUIRE(scene.load_from_file(path));
+    const std::string path = make_temp_path("lucid_test_scene_script.lscene");
+    REQUIRE(SceneSaver_save(out, path));
+
+    f.world.clear_rows();
+
+    Scene in = SceneLoader_load(path);
+    REQUIRE_FALSE(in.json_text().empty());
+    in.apply_to(f.world, ApplyMode::Clear);
 
     auto a_id = f.world.get_table("Engine_Entity")->find_by_primary("id", engine::ecs::CellValue::from_uint64(1));
     REQUIRE_FALSE(a_id.is_nil());
@@ -103,66 +114,83 @@ TEST_CASE("scene: script component round-trip", "[scene]")
 TEST_CASE("scene: refuses a newer version", "[scene]")
 {
     Fixture f;
-    Scene scene(f.world);
 
-    // Write a scene file with a version newer than the engine's.
-    std::string path = make_temp_path("lucid_test_scene_newer.lscene");
+    const std::string path = make_temp_path("lucid_test_scene_newer.lscene");
     {
         std::ofstream out(path);
         out << R"({ "version": 999, "name": "future", "entities": [] })";
     }
 
-    REQUIRE_FALSE(scene.load_from_file(path));
+    Scene s = SceneLoader_load(path);
+    REQUIRE(s.json_text().empty()); // refused
+    REQUIRE_FALSE(SceneLoader_load_into(f.world, path));
+
     std::filesystem::remove(path);
 }
 
-TEST_CASE("scene: clear removes all entities and cameras", "[scene]")
+TEST_CASE("scene: apply_to with empty JSON clears the world's rows",
+          "[scene]")
 {
     Fixture f;
-    Scene scene(f.world);
+
+    // Populate the world.
+    create_entity(f.world, 1, "A");
+    REQUIRE(f.world.get_table("Engine_Entity")->count() == 1);
+
+    // Load a file that does not exist; the loader returns an empty Scene.
+    Scene s = SceneLoader_load("nonexistent_scene.lscene");
+    REQUIRE(s.json_text().empty());
+
+    s.apply_to(f.world, ApplyMode::Clear);
+
+    // The rows are gone, the schema is not.
+    REQUIRE(f.world.has_table("Engine_Entity"));
+    REQUIRE(f.world.get_table("Engine_Entity")->count() == 0);
+}
+
+TEST_CASE("scene: SceneLoader_load_into on a missing file does not clear",
+          "[scene]")
+{
+    Fixture f;
 
     create_entity(f.world, 1, "A");
-    create_entity(f.world, 2, "B");
+    REQUIRE(f.world.get_table("Engine_Entity")->count() == 1);
 
-    scene.clear();
+    REQUIRE_FALSE(SceneLoader_load_into(f.world, "nonexistent_scene.lscene"));
 
-    REQUIRE(f.world.get_table("Engine_Entity")->count() == 0);
-    REQUIRE(f.world.get_table("Engine_Camera")->count() == 0);
+    // The world is untouched.
+    REQUIRE(f.world.get_table("Engine_Entity")->count() == 1);
 }
 
-TEST_CASE("scene: missing file returns false", "[scene]")
+TEST_CASE("scene: loading a scene with cameras sets active camera name",
+          "[scene]")
 {
     Fixture f;
-    Scene scene(f.world);
-    REQUIRE_FALSE(scene.load_from_file("nonexistent_scene.lscene"));
-}
 
-TEST_CASE("scene: loading a scene with cameras sets active camera", "[scene]")
-{
-    Fixture f;
-    Scene scene(f.world);
-
-    std::string path = make_temp_path("lucid_test_scene_cams.lscene");
-
-    // Save a scene with one camera.
+    // Populate the camera table directly.
     {
         auto *cam = f.world.get_table("Engine_Camera");
         auto ref = cam->add_partial("name", engine::ecs::CellValue::from_string("main"));
         cam->set_float32(ref, "pos_x", 640.0f);
         cam->set_float32(ref, "pos_y", 360.0f);
         cam->set_bool(ref, "is_orthographic", true);
-
-        REQUIRE(scene.save_to_file(path));
     }
 
-    scene.clear();
-    REQUIRE(scene.load_from_file(path));
-    REQUIRE_FALSE(scene.active_camera().is_nil());
+    Scene out = Scene::extract_from(f.world);
+    const std::string path = make_temp_path("lucid_test_scene_cams.lscene");
+    REQUIRE(SceneSaver_save(out, path));
 
-    CameraData data = scene.get_active_camera_data();
-    REQUIRE(data.name == "main");
-    REQUIRE(data.pos_x == 640.0f);
-    REQUIRE(data.pos_y == 360.0f);
+    f.world.clear_rows();
+
+    Scene in = SceneLoader_load(path);
+    REQUIRE(in.active_camera_name() == "main");
+    in.apply_to(f.world, ApplyMode::Clear);
+
+    // The camera row exists.
+    REQUIRE(f.world.get_table("Engine_Camera")->count() == 1);
+    auto ref = f.world.get_table("Engine_Camera")->find_by_primary("name", engine::ecs::CellValue::from_string("main"));
+    REQUIRE_FALSE(ref.is_nil());
+    REQUIRE(f.world.get_table("Engine_Camera")->get_float32(ref, "pos_x") == 640.0f);
 
     std::filesystem::remove(path);
 }

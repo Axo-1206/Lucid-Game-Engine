@@ -1,5 +1,6 @@
 #include "engine/scene/entity.h"
 #include "engine/core/log.h"
+#include "engine/scene/component_tags.h"
 
 #include <stdexcept>
 

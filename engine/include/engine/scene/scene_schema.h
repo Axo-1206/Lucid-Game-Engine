@@ -20,6 +20,22 @@ namespace engine
     // evolution rules.
     constexpr int kSceneSchemaVersion = 1;
 
+    // How a Scene is applied to a World.
+    //
+    // Clear:    the world's non-preserved tables are cleared first.
+    //           The default. This is the "load a new level" mode.
+    //
+    // Additive: existing rows are kept; the scene's entities and
+    //           cameras are added. Entity ids must not collide with
+    //           existing ones. This is the "stream a chunk" mode, and
+    //           it is a future extension; the loader accepts it but
+    //           the current implementation only appends.
+    enum class ApplyMode
+    {
+        Clear,
+        Additive,
+    };
+
     // -----------------------------------------------------------------------------
     // The component types the scene loader and saver know about
     // -----------------------------------------------------------------------------

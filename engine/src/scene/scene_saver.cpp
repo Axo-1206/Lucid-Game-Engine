@@ -1,10 +1,13 @@
 #include "engine/scene/scene.h"
-#include "engine/core/log.h"
 #include "engine/scene/scene_schema.h"
+#include "engine/scene/component_tags.h"
+#include "engine/scene/entity.h"
+#include "engine/core/log.h"
 
 #include <nlohmann/json.hpp>
 
 #include <fstream>
+#include <string>
 #include <vector>
 
 namespace engine
@@ -67,10 +70,11 @@ namespace engine
             return j;
         }
 
-        json save_component_by_name(engine::ecs::World &world, EntityRef e,
+        json save_component_by_name(const engine::ecs::World &world,
+                                    EntityRef e,
                                     const std::string &table_name)
         {
-            auto *tbl = world.get_table(table_name);
+            const auto *tbl = world.get_table(table_name);
             if (!tbl)
                 return json();
 
@@ -97,82 +101,90 @@ namespace engine
 
     } // namespace
 
-    bool Scene::save_to_file(const std::string &path) const
+    Scene SceneSaver_from_world(const engine::ecs::World &world)
     {
+        Scene s;
+
         json root;
-        root["version"] = 1;
-        root["name"] = name_;
+        root["version"] = kSceneSchemaVersion;
+
+        // --- Name ---
+        // A World has no name. Leave the scene name empty; the caller
+        // can set it before saving.
+        root["name"] = "";
 
         // --- Cameras ---
         {
             json cameras = json::array();
-            auto *cam_tbl = world_.get_table(CameraTag::name);
+            const auto *cam_tbl = world.get_table(CameraTag::name);
             if (cam_tbl)
             {
                 cam_tbl->each([&](engine::ecs::RowRef r)
                               {
-                json cj;
-                cj["name"] = cam_tbl->get_string(r, "name");
-                cj["pos"]  = { cam_tbl->get_float32(r, "pos_x"),
-                               cam_tbl->get_float32(r, "pos_y"),
-                               cam_tbl->get_float32(r, "pos_z") };
-                cj["target"] = { cam_tbl->get_float32(r, "target_x"),
-                                 cam_tbl->get_float32(r, "target_y"),
-                                 cam_tbl->get_float32(r, "target_z") };
-                cj["fov"]             = cam_tbl->get_float32(r, "fov");
-                cj["near"]            = cam_tbl->get_float32(r, "near");
-                cj["far"]             = cam_tbl->get_float32(r, "far");
-                cj["is_orthographic"] = cam_tbl->get_bool   (r, "is_orthographic");
-                cj["ortho_size"]      = cam_tbl->get_float32(r, "ortho_size");
-                cj["clear_color"]     = { cam_tbl->get_float32(r, "clear_r"),
-                                          cam_tbl->get_float32(r, "clear_g"),
-                                          cam_tbl->get_float32(r, "clear_b"),
-                                          cam_tbl->get_float32(r, "clear_a") };
-                cameras.push_back(cj); });
+                    json cj;
+                    cj["name"]            = cam_tbl->get_string(r, "name");
+                    cj["pos"]             = { cam_tbl->get_float32(r, "pos_x"),
+                                              cam_tbl->get_float32(r, "pos_y"),
+                                              cam_tbl->get_float32(r, "pos_z") };
+                    cj["target"]          = { cam_tbl->get_float32(r, "target_x"),
+                                              cam_tbl->get_float32(r, "target_y"),
+                                              cam_tbl->get_float32(r, "target_z") };
+                    cj["fov"]             = cam_tbl->get_float32(r, "fov");
+                    cj["near"]            = cam_tbl->get_float32(r, "near");
+                    cj["far"]             = cam_tbl->get_float32(r, "far");
+                    cj["is_orthographic"] = cam_tbl->get_bool   (r, "is_orthographic");
+                    cj["ortho_size"]      = cam_tbl->get_float32(r, "ortho_size");
+                    cj["clear_color"]     = { cam_tbl->get_float32(r, "clear_r"),
+                                              cam_tbl->get_float32(r, "clear_g"),
+                                              cam_tbl->get_float32(r, "clear_b"),
+                                              cam_tbl->get_float32(r, "clear_a") };
+                    cameras.push_back(cj); });
             }
             root["cameras"] = cameras;
         }
 
         // --- Entities ---
-        // Discover the component tables: any table with an `entity` column
-        // that is not the `Entity` table itself.
+        // Discover component tables: any table with an `entity` column
+        // that is not the Entity table itself.
         std::vector<std::string> component_tables;
-        world_.each_table([&](engine::ecs::Table &t)
-                          {
-        if (t.has_column("entity")) {
-            component_tables.push_back(t.name());
-        } });
+        world.each_table([&](const engine::ecs::Table &t)
+                         {
+            if (t.name() != EntityTag::name && t.has_column("entity"))
+                component_tables.push_back(t.name()); });
 
         {
             json entities = json::array();
-            auto *entity_tbl = world_.get_table(EntityTag::name);
+            const auto *entity_tbl = world.get_table(EntityTag::name);
             if (entity_tbl)
             {
                 entity_tbl->each([&](engine::ecs::RowRef r)
                                  {
-                json ej;
-                ej["id"]   = entity_tbl->get_uint64(r, "id");
-                ej["name"] = entity_tbl->get_string(r, "name");
+                    json ej;
+                    ej["id"]   = entity_tbl->get_uint64(r, "id");
+                    ej["name"] = entity_tbl->get_string(r, "name");
 
-                // Parent: emit the parent's id, or 0.
-                engine::ecs::RowRef parent = entity_tbl->get_row_ref(r, "parent");
-                if (!parent.is_nil() && entity_tbl->is_valid(parent)) {
-                    ej["parent"] = entity_tbl->get_uint64(parent, "id");
-                } else {
-                    ej["parent"] = 0;
-                }
-
-                // Components.
-                json components = json::object();
-                for (const auto& table_name : component_tables) {
-                    json cj = save_component_by_name(const_cast<engine::ecs::World&>(world_), r, table_name);
-                    if (!cj.is_null()) {
-                        components[table_name] = cj;
+                    engine::ecs::RowRef parent = entity_tbl->get_row_ref(r, "parent");
+                    if (!parent.is_nil() && entity_tbl->is_valid(parent))
+                    {
+                        ej["parent"] = entity_tbl->get_uint64(parent, "id");
                     }
-                }
-                ej["components"] = components;
+                    else
+                    {
+                        ej["parent"] = 0;
+                    }
 
-                entities.push_back(ej); });
+                    json components = json::object();
+                    for (const auto &table_name : component_tables)
+                    {
+                        json cj = save_component_by_name(world, r, table_name);
+                        if (!cj.is_null())
+                        {
+                            components[table_name] = cj;
+                        }
+                    }
+                    ej["components"] = components;
+
+                    entities.push_back(ej); });
             }
             root["entities"] = entities;
         }
@@ -180,20 +192,32 @@ namespace engine
         // --- Engine state ---
         {
             json state = json::object();
-            auto *state_tbl = world_.get_table("Engine_EngineState");
+            const auto *state_tbl = world.get_table("Engine_EngineState");
             if (state_tbl)
             {
                 state_tbl->each([&](engine::ecs::RowRef r)
                                 {
-                std::string key = state_tbl->get_string(r, "name");
-                if (key == "next_entity_id") {
-                    state["next_entity_id"] = state_tbl->get_uint64(r, "value_u64");
-                } });
+                    std::string key = state_tbl->get_string(r, "name");
+                    if (key == "next_entity_id")
+                    {
+                        state["next_entity_id"] = state_tbl->get_uint64(r, "value_u64");
+                    } });
             }
             root["engine_state"] = state;
         }
 
-        // --- Write ---
+        s.set_json_text(root.dump(4));
+        return s;
+    }
+
+    bool SceneSaver_save(const Scene &scene, const std::string &path)
+    {
+        if (scene.json_text().empty())
+        {
+            log_error("SceneSaver_save: scene has no JSON to save.");
+            return false;
+        }
+
         std::ofstream file(path);
         if (!file.is_open())
         {
@@ -201,10 +225,10 @@ namespace engine
             return false;
         }
 
-        file << root.dump(4);
+        file << scene.json_text();
         file.close();
 
-        log_info("Saved scene '%s' to '%s'", name_.c_str(), path.c_str());
+        log_info("Saved scene to '%s'", path.c_str());
         return true;
     }
 
