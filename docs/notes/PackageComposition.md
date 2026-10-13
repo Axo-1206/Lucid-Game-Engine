@@ -110,6 +110,23 @@ A registration that violates the prefix, or that collides with an
 existing name, is recorded as a conflict; `PackageManager::apply`
 refuses to run if any conflict exists.
 
+`add_component` registers a table and its codec in one call. The table
+creator runs at apply time; the codec is stored in the
+`ComponentRegistry` for the scene loader and saver. A package that wants
+a component to be serializable registers it this way; the alternative,
+calling `add_table` and then a separate codec registration, is not the
+API. `add_table` registers a table without a codec: the scene loader
+does not know how to move the table's rows to or from JSON, and the
+saver skips the table. This is the right call for a package's internal
+table (a runtime cache, an index) and it is what the engine itself does
+for `Engine_Camera` (which is not a component and has its own loader in
+`scene.cpp`).
+
+A component table's name must start with the package's prefix, like
+every other registered name. A codec's table name must be unique across
+all packages: two packages that register a codec for the same table name
+is a conflict caught at registration time.
+
 ---
 
 ## 4. Types
@@ -163,6 +180,22 @@ A `bob.game` package that wants to use `Alice_Vector3`:
 
 `bob.game` cannot compute on a `Vector3` without going through
 `alice.math`'s nodes. That is the package boundary.
+
+The `Alice_Vector3Table` is not an entity component: its rows are not
+attached to entities, and the table has no `entity` column. It is
+registered with `add_table`, not `add_component`, and it has no codec.
+Vectors created by `Alice_Vector3NewNode` live for the session; a scene
+that wants to persist a vector carries the entity that owns it and the
+component that stores the handle, not the vector table's rows.
+
+If a package wants a vector to be part of an entity — a velocity, a
+spawn offset — it registers a *component* table with `add_component`,
+whose columns include the vector's fields as primitives (`float32` `x`,
+`float32` `y`, `float32` `z`) and whose codec reads and writes them. The
+`.lucid` file sees three floats; the C++ executor may use a `Vector3`
+struct internally. The distinction is: the handle pattern is for shared
+values referenced from many places; the component pattern is for values
+attached to an entity and serialized with it.
 
 ### 4.2 A C++ struct with primitive arguments
 
@@ -366,6 +399,19 @@ services that are the package's own business. A package that wants
 to offer a service to *other* packages is asking for the first;
 there is no third mechanism.
 
+A package has two ways to affect what a node executor can reach without
+adding a field to `Services`. The first is to keep the object inside the
+package: the package's `register_into` stores a pointer in a
+package-level accessor, and the package's executors call that accessor.
+This is a service in everything but name; it is not on `Services`
+because no other package can use it. The second is to write to a table
+instead of calling a service: a package that wants to affect rendering
+writes a row in a `Render_*` table and lets a system read it.
+`Dataflow.md` §6 and §9 describe why this is the right shape when the
+operation is per-frame infrastructure rather than a discrete request.
+Between them, "keep it internal" and "write a table" cover every case a
+package will hit before it genuinely needs a new `Services` field.
+
 ### 7.2 Why a typed struct and not a service locator
 
 `Services` is a struct with typed fields. It is not
@@ -428,6 +474,16 @@ dependency graph, no version negotiation, no conflict resolution.
 The game's `main.cpp` loads packages in the order it wants, and a
 missing package is a link error, not a runtime error.
 
+The boundary is a policy, not an enforcement. The engine cannot stop
+`bob.game` from calling `world.get_table("Alice_Vector3Table")` and
+reading it directly. What the policy buys is that `alice.math` can
+change `Alice_Vector3Table`'s columns as long as `Alice_Vector3AddNode`,
+`Alice_Vector3XNode`, and the rest of its node interfaces stay the same.
+A `bob.game` that reads the table directly does not get that freedom; a
+`bob.game` that uses the nodes does. The engine's tests do not check the
+boundary. Code review does. The note exists so the reviewer has
+something to point at.
+
 ---
 
 ## 9. A worked example
@@ -459,10 +515,57 @@ directly; it uses `Engine_BodyPositionNode`. If the engine changes
 
 ---
 
-## 10. Summary in one line
+## 10. A second example: `alice.math`
+
+The package registers `Alice_Vector3` as a handle, `Alice_Vector3Table`
+as a plain table (no codec), and a set of value nodes:
+`Alice_Vector3NewNode(x, y, z)`, `Alice_Vector3XNode(v)`,
+`Alice_Vector3AddNode(a, b)`, and so on. Each node's executor reads or
+writes `Alice_Vector3Table`. The package ships no C++ header for a
+`Vector3` struct; the type is the handle.
+
+The same package could instead ship `alice/math/vector3.h` with `struct
+Vector3 { float x, y, z; }` and register the same nodes with three
+`float32` arguments each. The `.lucid` file would pass three floats
+where the handle version passes one handle. `bob.game`'s C++ would
+include the header to compute on vectors inline; the `.lucid` file would
+still compose `alice.math`'s nodes to keep the policy.
+
+Neither is wrong. The handle version keeps the ECS model intact: a value
+is a row in a table, operations are nodes, other packages use the
+handle. The struct version keeps the format library's type system simple
+and lets a C++ consumer use a normal type. The choice is the package
+author's, and §4.3 states the rule: a compound type is a handle plus a
+table, or a struct whose fields are declared to `.lucid` as primitives.
+It is never a new primitive in the format library.
+
+---
+
+## 11. Summary in one line
 
 **A package registers node types, executors, types, and tables with
 the engine at startup; its node executors read and write its own
 tables and call services; other packages use it through `.lucid`
 imports and C++ includes; and a package does not reach into another
 package's tables.**
+
+---
+
+## 12. What this note does not cover
+
+This note covers what a package contributes and how packages compose. It
+does not cover:
+
+- **Naming.** The prefix convention and its enforcement are in
+  `PackageNaming.md`.
+- **The node vocabulary's shape.** `NodeTypeInfo`, `EnumTypeInfo`,
+  `HandleTypeInfo`, and the `lucid::sema::Registry` are the format
+  library's types. See `LucidGraphFormat.md` and the format library's
+  `Architecture.md`.
+- **How a graph runs.** The trigger model, the firing rules, and the
+  value/action/trigger kinds are in `TriggerModel.md`. The dataflow
+  model — tables as the interface — is in `Dataflow.md`.
+- **The editor's view of a package.** `PackageInfo`, `NodeEditorInfo`,
+  and `TableEditorInfo` are in `EditorMetadata.md`.
+- **A specific package's design.** `PhysicsPlan.md` is the worked case
+  for `engine.physics_2d`.

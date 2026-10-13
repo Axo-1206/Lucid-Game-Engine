@@ -34,6 +34,23 @@ The loader:
 
 ---
 
+## Component recognition
+
+The scene loader and saver do not hardcode the set of component types.
+They consult the engine's `ComponentRegistry`, a codec table populated
+at startup: the engine's five core components (`Engine_Transform`,
+`Engine_WorldTransform`, `Engine_Velocity`, `Engine_Sprite`,
+`Engine_Script`) are registered by `register_core_components`; each
+loaded package registers its own component tables via
+`PackageBuilder::add_component`. A `components` key the registry does
+not know is logged as a warning and ignored; the entity does not get
+that component. The same registry drives the saver: a component table
+with no codec is not serialized. This is what makes a scene portable
+across engines with different package sets, and what makes adding a
+package's component a one-line change in the package's `register_into`.
+
+---
+
 ## Top-level shape
 
 ```json
@@ -187,6 +204,14 @@ different node registry, the load fails loudly.
 The scene neither compiles nor loads the graph. The path is a reference,
 not a dependency.
 
+The runtime reads the row after `Scene::apply_to` returns, not during
+the tick. The engine loop calls `scene.apply_to(world, components,
+ApplyMode::Clear)` and then `runtime.load()`; `load()` walks the
+`Engine_Script` table, loads each path, and is idempotent. A scene
+reload calls `apply_to` and then `load()` again. Nothing else in the
+loop reads `Engine_Script`; the runtime does not poll. See
+`docs/notes/Dataflow.md` §7 and `docs/Decision.md` Decision 11.
+
 ---
 
 ## Asset paths
@@ -216,6 +241,32 @@ scene still loads.
 
 The loader does not refuse to load a scene with unknown components. It
 refuses only if the file's version is newer than the engine's.
+
+"Unknown" means "not in the `ComponentRegistry`." The registry is built
+once, after all packages are loaded, before any scene is applied. A
+component that a package registers is known; a component that no loaded
+package registers is unknown. The loader does not consult a global name
+list; it asks the registry that the game's `main.cpp` built.
+
+---
+
+## Saving
+
+`SceneSaver_from_world(world, components)` produces a `Scene` whose JSON
+reflects the world's current rows. For each entity in `Engine_Entity`,
+the saver walks every table with an `entity` column (except
+`Engine_Entity` itself), looks up the table's codec in the same
+`ComponentRegistry` the loader uses, and calls the codec's `save`
+function. A table with no codec is skipped: the saver writes nothing for
+it, and the JSON for that entity has no key for the table. This is the
+mechanism by which `Engine_BodyRuntime` (a runtime table with no codec)
+is never serialized while `Engine_Body` (a component with a codec) is.
+
+The saver does not read the file. It writes a fresh JSON document from
+the world's rows. `SceneSaver_save(scene, path)` writes the `Scene`'s
+JSON text to disk. The two are separate: a caller who wants to save the
+world writes `SceneSaver_save(SceneSaver_from_world(world, components),
+path)`.
 
 ---
 
@@ -254,6 +305,16 @@ change. The loader accepts older versions with a log line, so bumping on
 compatible changes gives a version history without noise. Breaking
 changes must bump and must either migrate the old scene or refuse it
 with a clear message.
+
+A scene's compatibility with an engine is a question of the engine's
+`ComponentRegistry`, not of the scene format version. Adding a package's
+component is compatible: old scenes lack it on every entity, new scenes
+may carry it, and the format version does not need to bump. Removing a
+package from the engine makes the components it registered unknown; old
+scenes that carry those components load with warnings and lose the data.
+The format version tracks the shape of the envelope — the top-level
+keys, the entity object, the camera object — not the set of components a
+given engine knows.
 
 ---
 
