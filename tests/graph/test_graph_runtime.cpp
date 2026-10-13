@@ -193,6 +193,75 @@ TEST_CASE("graph_runtime: clear releases loaded graphs", "[graph][runtime]")
     REQUIRE(rt.graph_count() == 0);
 }
 
+TEST_CASE("graph_runtime: load is idempotent", "[graph][runtime]")
+{
+    Fixture f;
+
+    const auto lucgraph_path = temp_dir() / "idempotent.lucgraph";
+    REQUIRE(compile_to_file(
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(1.0) on frame\n",
+        lucgraph_path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "idempotent.lucgraph");
+
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
+    rt.set_asset_root(temp_dir());
+
+    // First load: one graph.
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+
+    // Second load: still one graph. load() clears graphs_ and reloads;
+    // it does not append.
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+
+    // Third: same.
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+}
+
+TEST_CASE("graph_runtime: load picks up a changed Script row",
+          "[graph][runtime]")
+{
+    Fixture f;
+
+    // Two graphs on disk.
+    const auto graph_a = temp_dir() / "a.lucgraph";
+    const auto graph_b = temp_dir() / "b.lucgraph";
+    REQUIRE(compile_to_file(
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(1.0) on frame\n",
+        graph_a));
+    REQUIRE(compile_to_file(
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(2.0) on frame\n",
+        graph_b));
+
+    // One entity with one Script row, pointing at A.
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "a.lucgraph");
+
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
+    rt.set_asset_root(temp_dir());
+
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+
+    // Change the Script row to point at B.
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "b.lucgraph");
+
+    // Reload picks up the change.
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+}
+
 TEST_CASE("graph_runtime: missing file does not throw", "[graph][runtime]")
 {
     Fixture f;

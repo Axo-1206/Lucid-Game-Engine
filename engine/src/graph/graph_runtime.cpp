@@ -283,6 +283,19 @@ namespace engine::graph
 
     } // namespace
 
+    // Load the graphs referenced by the world's Engine_Script table.
+    //
+    // Idempotent: clears the current graphs_ first, then walks
+    // Engine_Script and loads each path.
+    //
+    // The caller decides when to call this. The engine loop calls it
+    // after scene.apply_to, so the Script rows exist. A caller that
+    // reloads a scene calls it again after the reload. The runtime
+    // does not poll; it does not read the Script table on tick.
+    //
+    // Returns true if every script loaded; false if any failed. A
+    // failed script is logged and skipped; the runtime keeps the
+    // graphs it did load.
     bool GraphRuntime::load()
     {
         clear();

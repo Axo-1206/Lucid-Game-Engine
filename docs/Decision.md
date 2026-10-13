@@ -298,6 +298,42 @@ shape is a `World::clear_for_scene(callback)` that re-seeds
 engine-lifetime state through a callback. See
 `docs/notes/WorldLifecycle.md` for the full note.
 
+## Decision 10 — Package composition
+
+A package contributes node types, executors, types (enums and
+handles), and tables (with component codecs). It registers them
+through `PackageBuilder` at startup. It is a C++ object, not a
+plugin and not a runtime object.
+
+A compound type (a vector, a matrix) is either a handle plus a
+table, with operations as nodes, or a C++ struct whose fields are
+declared to `.lucid` as primitives. A package cannot add a new
+primitive to the format library's type system.
+
+A package's node executor is a C++ function. It reads and writes
+its own package's tables, and it calls services. The service is
+either the engine's (`Services::physics`) or the package's own
+internal object. A package does not call another package's
+executor or read another package's table directly; it uses the
+other package's nodes.
+
+## Decision 11 — Graph load lifecycle
+
+`GraphRuntime::load()` walks the world's `Engine_Script` table and
+loads each `.lucgraph` path. It is idempotent: it clears `graphs_`
+first, then reloads. It does not poll; it does not read
+`Engine_Script` on tick.
+
+The engine loop calls `runtime.load()` after `scene.apply_to` and
+before the first `runtime.tick()` for that scene. On a scene reload,
+the caller applies the scene and then calls `load()` again. A
+hot-reload key calls `load()` after writing the new Script row.
+
+A failed load logs and returns false. The runtime keeps the graphs
+it did load; the caller decides whether to abort or continue.
+
+See `docs/notes/Dataflow.md` §7 for the loop's step order.
+
 ---
 
 ## Gap table

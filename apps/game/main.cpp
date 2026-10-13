@@ -64,6 +64,11 @@ int main()
 
     engine::graph::GraphRuntime runtime(world, packages, services);
     runtime.set_asset_root(std::filesystem::current_path());
+
+    // Load the graphs referenced by the scene's Engine_Script table.
+    // This runs after scene.apply_to so the Script rows exist. On a
+    // scene reload, call scene.apply_to and then runtime.load() again;
+    // load() is idempotent.
     if (!runtime.load())
     {
         engine::log_warn("Some graphs failed to load; continuing without them.");

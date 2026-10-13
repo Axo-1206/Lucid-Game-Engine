@@ -209,6 +209,11 @@ between phases; there is only the table store.
 The engine loop runs in a fixed order each frame:
 
 ```
+0. Scene setup. If a scene was loaded this frame, scene.apply_to(world)
+   runs and runtime.load() follows. load() walks the world's
+   Engine_Script table and loads each graph. It is idempotent; a
+   caller who reloads a scene calls it again. Nothing else in the
+   loop reads Engine_Scrip
 1. Input is polled. The InputState is updated.
 2. runtime.tick(dt) is called. The graph's nodes execute:
    Value nodes evaluate; source triggers fire; gated triggers
@@ -224,6 +229,9 @@ The engine loop runs in a fixed order each frame:
 5. render_system builds a RenderList and submits it.
 6. The renderer ends the frame and presents.
 ```
+
+> [!NOTE]
+> Scene setup and graph load. Scene::apply_to writes the scene's entities, components, and cameras into the world, including the Engine_Script rows. runtime.load() then reads those rows and loads each .lucgraph file. This is the only point in the loop where the Script table is read. The runtime does not poll the table; it does not notice a script added mid-frame. A caller that wants to hot-reload a graph writes a new Script row and calls runtime.load().
 
 **Every step reads the tables left by the previous step.** A
 write by a node is visible to the systems. A write by a system
