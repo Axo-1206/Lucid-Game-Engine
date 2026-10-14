@@ -24,19 +24,19 @@ TEST_CASE("package_manager: registers core and logic nodes",
     REQUIRE(reg.nodeTypes.size() == 11);
 
     // Core (4).
-    REQUIRE(reg.nodeTypes[0].name == "Engine_Float32Node");
-    REQUIRE(reg.nodeTypes[1].name == "Engine_Int32Node");
-    REQUIRE(reg.nodeTypes[2].name == "Engine_EveryFrame");
-    REQUIRE(reg.nodeTypes[3].name == "Engine_PrintNode");
+    REQUIRE(reg.nodeTypes[0].name == "Engine_Float_Node");
+    REQUIRE(reg.nodeTypes[1].name == "Engine_Int_Node");
+    REQUIRE(reg.nodeTypes[2].name == "Engine_EveryFrame_Node");
+    REQUIRE(reg.nodeTypes[3].name == "Engine_Print_Float_Node");
 
     // Logic (7).
-    REQUIRE(reg.nodeTypes[4].name == "Engine_BoolNode");
-    REQUIRE(reg.nodeTypes[5].name == "Engine_LessThanNode");
-    REQUIRE(reg.nodeTypes[6].name == "Engine_GreaterThanNode");
-    REQUIRE(reg.nodeTypes[7].name == "Engine_EqualToNode");
-    REQUIRE(reg.nodeTypes[8].name == "Engine_AndNode");
-    REQUIRE(reg.nodeTypes[9].name == "Engine_NotNode");
-    REQUIRE(reg.nodeTypes[10].name == "Engine_IfNode");
+    REQUIRE(reg.nodeTypes[4].name == "Engine_Bool_Node");
+    REQUIRE(reg.nodeTypes[5].name == "Engine_LessThan_Float_Float_Node");
+    REQUIRE(reg.nodeTypes[6].name == "Engine_GreaterThan_Float_Float_Node");
+    REQUIRE(reg.nodeTypes[7].name == "Engine_EqualTo_Float_Float_Node");
+    REQUIRE(reg.nodeTypes[8].name == "Engine_And_Bool_Bool_Node");
+    REQUIRE(reg.nodeTypes[9].name == "Engine_Not_Bool_Node");
+    REQUIRE(reg.nodeTypes[10].name == "Engine_If_Bool_Node");
 }
 
 TEST_CASE("package_manager: package_infos includes both packages",
@@ -70,10 +70,10 @@ TEST_CASE("package_manager: explicit editor info is returned",
     REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
     REQUIRE(mgr.apply_registration_only());
 
-    const NodeEditorInfo *info = mgr.node_editor_info("Engine_PrintNode");
+    const NodeEditorInfo *info = mgr.node_editor_info("Engine_Print_Float_Node");
     REQUIRE(info != nullptr);
     REQUIRE(info->display_name == "Print");
-    REQUIRE(info->doc_summary == "Print a value to the engine log.");
+    REQUIRE(info->doc_summary == "Print a float32 value to the engine log.");
     REQUIRE(info->icon_id == "print");
 }
 
@@ -84,8 +84,8 @@ TEST_CASE("package_manager: unknown node type returns nullptr",
     REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
     REQUIRE(mgr.apply_registration_only());
 
-    REQUIRE(mgr.node_editor_info("Engine_NotANode") == nullptr);
-    REQUIRE(mgr.node_editor_info("Alice_GravityNode") == nullptr);
+    REQUIRE(mgr.node_editor_info("Engine_NotA_Node") == nullptr);
+    REQUIRE(mgr.node_editor_info("Alice_Gravity_Node") == nullptr);
 }
 
 TEST_CASE("package_manager: table editor info falls back",
@@ -170,4 +170,38 @@ TEST_CASE("package_manager: apply_registration_only after apply is a no-op",
     REQUIRE(mgr.apply_registration_only());
     REQUIRE(mgr.applied());
     REQUIRE(mgr.registry().nodeTypes.size() == 4);
+}
+
+TEST_CASE("package_manager: node editor info carries the operation",
+          "[package][editor][operation]")
+{
+    PackageManager mgr;
+    REQUIRE(mgr.load_package(std::make_unique<CorePackage>()));
+    REQUIRE(mgr.load_package(std::make_unique<LogicPackage>()));
+    REQUIRE(mgr.apply_registration_only());
+
+    const NodeEditorInfo *add_info =
+        mgr.node_editor_info("Engine_EveryFrame_Node");
+    REQUIRE(add_info != nullptr);
+    REQUIRE(add_info->operation == Operation::EveryFrame);
+
+    const NodeEditorInfo *print_info =
+        mgr.node_editor_info("Engine_Print_Float_Node");
+    REQUIRE(print_info != nullptr);
+    REQUIRE(print_info->operation == Operation::Print);
+
+    const NodeEditorInfo *bool_info =
+        mgr.node_editor_info("Engine_Bool_Node");
+    REQUIRE(bool_info != nullptr);
+    REQUIRE(bool_info->operation == Operation::None);
+
+    const NodeEditorInfo *less_than_info =
+        mgr.node_editor_info("Engine_LessThan_Float_Float_Node");
+    REQUIRE(less_than_info != nullptr);
+    REQUIRE(less_than_info->operation == Operation::LessThan);
+
+    const NodeEditorInfo *if_info =
+        mgr.node_editor_info("Engine_If_Bool_Node");
+    REQUIRE(if_info != nullptr);
+    REQUIRE(if_info->operation == Operation::If);
 }

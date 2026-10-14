@@ -22,10 +22,6 @@ namespace engine
 
         // ---- Argument lists ----
 
-        static std::array<NodeArgInfo, 1> kBoolArgs = {{
-            NodeArgInfo{"value", TypeId::primitive("bool")},
-        }};
-
         static std::array<NodeArgInfo, 1> kBoolUnaryArgs = {{
             NodeArgInfo{"a", TypeId::primitive("bool")},
         }};
@@ -50,65 +46,17 @@ namespace engine
         // every .lucgraph compiled against this registry. Append-only.
         //
         // 7 nodes:
-        //   0  Bool
-        //   1  LessThan
-        //   2  GreaterThan
-        //   3  EqualTo
-        //   4  And
-        //   5  Not
-        //   6  If
-        //
-        // The comparison nodes take float32 arguments and produce
-        // bool. The boolean nodes take and produce bool. If is the
-        // gating trigger.
+        //   0  Engine_Bool_Node
+        //   1  Engine_LessThan_Float_Float_Node
+        //   2  Engine_GreaterThan_Float_Float_Node
+        //   3  Engine_EqualTo_Float_Float_Node
+        //   4  Engine_And_Bool_Bool_Node
+        //   5  Engine_Not_Bool_Node
+        //   6  Engine_If_Bool_Node
 
         static const std::array<NodeTypeInfo, 7> kNodeTypes = {{
             NodeTypeInfo{
-                "Engine_BoolNode",
-                NodeKind::Value,
-                "Logic",
-                0,
-                ArenaSpan<NodeArgInfo>(kBoolArgs.data(), kBoolArgs.size()),
-                TypeId::primitive("bool"),
-            },
-            NodeTypeInfo{
-                "Engine_LessThanNode",
-                NodeKind::Value,
-                "Logic",
-                0,
-                ArenaSpan<NodeArgInfo>(kFloatCompareArgs.data(),
-                                       kFloatCompareArgs.size()),
-                TypeId::primitive("bool"),
-            },
-            NodeTypeInfo{
-                "Engine_GreaterThanNode",
-                NodeKind::Value,
-                "Logic",
-                0,
-                ArenaSpan<NodeArgInfo>(kFloatCompareArgs.data(),
-                                       kFloatCompareArgs.size()),
-                TypeId::primitive("bool"),
-            },
-            NodeTypeInfo{
-                "Engine_EqualToNode",
-                NodeKind::Value,
-                "Logic",
-                0,
-                ArenaSpan<NodeArgInfo>(kFloatCompareArgs.data(),
-                                       kFloatCompareArgs.size()),
-                TypeId::primitive("bool"),
-            },
-            NodeTypeInfo{
-                "Engine_AndNode",
-                NodeKind::Value,
-                "Logic",
-                0,
-                ArenaSpan<NodeArgInfo>(kBoolBinaryArgs.data(),
-                                       kBoolBinaryArgs.size()),
-                TypeId::primitive("bool"),
-            },
-            NodeTypeInfo{
-                "Engine_NotNode",
+                "Engine_Bool_Node",
                 NodeKind::Value,
                 "Logic",
                 0,
@@ -117,7 +65,52 @@ namespace engine
                 TypeId::primitive("bool"),
             },
             NodeTypeInfo{
-                "Engine_IfNode",
+                "Engine_LessThan_Float_Float_Node",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kFloatCompareArgs.data(),
+                                       kFloatCompareArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            NodeTypeInfo{
+                "Engine_GreaterThan_Float_Float_Node",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kFloatCompareArgs.data(),
+                                       kFloatCompareArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            NodeTypeInfo{
+                "Engine_EqualTo_Float_Float_Node",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kFloatCompareArgs.data(),
+                                       kFloatCompareArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            NodeTypeInfo{
+                "Engine_And_Bool_Bool_Node",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kBoolBinaryArgs.data(),
+                                       kBoolBinaryArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            NodeTypeInfo{
+                "Engine_Not_Bool_Node",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kBoolUnaryArgs.data(),
+                                       kBoolUnaryArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            NodeTypeInfo{
+                "Engine_If_Bool_Node",
                 NodeKind::Trigger,
                 "Flow",
                 0,
@@ -130,13 +123,13 @@ namespace engine
                       "kNodeTypes must have exactly 7 entries");
 
         static const std::array<TriggerMode, 7> kTriggerModes = {{
-            TriggerMode::NotATrigger, // Bool
-            TriggerMode::NotATrigger, // LessThan
-            TriggerMode::NotATrigger, // GreaterThan
-            TriggerMode::NotATrigger, // EqualTo
-            TriggerMode::NotATrigger, // And
-            TriggerMode::NotATrigger, // Not
-            TriggerMode::Gating,      // If
+            TriggerMode::NotATrigger, // Engine_Bool_Node
+            TriggerMode::NotATrigger, // Engine_LessThan_Float_Float_Node
+            TriggerMode::NotATrigger, // Engine_GreaterThan_Float_Float_Node
+            TriggerMode::NotATrigger, // Engine_EqualTo_Float_Float_Node
+            TriggerMode::NotATrigger, // Engine_And_Bool_Bool_Node
+            TriggerMode::NotATrigger, // Engine_Not_Bool_Node
+            TriggerMode::Gating,      // Engine_If_Bool_Node
         }};
 
         // ---- CellValue helpers ----
@@ -248,27 +241,69 @@ namespace engine
             b.add_trigger_mode(kTriggerModes[i]);
         }
 
-        b.add_node_editor_info("Engine_BoolNode", NodeEditorInfo{
-                                                      "Bool", "A boolean constant.", "", "bool",
-                                                      "node c = Engine_BoolNode(true)"});
-        b.add_node_editor_info("Engine_LessThanNode", NodeEditorInfo{
-                                                          "Less Than", "True if a < b.", "", "less",
-                                                          "node c = Engine_LessThanNode(a, b)"});
-        b.add_node_editor_info("Engine_GreaterThanNode", NodeEditorInfo{
-                                                             "Greater Than", "True if a > b.", "", "greater",
-                                                             "node c = Engine_GreaterThanNode(a, b)"});
-        b.add_node_editor_info("Engine_EqualToNode", NodeEditorInfo{
-                                                         "Equal To", "True if a == b.", "", "equal",
-                                                         "node c = Engine_EqualToNode(a, b)"});
-        b.add_node_editor_info("Engine_AndNode", NodeEditorInfo{
-                                                     "And", "True if both a and b.", "", "and",
-                                                     "node c = Engine_AndNode(a, b)"});
-        b.add_node_editor_info("Engine_NotNode", NodeEditorInfo{
-                                                     "Not", "True if a is false.", "", "not",
-                                                     "node c = Engine_NotNode(a)"});
-        b.add_node_editor_info("Engine_IfNode", NodeEditorInfo{
-                                                    "If", "Fires its subscribers when the condition is true.", "", "if",
-                                                    "node gate = Engine_IfNode(cond) on parent"});
+        b.add_node_editor_info("Engine_Bool_Node",
+                               NodeEditorInfo{
+                                   "Bool",
+                                   "A boolean constant.",
+                                   "",
+                                   "constant",
+                                   "node c = Engine_Bool_Node(true)",
+                                   Operation::None,
+                               });
+        b.add_node_editor_info("Engine_LessThan_Float_Float_Node",
+                               NodeEditorInfo{
+                                   "Less Than",
+                                   "True if a < b.",
+                                   "",
+                                   "less",
+                                   "node c = Engine_LessThan_Float_Float_Node(a, b)",
+                                   Operation::LessThan,
+                               });
+        b.add_node_editor_info("Engine_GreaterThan_Float_Float_Node",
+                               NodeEditorInfo{
+                                   "Greater Than",
+                                   "True if a > b.",
+                                   "",
+                                   "greater",
+                                   "node c = Engine_GreaterThan_Float_Float_Node(a, b)",
+                                   Operation::GreaterThan,
+                               });
+        b.add_node_editor_info("Engine_EqualTo_Float_Float_Node",
+                               NodeEditorInfo{
+                                   "Equal To",
+                                   "True if a == b.",
+                                   "",
+                                   "equal",
+                                   "node c = Engine_EqualTo_Float_Float_Node(a, b)",
+                                   Operation::EqualTo,
+                               });
+        b.add_node_editor_info("Engine_And_Bool_Bool_Node",
+                               NodeEditorInfo{
+                                   "And",
+                                   "True if both a and b.",
+                                   "",
+                                   "and",
+                                   "node c = Engine_And_Bool_Bool_Node(a, b)",
+                                   Operation::And,
+                               });
+        b.add_node_editor_info("Engine_Not_Bool_Node",
+                               NodeEditorInfo{
+                                   "Not",
+                                   "True if a is false.",
+                                   "",
+                                   "not",
+                                   "node c = Engine_Not_Bool_Node(a)",
+                                   Operation::Not,
+                               });
+        b.add_node_editor_info("Engine_If_Bool_Node",
+                               NodeEditorInfo{
+                                   "If",
+                                   "Fires its subscribers when the condition is true.",
+                                   "",
+                                   "if",
+                                   "node gate = Engine_If_Bool_Node(cond) on parent",
+                                   Operation::If,
+                               });
     }
 
 } // namespace engine

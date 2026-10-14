@@ -119,7 +119,7 @@ namespace engine
         static const std::array<NodeTypeInfo, 20> kNodeTypes = {{
             // --- Float arithmetic ---
             NodeTypeInfo{
-                "Engine_AddFloatNode",
+                "Engine_Add_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -128,7 +128,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_SubFloatNode",
+                "Engine_Sub_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -137,7 +137,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_MulFloatNode",
+                "Engine_Mul_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -146,7 +146,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_DivFloatNode",
+                "Engine_Div_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -155,7 +155,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_AbsFloatNode",
+                "Engine_Abs_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -164,7 +164,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_NegFloatNode",
+                "Engine_Neg_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -173,7 +173,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_MinFloatNode",
+                "Engine_Min_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -182,7 +182,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_MaxFloatNode",
+                "Engine_Max_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -191,7 +191,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_ClampFloatNode",
+                "Engine_Clamp_Float_Float_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -202,7 +202,7 @@ namespace engine
 
             // --- Int arithmetic ---
             NodeTypeInfo{
-                "Engine_AddIntNode",
+                "Engine_Add_Int_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -211,7 +211,7 @@ namespace engine
                 TypeId::primitive("int32"),
             },
             NodeTypeInfo{
-                "Engine_SubIntNode",
+                "Engine_Sub_Int_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -220,7 +220,7 @@ namespace engine
                 TypeId::primitive("int32"),
             },
             NodeTypeInfo{
-                "Engine_MulIntNode",
+                "Engine_Mul_Int_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -231,7 +231,7 @@ namespace engine
 
             // --- Conversions ---
             NodeTypeInfo{
-                "Engine_IntToFloatNode",
+                "Engine_IntToFloat_Int_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -240,7 +240,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_FloatToIntNode",
+                "Engine_FloatToInt_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -251,7 +251,7 @@ namespace engine
 
             // --- Vector2 ---
             NodeTypeInfo{
-                "Engine_Vector2Node",
+                "Engine_Vector2_Float_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -260,7 +260,7 @@ namespace engine
                 TypeId::structType("Engine_Vector2"),
             },
             NodeTypeInfo{
-                "Engine_Vector2XNode",
+                "Engine_X_Vector2_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -269,7 +269,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_Vector2YNode",
+                "Engine_Y_Vector2_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -278,7 +278,7 @@ namespace engine
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_Vector2AddNode",
+                "Engine_Add_Vector2_Vector2_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -287,7 +287,7 @@ namespace engine
                 TypeId::structType("Engine_Vector2"),
             },
             NodeTypeInfo{
-                "Engine_Vector2SubNode",
+                "Engine_Sub_Vector2_Vector2_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -296,7 +296,7 @@ namespace engine
                 TypeId::structType("Engine_Vector2"),
             },
             NodeTypeInfo{
-                "Engine_Vector2ScaleNode",
+                "Engine_Scale_Vector2_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
@@ -613,8 +613,6 @@ namespace engine
 
     void MathPackage::register_into(PackageBuilder &b)
     {
-        // Structs first: a node type that uses Engine_Vector2 must be
-        // registered after the struct type exists in the builder.
         for (const auto &s : kStructs)
         {
             b.add_struct(s);
@@ -627,67 +625,197 @@ namespace engine
             b.add_trigger_mode(kTriggerModes[i]);
         }
 
-        // Editor metadata.
-        b.add_node_editor_info("Engine_AddFloatNode", NodeEditorInfo{
-                                                          "Add (float)", "a + b.", "", "math",
-                                                          "node s = Engine_AddFloatNode(a, b)"});
-        b.add_node_editor_info("Engine_SubFloatNode", NodeEditorInfo{
-                                                          "Subtract (float)", "a - b.", "", "math",
-                                                          "node d = Engine_SubFloatNode(a, b)"});
-        b.add_node_editor_info("Engine_MulFloatNode", NodeEditorInfo{
-                                                          "Multiply (float)", "a * b.", "", "math",
-                                                          "node p = Engine_MulFloatNode(a, b)"});
-        b.add_node_editor_info("Engine_DivFloatNode", NodeEditorInfo{
-                                                          "Divide (float)", "a / b. Returns 0 if b is 0.", "", "math",
-                                                          "node q = Engine_DivFloatNode(a, b)"});
-        b.add_node_editor_info("Engine_AbsFloatNode", NodeEditorInfo{
-                                                          "Abs (float)", "|a|.", "", "math",
-                                                          "node r = Engine_AbsFloatNode(a)"});
-        b.add_node_editor_info("Engine_NegFloatNode", NodeEditorInfo{
-                                                          "Negate (float)", "-a.", "", "math",
-                                                          "node n = Engine_NegFloatNode(a)"});
-        b.add_node_editor_info("Engine_MinFloatNode", NodeEditorInfo{
-                                                          "Min (float)", "min(a, b).", "", "math",
-                                                          "node m = Engine_MinFloatNode(a, b)"});
-        b.add_node_editor_info("Engine_MaxFloatNode", NodeEditorInfo{
-                                                          "Max (float)", "max(a, b).", "", "math",
-                                                          "node m = Engine_MaxFloatNode(a, b)"});
-        b.add_node_editor_info("Engine_ClampFloatNode", NodeEditorInfo{
-                                                            "Clamp (float)", "Clamp v to [lo, hi].", "", "math",
-                                                            "node c = Engine_ClampFloatNode(v, lo, hi)"});
-        b.add_node_editor_info("Engine_AddIntNode", NodeEditorInfo{
-                                                        "Add (int)", "a + b.", "", "math",
-                                                        "node s = Engine_AddIntNode(a, b)"});
-        b.add_node_editor_info("Engine_SubIntNode", NodeEditorInfo{
-                                                        "Subtract (int)", "a - b.", "", "math",
-                                                        "node d = Engine_SubIntNode(a, b)"});
-        b.add_node_editor_info("Engine_MulIntNode", NodeEditorInfo{
-                                                        "Multiply (int)", "a * b.", "", "math",
-                                                        "node p = Engine_MulIntNode(a, b)"});
-        b.add_node_editor_info("Engine_IntToFloatNode", NodeEditorInfo{
-                                                            "Int to Float", "Convert an int32 to a float32.", "", "convert",
-                                                            "node f = Engine_IntToFloatNode(i)"});
-        b.add_node_editor_info("Engine_FloatToIntNode", NodeEditorInfo{
-                                                            "Float to Int", "Convert a float32 to an int32 (truncating).", "",
-                                                            "convert", "node i = Engine_FloatToIntNode(f)"});
-        b.add_node_editor_info("Engine_Vector2Node", NodeEditorInfo{
-                                                         "Vector2", "Create a Vector2 from x and y.", "", "vector",
-                                                         "node v = Engine_Vector2Node(1.0, 2.0)"});
-        b.add_node_editor_info("Engine_Vector2XNode", NodeEditorInfo{
-                                                          "Vector2 X", "Read the x component.", "", "vector",
-                                                          "node x = Engine_Vector2XNode(v)"});
-        b.add_node_editor_info("Engine_Vector2YNode", NodeEditorInfo{
-                                                          "Vector2 Y", "Read the y component.", "", "vector",
-                                                          "node y = Engine_Vector2YNode(v)"});
-        b.add_node_editor_info("Engine_Vector2AddNode", NodeEditorInfo{
-                                                            "Vector2 Add", "a + b, component-wise.", "", "vector",
-                                                            "node s = Engine_Vector2AddNode(a, b)"});
-        b.add_node_editor_info("Engine_Vector2SubNode", NodeEditorInfo{
-                                                            "Vector2 Sub", "a - b, component-wise.", "", "vector",
-                                                            "node d = Engine_Vector2SubNode(a, b)"});
-        b.add_node_editor_info("Engine_Vector2ScaleNode", NodeEditorInfo{
-                                                              "Vector2 Scale", "v * s, component-wise.", "", "vector",
-                                                              "node r = Engine_Vector2ScaleNode(v, s)"});
+        // --- Float arithmetic ---
+
+        b.add_node_editor_info("Engine_Add_Float_Node",
+                               NodeEditorInfo{
+                                   "Add",
+                                   "Add two float32 values.",
+                                   "",
+                                   "add",
+                                   "node s = Engine_Add_Float_Node(a, b)",
+                                   Operation::Add,
+                               });
+        b.add_node_editor_info("Engine_Sub_Float_Node",
+                               NodeEditorInfo{
+                                   "Subtract",
+                                   "Subtract b from a.",
+                                   "",
+                                   "sub",
+                                   "node d = Engine_Sub_Float_Node(a, b)",
+                                   Operation::Sub,
+                               });
+        b.add_node_editor_info("Engine_Mul_Float_Node",
+                               NodeEditorInfo{
+                                   "Multiply",
+                                   "Multiply a by b.",
+                                   "",
+                                   "mul",
+                                   "node p = Engine_Mul_Float_Node(a, b)",
+                                   Operation::Mul,
+                               });
+        b.add_node_editor_info("Engine_Div_Float_Node",
+                               NodeEditorInfo{
+                                   "Divide",
+                                   "Divide a by b. Returns 0 if b is 0.",
+                                   "",
+                                   "div",
+                                   "node q = Engine_Div_Float_Node(a, b)",
+                                   Operation::Div,
+                               });
+        b.add_node_editor_info("Engine_Abs_Float_Node",
+                               NodeEditorInfo{
+                                   "Abs",
+                                   "Absolute value.",
+                                   "",
+                                   "abs",
+                                   "node r = Engine_Abs_Float_Node(a)",
+                                   Operation::Abs,
+                               });
+        b.add_node_editor_info("Engine_Neg_Float_Node",
+                               NodeEditorInfo{
+                                   "Negate",
+                                   "Negate a.",
+                                   "",
+                                   "neg",
+                                   "node n = Engine_Neg_Float_Node(a)",
+                                   Operation::Neg,
+                               });
+        b.add_node_editor_info("Engine_Min_Float_Node",
+                               NodeEditorInfo{
+                                   "Min",
+                                   "The smaller of a and b.",
+                                   "",
+                                   "min",
+                                   "node m = Engine_Min_Float_Node(a, b)",
+                                   Operation::Min,
+                               });
+        b.add_node_editor_info("Engine_Max_Float_Node",
+                               NodeEditorInfo{
+                                   "Max",
+                                   "The larger of a and b.",
+                                   "",
+                                   "max",
+                                   "node m = Engine_Max_Float_Node(a, b)",
+                                   Operation::Max,
+                               });
+        b.add_node_editor_info("Engine_Clamp_Float_Float_Float_Node",
+                               NodeEditorInfo{
+                                   "Clamp",
+                                   "Clamp v to [lo, hi].",
+                                   "",
+                                   "clamp",
+                                   "node c = Engine_Clamp_Float_Float_Float_Node(v, lo, hi)",
+                                   Operation::Clamp,
+                               });
+
+        // --- Int arithmetic ---
+
+        b.add_node_editor_info("Engine_Add_Int_Node",
+                               NodeEditorInfo{
+                                   "Add (int)",
+                                   "Add two int32 values.",
+                                   "",
+                                   "add",
+                                   "node s = Engine_Add_Int_Node(a, b)",
+                                   Operation::Add,
+                               });
+        b.add_node_editor_info("Engine_Sub_Int_Node",
+                               NodeEditorInfo{
+                                   "Subtract (int)",
+                                   "Subtract b from a.",
+                                   "",
+                                   "sub",
+                                   "node d = Engine_Sub_Int_Node(a, b)",
+                                   Operation::Sub,
+                               });
+        b.add_node_editor_info("Engine_Mul_Int_Node",
+                               NodeEditorInfo{
+                                   "Multiply (int)",
+                                   "Multiply a by b.",
+                                   "",
+                                   "mul",
+                                   "node p = Engine_Mul_Int_Node(a, b)",
+                                   Operation::Mul,
+                               });
+
+        // --- Conversions ---
+
+        b.add_node_editor_info("Engine_IntToFloat_Int_Node",
+                               NodeEditorInfo{
+                                   "Int to Float",
+                                   "Convert an int32 to a float32.",
+                                   "",
+                                   "convert",
+                                   "node f = Engine_IntToFloat_Int_Node(i)",
+                                   Operation::IntToFloat,
+                               });
+        b.add_node_editor_info("Engine_FloatToInt_Float_Node",
+                               NodeEditorInfo{
+                                   "Float to Int",
+                                   "Convert a float32 to an int32 (truncating).",
+                                   "",
+                                   "convert",
+                                   "node i = Engine_FloatToInt_Float_Node(f)",
+                                   Operation::FloatToInt,
+                               });
+
+        // --- Vector2 ---
+
+        b.add_node_editor_info("Engine_Vector2_Float_Float_Node",
+                               NodeEditorInfo{
+                                   "Vector2",
+                                   "Create a Vector2 from x and y.",
+                                   "",
+                                   "vector2",
+                                   "node v = Engine_Vector2_Float_Float_Node(1.0, 2.0)",
+                                   Operation::Vector2Ctor,
+                               });
+        b.add_node_editor_info("Engine_X_Vector2_Node",
+                               NodeEditorInfo{
+                                   "Vector2 X",
+                                   "Read the x component.",
+                                   "",
+                                   "vector2x",
+                                   "node x = Engine_X_Vector2_Node(v)",
+                                   Operation::X,
+                               });
+        b.add_node_editor_info("Engine_Y_Vector2_Node",
+                               NodeEditorInfo{
+                                   "Vector2 Y",
+                                   "Read the y component.",
+                                   "",
+                                   "vector2y",
+                                   "node y = Engine_Y_Vector2_Node(v)",
+                                   Operation::Y,
+                               });
+        b.add_node_editor_info("Engine_Add_Vector2_Vector2_Node",
+                               NodeEditorInfo{
+                                   "Vector2 Add",
+                                   "Add two Vector2 values, component-wise.",
+                                   "",
+                                   "vector2add",
+                                   "node s = Engine_Add_Vector2_Vector2_Node(a, b)",
+                                   Operation::Add,
+                               });
+        b.add_node_editor_info("Engine_Sub_Vector2_Vector2_Node",
+                               NodeEditorInfo{
+                                   "Vector2 Sub",
+                                   "Subtract b from a, component-wise.",
+                                   "",
+                                   "vector2sub",
+                                   "node d = Engine_Sub_Vector2_Vector2_Node(a, b)",
+                                   Operation::Sub,
+                               });
+        b.add_node_editor_info("Engine_Scale_Vector2_Float_Node",
+                               NodeEditorInfo{
+                                   "Vector2 Scale",
+                                   "Multiply a Vector2 by a scalar.",
+                                   "",
+                                   "vector2scale",
+                                   "node r = Engine_Scale_Vector2_Float_Node(v, s)",
+                                   Operation::Mul,
+                               });
     }
 
 } // namespace engine

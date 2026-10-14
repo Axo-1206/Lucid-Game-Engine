@@ -57,23 +57,25 @@ namespace engine
 
         static const std::array<NodeTypeInfo, 4> kNodeTypes = {{
             NodeTypeInfo{
-                "Engine_Float32Node",
+                "Engine_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
-                ArenaSpan<NodeArgInfo>(kFloat32Args.data(), kFloat32Args.size()),
+                ArenaSpan<NodeArgInfo>(const_cast<NodeArgInfo *>(kFloat32Args.data()),
+                                       kFloat32Args.size()),
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
-                "Engine_Int32Node",
+                "Engine_Int_Node",
                 NodeKind::Value,
                 "Math",
                 0,
-                ArenaSpan<NodeArgInfo>(kInt32Args.data(), kInt32Args.size()),
+                ArenaSpan<NodeArgInfo>(const_cast<NodeArgInfo *>(kInt32Args.data()),
+                                       kInt32Args.size()),
                 TypeId::primitive("int32"),
             },
             NodeTypeInfo{
-                "Engine_EveryFrame",
+                "Engine_EveryFrame_Node",
                 NodeKind::Trigger,
                 "Flow",
                 0,
@@ -81,20 +83,21 @@ namespace engine
                 TypeId{},
             },
             NodeTypeInfo{
-                "Engine_PrintNode",
+                "Engine_Print_Float_Node",
                 NodeKind::Action,
                 "Debug",
                 0,
-                ArenaSpan<NodeArgInfo>(kFloat32Args.data(), kFloat32Args.size()),
+                ArenaSpan<NodeArgInfo>(const_cast<NodeArgInfo *>(kFloat32Args.data()),
+                                       kFloat32Args.size()),
                 TypeId{},
             },
         }};
 
         static const std::array<TriggerMode, 4> kTriggerModes = {{
-            TriggerMode::NotATrigger, // Engine_Float32Node
-            TriggerMode::NotATrigger, // Engine_Int32Node
-            TriggerMode::Source,      // Engine_EveryFrame
-            TriggerMode::NotATrigger, // Engine_PrintNode
+            TriggerMode::NotATrigger, // Engine_Float_Node
+            TriggerMode::NotATrigger, // Engine_Int_Node
+            TriggerMode::Source,      // Engine_EveryFrame_Node
+            TriggerMode::NotATrigger, // Engine_Print_Float_Node
         }};
 
         void exec_float32(engine::graph::TickContext &ctx, std::uint32_t node_index)
@@ -124,7 +127,7 @@ namespace engine
             {
                 d = static_cast<double>(v.as_int());
             }
-            engine::log_info("[graph] Engine_PrintNode: %f", d);
+            engine::log_info("[graph] Engine_Print_Float_Node: %f", d);
         }
 
         static const std::array<engine::graph::NodeExecutor, 4> kExecutors = {{
@@ -138,7 +141,6 @@ namespace engine
 
     void CorePackage::register_into(PackageBuilder &b)
     {
-        // Node types, executors, trigger modes (existing loop).
         for (std::size_t i = 0; i < kNodeTypes.size(); ++i)
         {
             b.add_node_type(kNodeTypes[i]);
@@ -146,41 +148,47 @@ namespace engine
             b.add_trigger_mode(kTriggerModes[i]);
         }
 
-        // Enums and handles (existing).
         for (const auto &e : kEnums)
             b.add_enum(e);
         for (const auto &h : kHandles)
             b.add_handle(h);
 
-        // Editor metadata.
-        b.add_node_editor_info("Engine_Float32Node", NodeEditorInfo{
-                                                         "Float32",
-                                                         "A 32-bit floating-point constant.",
-                                                         "",
-                                                         "float",
-                                                         "node v = Engine_Float32Node(2.5)",
-                                                     });
-        b.add_node_editor_info("Engine_Int32Node", NodeEditorInfo{
-                                                       "Int32",
-                                                       "A 32-bit integer constant.",
-                                                       "",
-                                                       "int",
-                                                       "node v = Engine_Int32Node(7)",
-                                                   });
-        b.add_node_editor_info("Engine_EveryFrame", NodeEditorInfo{
-                                                        "Every Frame",
-                                                        "Fires once per tick. A source trigger.",
-                                                        "",
-                                                        "clock",
-                                                        "node frame = Engine_EveryFrame()",
-                                                    });
-        b.add_node_editor_info("Engine_PrintNode", NodeEditorInfo{
-                                                       "Print",
-                                                       "Print a value to the engine log.",
-                                                       "",
-                                                       "print",
-                                                       "node p = Engine_PrintNode(v) on frame",
-                                                   });
+        b.add_node_editor_info("Engine_Float_Node",
+                               NodeEditorInfo{
+                                   "Float",
+                                   "A float32 constant.",
+                                   "",
+                                   "constant",
+                                   "node v = Engine_Float_Node(2.5)",
+                                   Operation::None,
+                               });
+        b.add_node_editor_info("Engine_Int_Node",
+                               NodeEditorInfo{
+                                   "Int",
+                                   "An int32 constant.",
+                                   "",
+                                   "constant",
+                                   "node v = Engine_Int_Node(7)",
+                                   Operation::None,
+                               });
+        b.add_node_editor_info("Engine_EveryFrame_Node",
+                               NodeEditorInfo{
+                                   "Every Frame",
+                                   "Fires once per tick. A source trigger.",
+                                   "",
+                                   "clock",
+                                   "node frame = Engine_EveryFrame_Node()",
+                                   Operation::EveryFrame,
+                               });
+        b.add_node_editor_info("Engine_Print_Float_Node",
+                               NodeEditorInfo{
+                                   "Print",
+                                   "Print a float32 value to the engine log.",
+                                   "",
+                                   "print",
+                                   "node p = Engine_Print_Float_Node(v) on frame",
+                                   Operation::Print,
+                               });
     }
 
 } // namespace engine

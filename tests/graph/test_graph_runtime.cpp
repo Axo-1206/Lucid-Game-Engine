@@ -159,8 +159,8 @@ TEST_CASE("graph_runtime: loads a graph referenced by a Script component",
 
     const auto lucgraph_path = temp_dir() / "test.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(1.0) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(1.0) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -183,8 +183,8 @@ TEST_CASE("graph_runtime: clear releases loaded graphs", "[graph][runtime]")
 
     const auto lucgraph_path = temp_dir() / "test.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(1.0) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(1.0) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -207,8 +207,8 @@ TEST_CASE("graph_runtime: load is idempotent", "[graph][runtime]")
 
     const auto lucgraph_path = temp_dir() / "idempotent.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(1.0) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(1.0) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -242,12 +242,12 @@ TEST_CASE("graph_runtime: load picks up a changed Script row",
     const auto graph_a = temp_dir() / "a.lucgraph";
     const auto graph_b = temp_dir() / "b.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(1.0) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(1.0) on frame\n",
         graph_a));
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(2.0) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(2.0) on frame\n",
         graph_b));
 
     // One entity with one Script row, pointing at A.
@@ -328,12 +328,12 @@ TEST_CASE("graph_runtime: a partial load keeps the graphs that succeeded",
     const auto good1 = temp_dir() / "good1.lucgraph";
     const auto good2 = temp_dir() / "good2.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(1.0) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(1.0) on frame\n",
         good1));
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(2.0) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(2.0) on frame\n",
         good2));
 
     // Three entities, three Script rows.
@@ -375,10 +375,10 @@ TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
 
     const auto lucgraph_path = temp_dir() / "false_gate.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node cond = Engine_BoolNode(false)\n"
-        "node gate = Engine_IfNode(cond) on frame\n"
-        "node p = Engine_PrintNode(1.0) on gate\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node cond = Engine_Bool_Node(false)\n"
+        "node gate = Engine_If_Bool_Node(cond) on frame\n"
+        "node p = Engine_Print_Float_Node(1.0) on gate\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -396,7 +396,7 @@ TEST_CASE("graph_runtime: IfNode(false) blocks its subscriber",
     bool found_print = false;
     for (std::size_t i = before; i < cap.messages.size(); ++i)
     {
-        if (cap.messages[i].find("PrintNode") != std::string::npos)
+        if (cap.messages[i].find("Engine_Print_Float_Node") != std::string::npos)
         {
             found_print = true;
             break;
@@ -419,10 +419,10 @@ TEST_CASE("graph_runtime: IfNode(true) lets its subscriber run",
 
     const auto lucgraph_path = temp_dir() / "true_gate.lucgraph";
     REQUIRE(compile_to_file(
-        "node frame = Engine_EveryFrame()\n"
-        "node cond = Engine_BoolNode(true)\n"
-        "node gate = Engine_IfNode(cond) on frame\n"
-        "node p = Engine_PrintNode(1.0) on gate\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node cond = Engine_Bool_Node(true)\n"
+        "node gate = Engine_If_Bool_Node(cond) on frame\n"
+        "node p = Engine_Print_Float_Node(1.0) on gate\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -436,7 +436,7 @@ TEST_CASE("graph_runtime: IfNode(true) lets its subscriber run",
 
     rt.tick(0.016f);
 
-    REQUIRE(cap.contains("PrintNode"));
+    REQUIRE(cap.contains("Engine_Print_Float_Node"));
 
     cap.detach();
 }
@@ -456,8 +456,8 @@ TEST_CASE("graph_runtime: a node reads a resource field",
         "resource Config {\n"
         "    speed: float32 = 42.0,\n"
         "}\n"
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(Config.speed) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(Config.speed) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -492,8 +492,8 @@ TEST_CASE("graph_runtime: a resource field with no written default is zero",
         "resource Config {\n"
         "    speed: float32,\n"
         "}\n"
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(Config.speed) on frame\n",
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(Config.speed) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -524,11 +524,11 @@ TEST_CASE("graph_runtime: math nodes evaluate", "[graph][runtime][math]")
 
     const auto lucgraph_path = temp_dir() / "math.lucgraph";
     REQUIRE(compile_to_file(
-        "node a = Engine_Float32Node(2.0)\n"
-        "node b = Engine_Float32Node(3.0)\n"
-        "node s = Engine_AddFloatNode(a, b)\n"
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(s) on frame\n",
+        "node a = Engine_Float_Node(2.0)\n"
+        "node b = Engine_Float_Node(3.0)\n"
+        "node s = Engine_Add_Float_Node(a, b)\n"
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(s) on frame\n",
         lucgraph_path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
@@ -559,12 +559,12 @@ TEST_CASE("graph_runtime: Vector2 nodes evaluate", "[graph][runtime][math]")
 
     const auto path = temp_dir() / "vec2.lucgraph";
     REQUIRE(compile_to_file(
-        "node a = Engine_Vector2Node(1.0, 2.0)\n"
-        "node b = Engine_Vector2Node(3.0, 4.0)\n"
-        "node s = Engine_Vector2AddNode(a, b)\n"
-        "node x = Engine_Vector2XNode(s)\n"
-        "node frame = Engine_EveryFrame()\n"
-        "node p = Engine_PrintNode(x) on frame\n",
+        "node a = Engine_Vector2_Float_Float_Node(1.0, 2.0)\n"
+        "node b = Engine_Vector2_Float_Float_Node(3.0, 4.0)\n"
+        "node s = Engine_Add_Vector2_Vector2_Node(a, b)\n"
+        "node x = Engine_X_Vector2_Node(s)\n"
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Float_Node(x) on frame\n",
         path));
 
     EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
