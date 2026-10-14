@@ -36,6 +36,17 @@ namespace engine::graph
         // Reset at the start of each tick. A node fires at most once
         // per tick; see docs/notes/TriggerModel.md §6.
         std::vector<bool> fired;
+
+        // One byte buffer per node whose result type is a
+        // struct. Empty for nodes whose result is a primitive, an
+        // enum, a handle, or nothing. A node that produces a struct
+        // writes the struct's bytes here; a node that consumes a
+        // struct reads from the producing node's buffer.
+        std::vector<std::vector<std::byte>> struct_results;
+
+        // The size in bytes of each node's struct result, from
+        // the registry's result type. 0 for non-struct results.
+        std::vector<std::size_t> struct_result_sizes;
     };
 
     // The graph runtime: loads .lucgraph files referenced by the

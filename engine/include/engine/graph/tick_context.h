@@ -33,6 +33,12 @@ namespace engine::graph
         const std::vector<engine::ecs::CellValue> &arg_values;
         Services *services;
         float dt;
+
+        // The struct results of the current graph. A node that
+        // produces a struct writes the struct's bytes into
+        // struct_results[node_index]. A node that consumes a struct
+        // reads the producing node's buffer.
+        std::vector<std::vector<std::byte>> &struct_results;
     };
 
     // One executor per node type, indexed by NodeId.

@@ -1,5 +1,6 @@
 #include "engine/graph/graph_runtime.h"
 #include "engine/graph/tick_context.h" // TickContext, NodeExecutor
+#include "engine/graph/arg_helpers.h"
 #include "engine/core/format_diagnostics.h"
 #include "engine/core/log.h"
 #include "engine/ecs/core/component_tags.h"
@@ -145,6 +146,56 @@ namespace engine::graph
             }
         }
 
+        std::size_t primitive_size_of(std::string_view name)
+        {
+            if (name == "bool" || name == "int8" || name == "uint8" || name == "char")
+                return 1;
+            if (name == "int16" || name == "uint16")
+                return 2;
+            if (name == "int32" || name == "uint32" || name == "float32")
+                return 4;
+            if (name == "int64" || name == "uint64" || name == "float64")
+                return 8;
+            return 0; // string has no fixed size; not a struct field in v1
+        }
+
+        std::size_t struct_size_of(const lucid::sema::TypeId &t,
+                                   const lucid::sema::Registry &reg)
+        {
+            using lucid::sema::TypeId;
+            if (!t.isStruct())
+                return 0;
+
+            // Find the struct by name.
+            for (const auto &st : reg.structs)
+            {
+                if (st.name != t.name)
+                    continue;
+
+                std::size_t total = 0;
+                for (const auto &field : st.fields)
+                {
+                    switch (field.type.kind)
+                    {
+                    case TypeId::Kind::Primitive:
+                        total += primitive_size_of(field.type.name);
+                        break;
+                    case TypeId::Kind::Enum:
+                        total += 4; // enums are uint32 on the wire
+                        break;
+                    case TypeId::Kind::Handle:
+                        total += 8; // handles are uint64
+                        break;
+                    case TypeId::Kind::Struct:
+                        total += struct_size_of(field.type, reg);
+                        break;
+                    }
+                }
+                return total;
+            }
+            return 0; // unknown struct
+        }
+
         // =============================================================================
         // Firing and ticking
         // =============================================================================
@@ -213,7 +264,7 @@ namespace engine::graph
                 std::fill(lg.results.begin(), lg.results.end(),
                           engine::ecs::CellValue::nil());
 
-                TickContext ctx{world, lg.graph, lg.results, lg.arg_values, &services, dt};
+                TickContext ctx{world, lg.graph, lg.results, lg.arg_values, &services, dt, lg.struct_results};
 
                 // 1. Evaluate Value nodes in value_order.
                 for (lucid::sema::NodeIndex node_idx : lg.graph.value_order)
@@ -338,6 +389,34 @@ namespace engine::graph
         lg.arg_values.assign(lg.graph.args.size(),
                              engine::ecs::CellValue::nil());
         lg.fired.assign(lg.graph.nodes.size(), false);
+
+        // Struct results: one buffer per node whose result type is
+        // a struct, sized from the registry.
+        lg.struct_results.assign(lg.graph.nodes.size(), {});
+        lg.struct_result_sizes.assign(lg.graph.nodes.size(), 0);
+
+        for (std::size_t i = 0; i < lg.graph.nodes.size(); ++i)
+        {
+            const auto &node = lg.graph.nodes[i];
+            if (node.type_id >= manager_.registry().nodeTypes.size())
+                continue;
+            const auto &info = manager_.registry().nodeTypes[node.type_id];
+            if (!info.resultType.isStruct())
+                continue;
+
+            const auto size = struct_size_of(info.resultType,
+                                             manager_.registry());
+            if (size == 0)
+            {
+                engine::log_error(
+                    "GraphRuntime: node %zu has an unknown struct result type",
+                    i);
+                continue;
+            }
+            lg.struct_result_sizes[i] = size;
+            lg.struct_results[i].assign(size, std::byte{0});
+        }
+
         graphs_.push_back(std::move(lg));
 
         engine::log_info("GraphRuntime: loaded '%s' (%zu nodes)",

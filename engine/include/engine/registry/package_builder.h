@@ -56,6 +56,7 @@ namespace engine
         void add_trigger_mode(TriggerMode mode);
         void add_enum(const lucid::sema::EnumTypeInfo &info);
         void add_handle(const lucid::sema::HandleTypeInfo &info);
+        void add_struct(const lucid::sema::StructTypeInfo &info);
 
         // Register a component table and its codec. The table creator
         // runs at apply time to create the table in the world. The
@@ -101,6 +102,7 @@ namespace engine
 
         const std::vector<lucid::sema::EnumTypeInfo> &enums() const { return enums_; }
         const std::vector<lucid::sema::HandleTypeInfo> &handles() const { return handles_; }
+        const std::vector<lucid::sema::StructTypeInfo> &structs() const { return structs_; }
 
         const std::unordered_map<std::string, NodeEditorInfo> &node_editor_infos() const
         {
@@ -118,6 +120,7 @@ namespace engine
             std::size_t tables = 0;
             std::size_t enums = 0;
             std::size_t handles = 0;
+            std::size_t structs = 0;
         };
         const std::vector<PackageCounts> &package_counts() const { return package_counts_; }
 
@@ -142,6 +145,7 @@ namespace engine
         std::size_t begin_tables_ = 0;
         std::size_t begin_enums_ = 0;
         std::size_t begin_handles_ = 0;
+        std::size_t begin_structs_ = 0;
 
         std::vector<std::string> table_names_;
         std::vector<TableCreator> table_creators_;
@@ -152,6 +156,7 @@ namespace engine
 
         std::vector<lucid::sema::EnumTypeInfo> enums_;
         std::vector<lucid::sema::HandleTypeInfo> handles_;
+        std::vector<lucid::sema::StructTypeInfo> structs_;
 
         std::unordered_map<std::string, NodeEditorInfo> node_editor_infos_;
         std::unordered_map<std::string, TableEditorInfo> table_editor_infos_;

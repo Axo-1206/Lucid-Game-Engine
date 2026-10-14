@@ -20,6 +20,7 @@ namespace engine
         begin_tables_ = table_names_.size();
         begin_enums_ = enums_.size();
         begin_handles_ = handles_.size();
+        begin_structs_ = structs_.size();
     }
 
     void PackageBuilder::end_package()
@@ -29,6 +30,7 @@ namespace engine
         counts.tables = table_names_.size() - begin_tables_;
         counts.enums = enums_.size() - begin_enums_;
         counts.handles = handles_.size() - begin_handles_;
+        counts.structs = structs_.size() - begin_structs_;
         package_counts_.push_back(counts);
 
         current_package_name_.clear();
@@ -88,6 +90,11 @@ namespace engine
             conflicts_.push_back("duplicate handle: " + name);
             return false;
         }
+        if (kind_str == "struct" && is_duplicate(structs_))
+        {
+            conflicts_.push_back("duplicate struct: " + name);
+            return false;
+        }
         if (kind_str == "table")
         {
             if (std::find(table_names_.begin(), table_names_.end(), name) != table_names_.end())
@@ -140,6 +147,14 @@ namespace engine
         if (!check_name(name, "handle"))
             return;
         handles_.push_back(info);
+    }
+
+    void PackageBuilder::add_struct(const lucid::sema::StructTypeInfo &info)
+    {
+        const std::string name(info.name);
+        if (!check_name(name, "struct"))
+            return;
+        structs_.push_back(info);
     }
 
     void PackageBuilder::add_node_editor_info(const std::string &type_name,

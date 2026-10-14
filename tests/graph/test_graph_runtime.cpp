@@ -547,3 +547,40 @@ TEST_CASE("graph_runtime: math nodes evaluate", "[graph][runtime][math]")
 
     cap.detach();
 }
+
+TEST_CASE("graph_runtime: Vector2 nodes evaluate", "[graph][runtime][math]")
+{
+    Fixture f;
+
+    engine::clear_log_sinks();
+    LogCapture cap;
+    cap.attach();
+    engine::set_log_level(engine::LogLevel::Trace);
+
+    const auto path = temp_dir() / "vec2.lucgraph";
+    REQUIRE(compile_to_file(
+        "node a = Engine_Vector2Node(1.0, 2.0)\n"
+        "node b = Engine_Vector2Node(3.0, 4.0)\n"
+        "node s = Engine_Vector2AddNode(a, b)\n"
+        "node x = Engine_Vector2XNode(s)\n"
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(x) on frame\n",
+        path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "vec2.lucgraph");
+
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
+    rt.set_asset_root(temp_dir());
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+
+    rt.tick(0.016f);
+
+    // a + b = (4, 6); x = 4.
+    REQUIRE(cap.contains("4"));
+
+    cap.detach();
+}

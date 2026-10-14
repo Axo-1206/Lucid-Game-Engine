@@ -147,6 +147,8 @@ namespace engine
                 builder.handles().data(), builder.handles().size());
             registry.nodeTypes = ArenaSpan<lucid::sema::NodeTypeInfo>(
                 builder.node_types().data(), builder.node_types().size());
+            registry.structs = ArenaSpan<lucid::sema::StructTypeInfo>(
+                builder.structs().data(), builder.structs().size());
 
             // Executor and trigger-mode counts must match node types.
             const std::size_t n = builder.node_types().size();
@@ -190,6 +192,7 @@ namespace engine
                 package_infos[i].table_count = counts[i].tables;
                 package_infos[i].enum_count = counts[i].enums;
                 package_infos[i].handle_count = counts[i].handles;
+                package_infos[i].struct_count = counts[i].structs;
             }
 
             engine::log_info("PackageManager: %zu node types registered, "

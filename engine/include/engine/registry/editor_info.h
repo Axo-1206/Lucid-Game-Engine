@@ -74,6 +74,7 @@ namespace engine
         std::size_t table_count = 0;
         std::size_t enum_count = 0;
         std::size_t handle_count = 0;
+        std::size_t struct_count = 0;
     };
 
 } // namespace engine
