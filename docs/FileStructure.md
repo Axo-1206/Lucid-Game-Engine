@@ -96,7 +96,8 @@ engine/
 │   │   └── packages/
 │   │       ├── core_package.h
 │   │       ├── logic_package.h
-│   │       └── render_package.h
+│   │       ├── math_package.h
+│   │       ├── render_package.h
 │   │       └── ui_package.h
 │   ├── render/
 │   │   ├── camera.h
@@ -107,9 +108,9 @@ engine/
 │   │   ├── texture.h
 │   │   ├── view.h
 │   │   └── backend_gl.h
-│   │     ├── renderer_gl.h
-│   │     ├── shader_gl.h
-│   │     └── sprite_batch_gl.h
+│   │       ├── renderer_gl.h
+│   │       ├── shader_gl.h
+│   │       └── sprite_batch_gl.h
 │   ├── scene/
 │   │   ├── component_registry.h
 │   │   ├── scene.h
@@ -140,7 +141,8 @@ engine/
     │   └── packages/
     │       ├── core_package.cpp
     │       ├── logic_package.cpp
-    │       └── render_package.cpp
+    │       ├── math_package.cpp
+    │       ├── render_package.cpp
     │       └── ui_package.cpp
     ├── render/
     │   ├── render_list.cpp
@@ -231,6 +233,7 @@ tests/
 │   └── test_stub_backend.cpp
 ├── registry/
 │   ├── test_default_registry.cpp
+│   └── test_math_manager.cpp
 │   └── test_package_manager.cpp
 └── CMakeLists.txt
 ```

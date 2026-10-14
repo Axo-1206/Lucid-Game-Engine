@@ -1,22 +1,29 @@
 /// @file apps/game/main.cpp
 
-#include "engine/platform/window.h"
 #include "engine/core/clock.h"
 #include "engine/core/log.h"
+
 #include "engine/render/camera.h"
 #include "engine/render/renderer.h"
 #include "engine/render/view.h"
+
+#include "engine/platform/window.h"
 #include "engine/platform/input.h"
+
 #include "engine/ecs/core/entity.h"
-#include "engine/scene/scene.h"
+
 #include "engine/systems/system_context.h"
 #include "engine/systems/systems.h"
+
 #include "engine/graph/graph_runtime.h"
+#include "engine/scene/scene.h"
+#include "engine/services.h"
+
 #include "engine/registry/package_manager.h"
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
-#include "engine/services.h"
 #include "engine/registry/packages/ui_package.h"
+#include "engine/registry/packages/math_package.h"
 
 #include <vector>
 #include <filesystem>
@@ -48,6 +55,7 @@ int main()
     engine::PackageManager packages;
     packages.load_package(std::make_unique<engine::CorePackage>());
     packages.load_package(std::make_unique<engine::LogicPackage>());
+    packages.load_package(std::make_unique<engine::MathPackage>());
     packages.load_package(std::make_unique<engine::UIPackage>());
     if (!packages.apply(world))
     {

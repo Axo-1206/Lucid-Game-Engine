@@ -20,6 +20,7 @@ add_library(luc_engine STATIC
     src/registry/packages/logic_package.cpp
     src/registry/packages/ui_package.cpp
     src/registry/packages/render_package.cpp
+    src/registry/packages/math_package.cpp
 
     src/render/backend_gl/shader_gl.cpp
     src/render/backend_gl/sprite_batch_gl.cpp

@@ -1,13 +1,17 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include "engine/core/log.h"
+
+#include "engine/ecs/core/component_tags.h"
+#include "engine/ecs/core/entity.h"
+
 #include "engine/graph/graph_runtime.h"
+#include "engine/scene/scene.h"
+
 #include "engine/registry/package_manager.h"
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
-#include "engine/ecs/core/entity.h"
-#include "engine/scene/scene.h"
-#include "engine/ecs/core/component_tags.h"
-#include "engine/core/log.h"
+#include "engine/registry/packages/math_package.h"
 
 #include "sema/Sema.hpp"
 #include "serialization/Serializer.hpp"
@@ -39,6 +43,7 @@ namespace
         {
             mgr.load_package(std::make_unique<engine::CorePackage>());
             mgr.load_package(std::make_unique<engine::LogicPackage>());
+            mgr.load_package(std::make_unique<engine::MathPackage>());
             return true;
         }();
         (void)loaded;
@@ -504,6 +509,41 @@ TEST_CASE("graph_runtime: a resource field with no written default is zero",
     rt.tick(0.016f);
 
     REQUIRE(cap.contains("0.0"));
+
+    cap.detach();
+}
+
+TEST_CASE("graph_runtime: math nodes evaluate", "[graph][runtime][math]")
+{
+    Fixture f;
+
+    engine::clear_log_sinks();
+    LogCapture cap;
+    cap.attach();
+    engine::set_log_level(engine::LogLevel::Trace);
+
+    const auto lucgraph_path = temp_dir() / "math.lucgraph";
+    REQUIRE(compile_to_file(
+        "node a = Engine_Float32Node(2.0)\n"
+        "node b = Engine_Float32Node(3.0)\n"
+        "node s = Engine_AddFloatNode(a, b)\n"
+        "node frame = Engine_EveryFrame()\n"
+        "node p = Engine_PrintNode(s) on frame\n",
+        lucgraph_path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "math.lucgraph");
+
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
+    rt.set_asset_root(temp_dir());
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+
+    rt.tick(0.016f);
+
+    REQUIRE(cap.contains("5"));
 
     cap.detach();
 }
