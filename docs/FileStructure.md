@@ -92,6 +92,8 @@ engine/
 │   ├── registry/
 │   │   ├── default_registry.h
 │   │   ├── package.h
+│   │   ├── editor_info.h
+│   │   ├── operation.h
 │   │   ├── package_builder.h
 │   │   ├── package_manager.h
 │   │   └── packages/
@@ -137,6 +139,7 @@ engine/
     │   └── window_glfw.cpp
     ├── registry/
     │   ├── default_registry.cpp
+    │   ├── operation.cpp
     │   ├── package_builder.cpp
     │   ├── package_manager.cpp
     │   └── packages/
@@ -221,6 +224,7 @@ tests/
 │   ├── test_input.cpp
 │   ├── test_linear_allocator.cpp
 │   ├── test_log.cpp
+│   ├── test_operation.cpp
 │   ├── test_render_types.h
 │   ├── test_scene.cpp
 │   ├── test_systems.cpp

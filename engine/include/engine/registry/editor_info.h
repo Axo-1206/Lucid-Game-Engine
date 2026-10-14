@@ -1,5 +1,7 @@
 #pragma once
 
+#include "engine/registry/operation.h"
+
 #include <string>
 
 namespace engine
@@ -12,27 +14,57 @@ namespace engine
     // A node type without explicit editor info gets defaults at
     // lookup time: display_name is the base name (the type name with
     // the package prefix stripped), doc_summary is empty, icon_id is
-    // empty, category comes from NodeTypeInfo::category.
+    // empty, category comes from NodeTypeInfo::category, and the
+    // operation is Operation::None.
     struct NodeEditorInfo
     {
-        // The base name for display, e.g. "Print" for
-        // "Engine_PrintNode". Empty means "use the base name".
+        // The base name for display, e.g. "Add" for
+        // "Engine_Add_Float_Node". Empty means "use the base name".
         std::string display_name;
 
-        // A one-line summary, e.g. "Print a value to the log."
+        // A one-line summary, e.g. "Add two float32 values."
         std::string doc_summary;
 
         // A longer description, optional. May be shown in a tooltip
         // or a help panel.
         std::string doc_long;
 
-        // An icon identifier, e.g. "print". The editor maps it to an
+        // An icon identifier, e.g. "add". The editor maps it to an
         // image. Empty means "no icon".
         std::string icon_id;
 
         // A sample .lucid snippet, optional. May be shown in a help
         // panel.
         std::string example;
+
+        // What operation the node performs. See Operation in
+        // engine/registry/operation.h.
+        //
+        //   Operation::None   — the node has no operation. A bare
+        //                       constant, a passthrough. The editor
+        //                       shows no operation name and no
+        //                       group.
+        //   Operation::Custom — the operation is not in the engine's
+        //                       table. The editor reads
+        //                       `custom_operation` and
+        //                       `operation_group_override`.
+        //   Other values      — a well-known operation. The engine's
+        //                       operation table supplies the name
+        //                       and group; the two strings below
+        //                       are ignored for the name and
+        //                       optional for the group.
+        Operation operation = Operation::None;
+
+        // The operation name, when `operation == Operation::Custom`.
+        // Ignored otherwise.
+        std::string custom_operation;
+
+        // The group, when `operation == Operation::Custom`, or an
+        // override of the group for a well-known operation. Empty
+        // means "no override"; the editor falls back to the group
+        // from the operation's table entry, or to the fallback
+        // color for Operation::None.
+        std::string operation_group_override;
     };
 
     // Display metadata for a table. Read by the editor's entity

@@ -15,6 +15,7 @@ add_library(luc_engine STATIC
     src/registry/default_registry.cpp
     src/registry/package_builder.cpp
     src/registry/package_manager.cpp
+    src/registry/operation.cpp
 
     src/registry/packages/core_package.cpp
     src/registry/packages/logic_package.cpp
