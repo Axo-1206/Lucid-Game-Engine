@@ -78,6 +78,9 @@ engine/
 │   ├── graph/
 │   │   ├── graph_runtime.h
 │   │   └── tick_context.h
+│   ├── math/
+│   │   ├── math.h
+│   │   └── vector2.h
 │   ├── physics/
 │   │   ├── backend_box2d/
 │   │   │   └── backend_box2d.h
@@ -93,9 +96,11 @@ engine/
 │   │   └── packages/
 │   │       ├── core_package.h
 │   │       ├── logic_package.h
+│   │       └── render_package.h
 │   │       └── ui_package.h
 │   ├── render/
 │   │   ├── camera.h
+│   │   ├── color.h
 │   │   ├── render_list.h
 │   │   ├── render_types.h
 │   │   ├── renderer.h
@@ -135,6 +140,7 @@ engine/
     │   └── packages/
     │       ├── core_package.cpp
     │       ├── logic_package.cpp
+    │       └── render_package.cpp
     │       └── ui_package.cpp
     ├── render/
     │   ├── render_list.cpp
@@ -205,17 +211,22 @@ tests/
 │   ├── test_table.cpp
 │   └── test_world.cpp
 ├── engine/
+│   ├── stub_renderer.h
 │   ├── test_clock.cpp
 │   ├── test_entity.cpp
+│   ├── test_format_diagnostic.cpp
 │   ├── test_input.cpp
 │   ├── test_linear_allocator.cpp
 │   ├── test_log.cpp
+│   ├── test_render_types.h
 │   ├── test_scene.cpp
-│   └── test_systems.cpp
+│   ├── test_systems.cpp
+│   ├── test_ui_system.cpp
+│   └── test_view.cpp
 ├── graph/
 │   └── test_graph_runtime.cpp
 ├── physics/
-│   ├── test_backend.h
+│   ├── stub_backend.h
 │   ├── test_backend_box2d.cpp
 │   └── test_stub_backend.cpp
 ├── registry/

@@ -10,6 +10,17 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(catch2)
 
 add_executable(lucid_tests
+    ecs/test_world.cpp
+    ecs/test_table.cpp
+    
+    graph/test_graph_runtime.cpp
+    
+    registry/test_default_registry.cpp
+    registry/test_package_manager.cpp
+
+    physics/test_stub_backend.cpp
+    physics/test_backend_box2d.cpp
+
     engine/test_log.cpp
     engine/test_clock.cpp
     engine/test_linear_allocator.cpp
@@ -18,16 +29,7 @@ add_executable(lucid_tests
     engine/test_scene.cpp
     engine/test_systems.cpp
     engine/test_format_diagnostics.cpp
-
-    ecs/test_world.cpp
-    ecs/test_table.cpp
-    
-    graph/test_graph_runtime.cpp
-    
-    registry/test_default_registry.cpp
-    registry/test_package_manager.cpp
-    physics/test_stub_backend.cpp
-    physics/test_backend_box2d.cpp
+    engine/test_render_types.cpp
     engine/test_view.cpp
     engine/test_ui_system.cpp
 )
