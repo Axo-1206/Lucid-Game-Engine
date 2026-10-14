@@ -21,7 +21,13 @@ namespace engine
         using ::ArenaSpan;
         using namespace lucid::sema;
 
-        // --- Enums ---
+        // ---- Enums ----
+        //
+        // The array's size is explicit; the static_assert at the
+        // bottom of the anonymous namespace checks it. A mismatch
+        // would otherwise pass a default-constructed entry into the
+        // registry, and a default-constructed EnumMemberInfo's name
+        // is not a valid pointer.
 
         static const std::array<lucid::sema::EnumMemberInfo, 4> kKeyMembers = {{
             lucid::sema::EnumMemberInfo{"W", 0},
@@ -29,6 +35,9 @@ namespace engine
             lucid::sema::EnumMemberInfo{"S", 2},
             lucid::sema::EnumMemberInfo{"D", 3},
         }};
+
+        static_assert(kKeyMembers.size() == 4,
+                      "kKeyMembers must have 4 entries");
 
         static const std::array<lucid::sema::EnumTypeInfo, 1> kEnums = {{
             lucid::sema::EnumTypeInfo{
@@ -39,30 +48,55 @@ namespace engine
             },
         }};
 
-        // --- Handles ---
+        static_assert(kEnums.size() == 1,
+                      "kEnums must have 1 entry");
+
+        // ---- Handles ----
 
         static const std::array<lucid::sema::HandleTypeInfo, 1> kHandles = {{
             lucid::sema::HandleTypeInfo{"Engine_BodyRef"},
         }};
 
-        // --- Nodes ---
+        static_assert(kHandles.size() == 1,
+                      "kHandles must have 1 entry");
 
-        static const std::array<NodeArgInfo, 1> kFloat32Args = {{
+        // ---- Argument lists ----
+        //
+        // One list per argument shape. Non-const because the
+        // library's ArenaSpan takes a non-const pointer for
+        // read-only data; nothing here modifies them.
+
+        static std::array<NodeArgInfo, 1> kFloat32Args = {{
             NodeArgInfo{"value", TypeId::primitive("float32")},
         }};
 
-        static const std::array<NodeArgInfo, 1> kInt32Args = {{
+        static std::array<NodeArgInfo, 1> kInt32Args = {{
             NodeArgInfo{"value", TypeId::primitive("int32")},
         }};
 
-        static const std::array<NodeTypeInfo, 4> kNodeTypes = {{
+        static std::array<NodeArgInfo, 1> kBoolArgs = {{
+            NodeArgInfo{"value", TypeId::primitive("bool")},
+        }};
+
+        // ---- Node types ----
+        //
+        // The order of this array is the order of NodeId values in
+        // every .lucgraph compiled against this registry. Append-only.
+        //
+        // 5 nodes:
+        //   0  Engine_Float_Node
+        //   1  Engine_Int_Node
+        //   2  Engine_EveryFrame_Node
+        //   3  Engine_Print_Float_Node
+        //   4  Engine_Print_Bool_Node
+
+        static const std::array<NodeTypeInfo, 5> kNodeTypes = {{
             NodeTypeInfo{
                 "Engine_Float_Node",
                 NodeKind::Value,
                 "Math",
                 0,
-                ArenaSpan<NodeArgInfo>(const_cast<NodeArgInfo *>(kFloat32Args.data()),
-                                       kFloat32Args.size()),
+                ArenaSpan<NodeArgInfo>(kFloat32Args.data(), kFloat32Args.size()),
                 TypeId::primitive("float32"),
             },
             NodeTypeInfo{
@@ -70,8 +104,7 @@ namespace engine
                 NodeKind::Value,
                 "Math",
                 0,
-                ArenaSpan<NodeArgInfo>(const_cast<NodeArgInfo *>(kInt32Args.data()),
-                                       kInt32Args.size()),
+                ArenaSpan<NodeArgInfo>(kInt32Args.data(), kInt32Args.size()),
                 TypeId::primitive("int32"),
             },
             NodeTypeInfo{
@@ -87,26 +120,49 @@ namespace engine
                 NodeKind::Action,
                 "Debug",
                 0,
-                ArenaSpan<NodeArgInfo>(const_cast<NodeArgInfo *>(kFloat32Args.data()),
-                                       kFloat32Args.size()),
+                ArenaSpan<NodeArgInfo>(kFloat32Args.data(), kFloat32Args.size()),
+                TypeId{},
+            },
+            NodeTypeInfo{
+                "Engine_Print_Bool_Node",
+                NodeKind::Action,
+                "Debug",
+                0,
+                ArenaSpan<NodeArgInfo>(kBoolArgs.data(), kBoolArgs.size()),
                 TypeId{},
             },
         }};
 
-        static const std::array<TriggerMode, 4> kTriggerModes = {{
+        static_assert(kNodeTypes.size() == 5,
+                      "kNodeTypes must have exactly 5 entries");
+
+        // ---- Trigger modes ----
+
+        static const std::array<TriggerMode, 5> kTriggerModes = {{
             TriggerMode::NotATrigger, // Engine_Float_Node
             TriggerMode::NotATrigger, // Engine_Int_Node
             TriggerMode::Source,      // Engine_EveryFrame_Node
             TriggerMode::NotATrigger, // Engine_Print_Float_Node
+            TriggerMode::NotATrigger, // Engine_Print_Bool_Node
         }};
 
-        void exec_float32(engine::graph::TickContext &ctx, std::uint32_t node_index)
+        static_assert(kTriggerModes.size() == kNodeTypes.size(),
+                      "kTriggerModes must be parallel to kNodeTypes");
+
+        // ---- Executors ----
+        //
+        // Naming: exec_<operation>_<type>. The type is the node's
+        // primary argument (or the constant's type). One executor
+        // per node type. Do not reorder; the order matches
+        // kNodeTypes.
+
+        void exec_const_float(engine::graph::TickContext &ctx, std::uint32_t node_index)
         {
             const auto &node = ctx.graph.nodes[node_index];
             ctx.results[node_index] = ctx.arg_values[node.args_offset];
         }
 
-        void exec_int32(engine::graph::TickContext &ctx, std::uint32_t node_index)
+        void exec_const_int(engine::graph::TickContext &ctx, std::uint32_t node_index)
         {
             const auto &node = ctx.graph.nodes[node_index];
             ctx.results[node_index] = ctx.arg_values[node.args_offset];
@@ -114,7 +170,7 @@ namespace engine
 
         void exec_every_frame(engine::graph::TickContext &, std::uint32_t) {}
 
-        void exec_print(engine::graph::TickContext &ctx, std::uint32_t node_index)
+        void exec_print_float(engine::graph::TickContext &ctx, std::uint32_t node_index)
         {
             const auto &node = ctx.graph.nodes[node_index];
             const auto &v = ctx.arg_values[node.args_offset];
@@ -130,12 +186,39 @@ namespace engine
             engine::log_info("[graph] Engine_Print_Float_Node: %f", d);
         }
 
-        static const std::array<engine::graph::NodeExecutor, 4> kExecutors = {{
-            exec_float32,
-            exec_int32,
-            exec_every_frame,
-            exec_print,
+        void exec_print_bool(engine::graph::TickContext &ctx, std::uint32_t node_index)
+        {
+            const auto &node = ctx.graph.nodes[node_index];
+            const auto &v = ctx.arg_values[node.args_offset];
+            bool b = false;
+            switch (v.kind())
+            {
+            case engine::ecs::CellValue::Kind::Bool:
+                b = v.as_bool();
+                break;
+            case engine::ecs::CellValue::Kind::Int:
+                b = v.as_int() != 0;
+                break;
+            case engine::ecs::CellValue::Kind::Float:
+                b = v.as_float() != 0.0;
+                break;
+            default:
+                break;
+            }
+            engine::log_info("[graph] Engine_Print_Bool_Node: %s",
+                             b ? "true" : "false");
+        }
+
+        static const std::array<engine::graph::NodeExecutor, 5> kExecutors = {{
+            exec_const_float, // Engine_Float_Node
+            exec_const_int,   // Engine_Int_Node
+            exec_every_frame, // Engine_EveryFrame_Node
+            exec_print_float, // Engine_Print_Float_Node
+            exec_print_bool,  // Engine_Print_Bool_Node
         }};
+
+        static_assert(kExecutors.size() == kNodeTypes.size(),
+                      "kExecutors must be parallel to kNodeTypes");
 
     } // namespace
 
@@ -182,11 +265,20 @@ namespace engine
                                });
         b.add_node_editor_info("Engine_Print_Float_Node",
                                NodeEditorInfo{
-                                   "Print",
+                                   "Print (float)",
                                    "Print a float32 value to the engine log.",
                                    "",
                                    "print",
                                    "node p = Engine_Print_Float_Node(v) on frame",
+                                   Operation::Print,
+                               });
+        b.add_node_editor_info("Engine_Print_Bool_Node",
+                               NodeEditorInfo{
+                                   "Print (bool)",
+                                   "Print a bool value to the engine log.",
+                                   "",
+                                   "print",
+                                   "node p = Engine_Print_Bool_Node(v) on frame",
                                    Operation::Print,
                                });
     }

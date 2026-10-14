@@ -36,6 +36,11 @@ namespace engine
             NodeArgInfo{"b", TypeId::primitive("float32")},
         }};
 
+        static std::array<NodeArgInfo, 2> kIntCompareArgs = {{
+            NodeArgInfo{"a", TypeId::primitive("int32")},
+            NodeArgInfo{"b", TypeId::primitive("int32")},
+        }};
+
         static std::array<NodeArgInfo, 1> kIfArgs = {{
             NodeArgInfo{"cond", TypeId::primitive("bool")},
         }};
@@ -45,7 +50,7 @@ namespace engine
         // The order of this array is the order of NodeId values in
         // every .lucgraph compiled against this registry. Append-only.
         //
-        // 7 nodes:
+        // 10 nodes:
         //   0  Engine_Bool_Node
         //   1  Engine_LessThan_Float_Float_Node
         //   2  Engine_GreaterThan_Float_Float_Node
@@ -53,8 +58,11 @@ namespace engine
         //   4  Engine_And_Bool_Bool_Node
         //   5  Engine_Not_Bool_Node
         //   6  Engine_If_Bool_Node
+        //   7  Engine_LessThan_Int_Int_Node
+        //   8  Engine_GreaterThan_Int_Int_Node
+        //   9  Engine_EqualTo_Int_Int_Node
 
-        static const std::array<NodeTypeInfo, 7> kNodeTypes = {{
+        static const std::array<NodeTypeInfo, 10> kNodeTypes = {{
             NodeTypeInfo{
                 "Engine_Bool_Node",
                 NodeKind::Value,
@@ -117,12 +125,39 @@ namespace engine
                 ArenaSpan<NodeArgInfo>(kIfArgs.data(), kIfArgs.size()),
                 TypeId{},
             },
+            NodeTypeInfo{
+                "Engine_LessThan_Int_Int_Node",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kIntCompareArgs.data(),
+                                       kIntCompareArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            NodeTypeInfo{
+                "Engine_GreaterThan_Int_Int_Node",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kIntCompareArgs.data(),
+                                       kIntCompareArgs.size()),
+                TypeId::primitive("bool"),
+            },
+            NodeTypeInfo{
+                "Engine_EqualTo_Int_Int_Node",
+                NodeKind::Value,
+                "Logic",
+                0,
+                ArenaSpan<NodeArgInfo>(kIntCompareArgs.data(),
+                                       kIntCompareArgs.size()),
+                TypeId::primitive("bool"),
+            },
         }};
 
-        static_assert(kNodeTypes.size() == 7,
-                      "kNodeTypes must have exactly 7 entries");
+        static_assert(kNodeTypes.size() == 10,
+                      "kNodeTypes must have exactly 10 entries");
 
-        static const std::array<TriggerMode, 7> kTriggerModes = {{
+        static const std::array<TriggerMode, 10> kTriggerModes = {{
             TriggerMode::NotATrigger, // Engine_Bool_Node
             TriggerMode::NotATrigger, // Engine_LessThan_Float_Float_Node
             TriggerMode::NotATrigger, // Engine_GreaterThan_Float_Float_Node
@@ -130,6 +165,9 @@ namespace engine
             TriggerMode::NotATrigger, // Engine_And_Bool_Bool_Node
             TriggerMode::NotATrigger, // Engine_Not_Bool_Node
             TriggerMode::Gating,      // Engine_If_Bool_Node
+            TriggerMode::NotATrigger, // Engine_LessThan_Int_Int_Node
+            TriggerMode::NotATrigger, // Engine_GreaterThan_Int_Int_Node
+            TriggerMode::NotATrigger, // Engine_EqualTo_Int_Int_Node
         }};
 
         // ---- CellValue helpers ----
@@ -147,6 +185,22 @@ namespace engine
                 return v.as_bool() ? 1.0f : 0.0f;
             default:
                 return 0.0f;
+            }
+        }
+
+        std::int32_t cell_as_int(const engine::ecs::CellValue &v)
+        {
+            using Kind = engine::ecs::CellValue::Kind;
+            switch (v.kind())
+            {
+            case Kind::Int:
+                return static_cast<std::int32_t>(v.as_int());
+            case Kind::Float:
+                return static_cast<std::int32_t>(v.as_float());
+            case Kind::Bool:
+                return v.as_bool() ? 1 : 0;
+            default:
+                return 0;
             }
         }
 
@@ -215,7 +269,31 @@ namespace engine
 
         void exec_if(engine::graph::TickContext &, std::uint32_t) {}
 
-        static const std::array<engine::graph::NodeExecutor, 7> kExecutors = {{
+        void exec_less_than_int(engine::graph::TickContext &ctx, std::uint32_t i)
+        {
+            const auto &node = ctx.graph.nodes[i];
+            const std::int32_t a = cell_as_int(ctx.arg_values[node.args_offset + 0]);
+            const std::int32_t b = cell_as_int(ctx.arg_values[node.args_offset + 1]);
+            ctx.results[i] = engine::ecs::CellValue::from_bool(a < b);
+        }
+
+        void exec_greater_than_int(engine::graph::TickContext &ctx, std::uint32_t i)
+        {
+            const auto &node = ctx.graph.nodes[i];
+            const std::int32_t a = cell_as_int(ctx.arg_values[node.args_offset + 0]);
+            const std::int32_t b = cell_as_int(ctx.arg_values[node.args_offset + 1]);
+            ctx.results[i] = engine::ecs::CellValue::from_bool(a > b);
+        }
+
+        void exec_equal_to_int(engine::graph::TickContext &ctx, std::uint32_t i)
+        {
+            const auto &node = ctx.graph.nodes[i];
+            const std::int32_t a = cell_as_int(ctx.arg_values[node.args_offset + 0]);
+            const std::int32_t b = cell_as_int(ctx.arg_values[node.args_offset + 1]);
+            ctx.results[i] = engine::ecs::CellValue::from_bool(a == b);
+        }
+
+        static const std::array<engine::graph::NodeExecutor, 10> kExecutors = {{
             exec_bool,
             exec_less_than,
             exec_greater_than,
@@ -223,6 +301,9 @@ namespace engine
             exec_and,
             exec_not,
             exec_if,
+            exec_less_than_int,
+            exec_greater_than_int,
+            exec_equal_to_int,
         }};
 
         static_assert(kExecutors.size() == kNodeTypes.size(),
@@ -241,6 +322,8 @@ namespace engine
             b.add_trigger_mode(kTriggerModes[i]);
         }
 
+        // --- Existing ---
+
         b.add_node_editor_info("Engine_Bool_Node",
                                NodeEditorInfo{
                                    "Bool",
@@ -252,8 +335,8 @@ namespace engine
                                });
         b.add_node_editor_info("Engine_LessThan_Float_Float_Node",
                                NodeEditorInfo{
-                                   "Less Than",
-                                   "True if a < b.",
+                                   "Less Than (float)",
+                                   "True if a < b, comparing two float32 values.",
                                    "",
                                    "less",
                                    "node c = Engine_LessThan_Float_Float_Node(a, b)",
@@ -261,8 +344,8 @@ namespace engine
                                });
         b.add_node_editor_info("Engine_GreaterThan_Float_Float_Node",
                                NodeEditorInfo{
-                                   "Greater Than",
-                                   "True if a > b.",
+                                   "Greater Than (float)",
+                                   "True if a > b, comparing two float32 values.",
                                    "",
                                    "greater",
                                    "node c = Engine_GreaterThan_Float_Float_Node(a, b)",
@@ -270,8 +353,8 @@ namespace engine
                                });
         b.add_node_editor_info("Engine_EqualTo_Float_Float_Node",
                                NodeEditorInfo{
-                                   "Equal To",
-                                   "True if a == b.",
+                                   "Equal To (float)",
+                                   "True if a == b, comparing two float32 values.",
                                    "",
                                    "equal",
                                    "node c = Engine_EqualTo_Float_Float_Node(a, b)",
@@ -303,6 +386,36 @@ namespace engine
                                    "if",
                                    "node gate = Engine_If_Bool_Node(cond) on parent",
                                    Operation::If,
+                               });
+
+        // --- Int comparison ---
+
+        b.add_node_editor_info("Engine_LessThan_Int_Int_Node",
+                               NodeEditorInfo{
+                                   "Less Than (int)",
+                                   "True if a < b, comparing two int32 values exactly.",
+                                   "",
+                                   "less",
+                                   "node c = Engine_LessThan_Int_Int_Node(a, b)",
+                                   Operation::LessThan,
+                               });
+        b.add_node_editor_info("Engine_GreaterThan_Int_Int_Node",
+                               NodeEditorInfo{
+                                   "Greater Than (int)",
+                                   "True if a > b, comparing two int32 values exactly.",
+                                   "",
+                                   "greater",
+                                   "node c = Engine_GreaterThan_Int_Int_Node(a, b)",
+                                   Operation::GreaterThan,
+                               });
+        b.add_node_editor_info("Engine_EqualTo_Int_Int_Node",
+                               NodeEditorInfo{
+                                   "Equal To (int)",
+                                   "True if a == b, comparing two int32 values exactly.",
+                                   "",
+                                   "equal",
+                                   "node c = Engine_EqualTo_Int_Int_Node(a, b)",
+                                   Operation::EqualTo,
                                });
     }
 

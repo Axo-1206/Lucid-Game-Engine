@@ -21,22 +21,26 @@ TEST_CASE("package_manager: registers core and logic nodes",
     REQUIRE_FALSE(mgr.has_conflicts());
 
     const auto &reg = mgr.registry();
-    REQUIRE(reg.nodeTypes.size() == 11);
+    REQUIRE(reg.nodeTypes.size() == 15);
 
-    // Core (4).
+    // Core (5).
     REQUIRE(reg.nodeTypes[0].name == "Engine_Float_Node");
     REQUIRE(reg.nodeTypes[1].name == "Engine_Int_Node");
     REQUIRE(reg.nodeTypes[2].name == "Engine_EveryFrame_Node");
     REQUIRE(reg.nodeTypes[3].name == "Engine_Print_Float_Node");
+    REQUIRE(reg.nodeTypes[4].name == "Engine_Print_Bool_Node");
 
-    // Logic (7).
-    REQUIRE(reg.nodeTypes[4].name == "Engine_Bool_Node");
-    REQUIRE(reg.nodeTypes[5].name == "Engine_LessThan_Float_Float_Node");
-    REQUIRE(reg.nodeTypes[6].name == "Engine_GreaterThan_Float_Float_Node");
-    REQUIRE(reg.nodeTypes[7].name == "Engine_EqualTo_Float_Float_Node");
-    REQUIRE(reg.nodeTypes[8].name == "Engine_And_Bool_Bool_Node");
-    REQUIRE(reg.nodeTypes[9].name == "Engine_Not_Bool_Node");
-    REQUIRE(reg.nodeTypes[10].name == "Engine_If_Bool_Node");
+    // Logic (10).
+    REQUIRE(reg.nodeTypes[5].name == "Engine_Bool_Node");
+    REQUIRE(reg.nodeTypes[6].name == "Engine_LessThan_Float_Float_Node");
+    REQUIRE(reg.nodeTypes[7].name == "Engine_GreaterThan_Float_Float_Node");
+    REQUIRE(reg.nodeTypes[8].name == "Engine_EqualTo_Float_Float_Node");
+    REQUIRE(reg.nodeTypes[9].name == "Engine_And_Bool_Bool_Node");
+    REQUIRE(reg.nodeTypes[10].name == "Engine_Not_Bool_Node");
+    REQUIRE(reg.nodeTypes[11].name == "Engine_If_Bool_Node");
+    REQUIRE(reg.nodeTypes[12].name == "Engine_LessThan_Int_Int_Node");
+    REQUIRE(reg.nodeTypes[13].name == "Engine_GreaterThan_Int_Int_Node");
+    REQUIRE(reg.nodeTypes[14].name == "Engine_EqualTo_Int_Int_Node");
 }
 
 TEST_CASE("package_manager: package_infos includes both packages",
@@ -55,11 +59,11 @@ TEST_CASE("package_manager: package_infos includes both packages",
     REQUIRE(infos[0].version == "0.1.0");
     REQUIRE(infos[0].description == "The engine's core nodes.");
     REQUIRE(infos[0].author == "Axo");
-    REQUIRE(infos[0].node_type_count == 4);
+    REQUIRE(infos[0].node_type_count == 5);
 
     REQUIRE(infos[1].name == "engine.logic");
     REQUIRE(infos[1].prefix == "Engine");
-    REQUIRE(infos[1].node_type_count == 7);
+    REQUIRE(infos[1].node_type_count == 10);
 }
 
 TEST_CASE("package_manager: explicit editor info is returned",
@@ -72,7 +76,7 @@ TEST_CASE("package_manager: explicit editor info is returned",
 
     const NodeEditorInfo *info = mgr.node_editor_info("Engine_Print_Float_Node");
     REQUIRE(info != nullptr);
-    REQUIRE(info->display_name == "Print");
+    REQUIRE(info->display_name == "Print (float)");
     REQUIRE(info->doc_summary == "Print a float32 value to the engine log.");
     REQUIRE(info->icon_id == "print");
 }
@@ -113,7 +117,7 @@ TEST_CASE("package_manager: apply_registration_only twice is a no-op",
     REQUIRE(mgr.applied());
 
     // The registry is unchanged.
-    REQUIRE(mgr.registry().nodeTypes.size() == 4);
+    REQUIRE(mgr.registry().nodeTypes.size() == 5);
 }
 
 TEST_CASE("package_manager: apply twice is a no-op",
@@ -133,7 +137,7 @@ TEST_CASE("package_manager: apply twice is a no-op",
     REQUIRE(mgr.apply(world));
     REQUIRE(mgr.applied());
 
-    REQUIRE(mgr.registry().nodeTypes.size() == 4);
+    REQUIRE(mgr.registry().nodeTypes.size() == 5);
 }
 
 TEST_CASE("package_manager: apply after apply_registration_only is a no-op",
@@ -153,7 +157,7 @@ TEST_CASE("package_manager: apply after apply_registration_only is a no-op",
     // observed).
     REQUIRE(mgr.apply(world));
     REQUIRE(mgr.applied());
-    REQUIRE(mgr.registry().nodeTypes.size() == 4);
+    REQUIRE(mgr.registry().nodeTypes.size() == 5);
 }
 
 TEST_CASE("package_manager: apply_registration_only after apply is a no-op",
@@ -169,7 +173,7 @@ TEST_CASE("package_manager: apply_registration_only after apply is a no-op",
 
     REQUIRE(mgr.apply_registration_only());
     REQUIRE(mgr.applied());
-    REQUIRE(mgr.registry().nodeTypes.size() == 4);
+    REQUIRE(mgr.registry().nodeTypes.size() == 5);
 }
 
 TEST_CASE("package_manager: node editor info carries the operation",

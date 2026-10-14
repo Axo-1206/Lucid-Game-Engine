@@ -584,3 +584,46 @@ TEST_CASE("graph_runtime: Vector2 nodes evaluate", "[graph][runtime][math]")
 
     cap.detach();
 }
+
+TEST_CASE("graph_runtime: int comparison is exact above 2^24",
+          "[graph][runtime][logic]")
+{
+    Fixture f;
+
+    engine::clear_log_sinks();
+    LogCapture cap;
+    cap.attach();
+    engine::set_log_level(engine::LogLevel::Trace);
+
+    const auto path = temp_dir() / "int_cmp.lucgraph";
+
+    // 16777217 and 16777216 are the same float32 (2^24 is the
+    // largest integer a float32 represents exactly; above it, the
+    // step is 2). A float comparison would say they are equal.
+    // The int comparison says they are not.
+    REQUIRE(compile_to_file(
+        "node a = Engine_Int_Node(16777217)\n"
+        "node b = Engine_Int_Node(16777216)\n"
+        "node c = Engine_EqualTo_Int_Int_Node(a, b)\n"
+        "node frame = Engine_EveryFrame_Node()\n"
+        "node p = Engine_Print_Bool_Node(c) on frame\n",
+        path));
+
+    EntityRef e = create_entity(f.world, allocate_entity_id(f.world), "E");
+    auto s = add_component<ScriptTag>(f.world, e);
+    f.world.get_table(ScriptTag::name)->set_string(s, "graph", "int_cmp.lucgraph");
+
+    engine::Services services;
+    engine::graph::GraphRuntime rt(f.world, test_packages(), services);
+    rt.set_asset_root(temp_dir());
+    REQUIRE(rt.load());
+    REQUIRE(rt.graph_count() == 1);
+
+    rt.tick(0.016f);
+
+    // The two int32 values are distinct (a float32 would collapse
+    // them). The int comparison says so, and the print emits "false".
+    REQUIRE(cap.contains("false"));
+
+    cap.detach();
+}
