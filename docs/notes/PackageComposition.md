@@ -37,6 +37,12 @@ and of versioning. It is not a runtime object; there is one instance
 per package, created by the game's `main.cpp` and handed to the
 `PackageManager` before `apply()`.
 
+A package has two halves, and they live in two places. The `Package` subclass — the object the `PackageManager` loads, the thing that calls `PackageBuilder::add_*` — lives in `engine/include/engine/registry/packages/`. The package's public C++ types — the structs and classes other code includes — live in the layer the package serves: `engine/math/` for `engine.math`, `engine/render/` for `engine.render`. A package can have one, the other, or both.
+
+`engine.core` and `engine.logic` have the Package subclass only; they ship no public C++ types beyond the registry. `engine.math` ships `Vector2` under `engine/math/`. `engine.render` ships `Color` under `engine/render/`. The `Package` subclass for each lives under registry/packages/.
+
+A user's package follows the same convention, in the user's tree. The engine cannot name the user's paths; it names the interface (`Package`, `PackageBuilder`). A user who wants a package that ships a public type puts the type wherever the user's code expects it and subclasses `Package` in the user's own source tree.
+
 ---
 
 ## 2. What a package is not
