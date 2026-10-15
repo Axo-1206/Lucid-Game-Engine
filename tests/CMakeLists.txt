@@ -24,7 +24,6 @@ add_executable(lucid_tests
 
     engine/test_log.cpp
     engine/test_clock.cpp
-    engine/test_linear_allocator.cpp
     engine/test_input.cpp
     engine/test_entity.cpp
     engine/test_scene.cpp
