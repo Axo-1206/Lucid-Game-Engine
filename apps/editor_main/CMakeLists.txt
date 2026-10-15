@@ -4,6 +4,6 @@ add_executable(lucid_editor
 
 target_link_libraries(lucid_editor
     PRIVATE
-        lucid::engine
-        lucid::editor
+        luc_engine
+        luc_editor
 )
