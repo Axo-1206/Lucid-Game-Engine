@@ -1,6 +1,7 @@
 #include "engine/platform/window.h"
 #include "engine/core/log.h"
 
+#include <glad/glad.h> // for gladLoadGLLoader
 #include <GLFW/glfw3.h>
 
 namespace engine
@@ -44,7 +45,6 @@ namespace engine
         if (!ensure_glfw_initialized())
             return;
 
-        // Request OpenGL 3.3 core profile.
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -61,9 +61,22 @@ namespace engine
             return;
         }
 
-        // Note: no callbacks are registered here. The input backend owns them.
+        // NEW: bind the GL context to this thread.
+        glfwMakeContextCurrent(impl_->handle);
+
+        // NEW: load GL function pointers. After this, any OpenGL call
+        // from any consumer of this Window is safe.
+        if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
+        {
+            log_error("Window: failed to load OpenGL function pointers");
+            glfwDestroyWindow(impl_->handle);
+            delete impl_;
+            impl_ = nullptr;
+            return;
+        }
 
         log_info("Window created: %dx%d \"%s\"", width, height, title.c_str());
+        log_info("OpenGL %s", glGetString(GL_VERSION)); // NEW: useful for logs
     }
 
     Window::~Window()
@@ -71,9 +84,7 @@ namespace engine
         if (impl_)
         {
             if (impl_->handle)
-            {
                 glfwDestroyWindow(impl_->handle);
-            }
             delete impl_;
         }
     }
@@ -88,24 +99,19 @@ namespace engine
     void Window::request_close()
     {
         if (impl_ && impl_->handle)
-        {
             glfwSetWindowShouldClose(impl_->handle, GLFW_TRUE);
-        }
     }
 
     void Window::poll_events()
     {
-        // Kept for compatibility; the input backend calls glfwPollEvents().
-        // Do not call both in the same frame.
+        // REMOVED? See Part 5. For now, keep the body.
         glfwPollEvents();
     }
 
     void Window::swap_buffers()
     {
         if (impl_ && impl_->handle)
-        {
             glfwSwapBuffers(impl_->handle);
-        }
     }
 
     void *Window::native_handle() const
