@@ -2,6 +2,7 @@
 #include "engine/registry/package_manager.h"
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
+#include "engine/registry/packages/math_package.h"
 #include "engine/core/log.h"
 
 namespace engine
@@ -10,6 +11,18 @@ namespace engine
     namespace
     {
 
+        // The process-lifetime PackageManager for the engine's
+        // built-in packages.
+        //
+        // The load order is fixed: CorePackage, LogicPackage,
+        // MathPackage. The order determines the NodeId space; a
+        // .lucgraph compiled against this order refers to node types
+        // by index. Appending a package at the end is safe (existing
+        // ids are unchanged; existing .lucgraph files stay valid if
+        // they do not use the new package's nodes). Inserting a
+        // package before an existing one renumbers every node after
+        // it and invalidates every .lucgraph that has not been
+        // regenerated.
         PackageManager &default_package_manager()
         {
             static auto mgr = []
@@ -17,6 +30,7 @@ namespace engine
                 auto m = std::make_unique<PackageManager>();
                 m->load_package(std::make_unique<CorePackage>());
                 m->load_package(std::make_unique<LogicPackage>());
+                m->load_package(std::make_unique<MathPackage>());
                 if (!m->apply_registration_only())
                 {
                     for (const auto &c : m->conflicts())

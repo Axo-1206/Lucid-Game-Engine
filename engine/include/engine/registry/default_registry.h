@@ -23,28 +23,27 @@ namespace engine
         TriggerMode mode = TriggerMode::NotATrigger;
     };
 
-    // The engine's node registry, produced by the process-lifetime
-    // PackageManager (see default_registry.cpp).
+    // The engine's built-in node registry, produced by the
+    // process-lifetime PackageManager built from the engine's own
+    // packages (CorePackage, LogicPackage, MathPackage).
     //
-    // Constructed once, on first call, from CorePackage and
-    // LogicPackage. Returns a reference valid for the process's
-    // lifetime.
+    // Constructed once, on first call. Returns a reference valid for
+    // the process's lifetime.
     //
-    // This function is the compatibility shim for existing call sites.
-    // New code uses a PackageManager directly, so that custom packages
-    // can be added.
+    // This is a convenience, not the engine's only registry. A
+    // caller that wants the built-in vocabulary without constructing
+    // its own PackageManager calls this. A caller that wants a
+    // custom vocabulary — a game that loads its own packages, a test
+    // that uses a test package — builds a PackageManager directly.
     //
-    // Node types registered (in this order):
-    //   0: Engine_Float32Node    (engine.core)
-    //   1: Engine_Int32Node      (engine.core)
-    //   2: Engine_EveryFrame     (engine.core)
-    //   3: Engine_PrintNode      (engine.core)
-    //   4: Engine_BoolNode       (engine.logic)
-    //   5: Engine_LessThanNode   (engine.logic)
-    //   6: Engine_IfNode         (engine.logic)
-    //
-    // Append-only. The index of a node type in nodeTypes is its NodeId
-    // in every .lucgraph.
+    // The node types the registry contains are the ones the
+    // built-in packages register; see default_registry.cpp for the
+    // list of packages and the order they are loaded in. The
+    // registry is append-only: adding a package at the end of the
+    // load list leaves the existing node ids stable. Inserting one
+    // in the middle renumbers every node after it, and every
+    // .lucgraph compiled against the old order must be regenerated.
+    // See docs/notes/PackageNaming.md and docs/Decision.md.
     const lucid::sema::Registry &default_registry();
 
     // The runtime info for the node type at index `id` in
