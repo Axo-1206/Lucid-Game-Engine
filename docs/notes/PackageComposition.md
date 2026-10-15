@@ -25,16 +25,28 @@ startup. It is a `Package` subclass. Its `register_into(PackageBuilder&)`
 is called exactly once, in load order, before any `.lucid` file is
 compiled and before any `.lscene` file is loaded.
 
-A package contributes four kinds of content:
+A package contributes five kinds of content:
 
 - **Node types** — `.lucid`-visible names with a signature, a kind
-  (Value, Action, Trigger), and an executor.
-- **Executors** — the C++ function that runs when a node fires.
+  (Value, Action, Trigger), and either a C++ executor or a `.lucid`
+  body. See §5.
+- **Executors** — the C++ function that runs when a C++-registered
+  node fires.
 - **Types** — enums, handles, and structs that `.lucid` files can name.
 - **Tables and component codecs** — `.lscene`-visible table schemas
   and their JSON loaders and savers.
+- **`.lucid` helper nodes** — `.lucid` files the package ships, whose
+  exported nodes enter the registry when the file is compiled. See
+  §5.3.
 
-A package owns all four. It is the unit of registration, of naming,
+A `.lucid` helper is a node type. It has a name, arguments, and a
+result type, and it appears in the registry the same way a
+C++-registered node does. The difference is how it is registered: a
+`.lucid` helper is compiled by the format library, and a C++ node type
+is registered with `PackageBuilder::add_node_type`. The registry does
+not distinguish them. Both are exported under the package's prefix.
+
+A package owns all five. It is the unit of registration, of naming,
 and of versioning. It is not a runtime object; there is one instance
 per package, created by the game's `main.cpp` and handed to the
 `PackageManager` before `apply()` or `apply_registration_only()`.
@@ -61,7 +73,9 @@ A package is not:
   not reachable.
 - **A file format.** A package may ship `.lucid` helper files and
   C++ headers, but those are the package's source, not a packaged
-  artifact. There is no `.lucidpkg` file.
+  artifact. There is no `.lucidpkg` file. A package's `.lucid` files
+  are compiled by the format library, and their exported nodes enter
+  the registry the same way C++-registered nodes do. See §5.3.
 - **A service.** A package may offer a service (see §7), but a
   package is not itself a service. The two are separate concepts.
 

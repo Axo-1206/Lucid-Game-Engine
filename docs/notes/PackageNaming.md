@@ -244,10 +244,19 @@ is a `package.json`-like file at the package's root:
 }
 ```
 
-The engine reads `name` and `prefix`. If `prefix` is missing, the
-package may still load if it registers no node types, enums,
-handles, structs, or tables (a logic-only package that only ships
-`.lucid` helpers).
+The engine reads `name` and `prefix`. A package that contributes
+anything to the merged registry — node types, enums, handles,
+structs, tables, or exported `.lucid` helper nodes — must declare a
+prefix. The prefix is what makes the package's content unique in the
+shared namespace.
+
+A package with no `prefix` may still load if it registers nothing: no
+node types, enums, handles, structs, tables, components, or exported
+`.lucid` helper nodes. Such a package contributes nothing to the
+registry; the engine logs it and registers no content. A `.lucid`
+file whose nodes are private (not marked `@export`) does not require a
+prefix: only exported nodes enter the shared namespace, and private
+node names are file-local.
 
 ### 3.2 Package name rules
 
@@ -352,8 +361,11 @@ A package author follows this workflow:
    each node type, with an `Operation` value. See
    `EditorMetadata.md`.
 
-7. **Write `.lucid` helpers with prefixed references.** A helper
-   that composes your C++ nodes writes:
+7. **Write `.lucid` helpers with the package's prefix.** An exported
+   `.lucid` node (marked `@export`) carries the package's prefix, like
+   any C++-registered node. A private `.lucid` node is file-local, and
+   the convention does not apply to it. A helper that composes your
+   C++ nodes writes:
 
    ```lucid
    @export
