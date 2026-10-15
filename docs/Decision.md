@@ -1,6 +1,6 @@
 # `docs/Decision.md`
 
-The decisions are recorded in the order they were made. Each answers a question that was genuinely open at the time. Where an earlier decision's text is now inaccurate, the file says so rather than rewriting history.
+The decisions are recorded in the order they were made. Each answers a question that was genuinely open at the time and states what the engine does.
 
 Cross-references: `docs/FileStructure.md` for the repository layout, `docs/notes/SceneFormat.md` for the scene format spec, `docs/notes/TriggerModel.md` for how a graph expresses control flow, `docs/notes/WorldLifecycle.md` for the world's empty operations, and `docs/notes/PackageComposition.md` for the package policy.
 
@@ -58,12 +58,6 @@ The distinction between `Registry` and `ComponentRegistry` is load-bearing. They
 - **Is `World` copyable?** No. It is an owning, mutable store. Copy is deleted; move is allowed.
 - **Does `World` clear itself?** Yes, in two ways. `World::clear()` removes every non-preserved table and keeps every preserved table with its rows. `World::clear_rows()` empties every table's rows and keeps every schema. See Decision 9.
 
-Migration from old design:
-
-> Old: `lucid::Runtime` was the table store. `Scene` held a `Runtime&` and mutated it. `Scene::clear()` cleared the runtime's tables.
->
-> New: `engine::ecs::World` is the table store. `Scene` does not hold a `World&`. `World::clear()` and `World::clear_rows()` are the two resets.
-
 ---
 
 ## Decision 2 — What `Scene` is
@@ -84,11 +78,7 @@ Migration from old design:
 
 **What does a `Scene` hold internally?** The file's JSON text, not a typed model of its entities and cameras. `apply_to` parses the text. This keeps `scene.h` free of `nlohmann/json`, keeps `EntityDesc` from being a half-typed mirror of the file, and defers component parsing to `apply_to` where the `ComponentRegistry` owns it. A `Scene` built by `SceneLoader_load` holds the file's text; a `Scene` built by `Scene::extract_from` holds JSON text produced by `SceneSaver_from_world`. The two are symmetric.
 
-Migration from old design:
-
-> Old: `Scene(lucid::Runtime& rt)`, `scene.load_from_file(path)` cleared `rt` and loaded into it, `scene.clear()` cleared `rt`.
->
-> New: `Scene{}` is default-constructible. `SceneLoader_load(path)` returns a `Scene`. `SceneLoader_load_into(world, components, path)` loads and applies in one call. `scene.apply_to(world, components, ApplyMode::Clear)`. `world.clear_rows()` is the only clear.
+**How a scene is loaded.** `Scene{}` is default-constructible. `SceneLoader_load(path)` returns a `Scene`. `SceneLoader_load_into(world, components, path)` loads and applies in one call. `scene.apply_to(world, components, ApplyMode::Clear)` applies a scene already in hand. `world.clear_rows()` is the only operation that unloads a scene's rows.
 
 ---
 
@@ -96,11 +86,11 @@ Migration from old design:
 
 - **Are cameras entities?** No.
 - **Where do they live?** In the `World`'s `Engine_Camera` table, keyed by `name` (primary column). A scene description carries its cameras as JSON; `load_camera` writes them into the table.
-- **Is `CameraTag` kept?** No. The comment `// not an entity component` was an apology; this decision removes the need for it. The camera table's name is `engine::kCameraTableName`, declared in `engine/ecs/core/component_tags.h` next to the entity-component tags, with a comment explaining why it is a constant and not a tag. There is no `add_component<CameraTag>` instantiation.
+- **How is the camera table named?** By the constant `engine::kCameraTableName`, declared in `engine/ecs/include/engine/ecs/core/component_tags.h` next to the entity-component tags. It is a constant and not a tag because the camera table is not an entity component; there is no `add_component` instantiation for it.
 - **How is the active camera identified?** In the `Scene`, by name. The engine loop looks up the name in the `Engine_Camera` table when it needs the camera. The name is canonical; a `RowRef` is a short-lived lookup result, not stored.
 - **Three camera types and their roles:**
   - `CameraDesc` — the schema type. What is serialized, what a camera table row mirrors. Lives in `engine/include/engine/render/camera.h`.
-  - The `Camera` table row — runtime state. Columns mirror `CameraDesc`.
+  - The `Engine_Camera` table row — runtime state. Columns mirror `CameraDesc`.
   - `Camera2D` — the renderer's view struct. Produced by `to_camera2d(const CameraDesc&, int w, int h)` or by reading a camera row and converting.
 - **Who sets the renderer's camera each frame?** The engine loop. It looks up the world's camera row by the scene's active camera name, reads the row into a `CameraDesc`, converts to `Camera2D`, calls `renderer.set_camera_2d(cam2d)`. The renderer never reads the `World`. The `World` never talks to the renderer. The loop is the bridge.
 - **Camera helpers:** `find_camera(world, name)`, `read_camera_row(world, ref)`, `write_camera_row(world, desc)`, `to_camera2d(desc, w, h)` — all in `engine/render/camera.h`.
@@ -120,9 +110,9 @@ In practice, the top-level type exposed from `scene.h` remains `engine::Scene` f
 
 ---
 
-## Decision 5 — What `.lscene` is *(superseded by Decision 8)*
+## Decision 5 — What `.lscene` is
 
-Decision 5 deferred the `.lscene` format choice. Decision 8 resolves it: `.lscene` is JSON, its schema is engine-owned and versioned independently, and its only interface to the format library is a `Script` component holding a `.lucgraph` path.
+`.lscene` is a JSON file describing a scene: entities, components, and cameras. Its schema is engine-owned and versioned independently of the format library. Its only interface to the format library is an `Engine_Script` component holding a `.lucgraph` path.
 
 See Decision 8 for the full rationale.
 
@@ -138,11 +128,7 @@ The exact rule:
 
 > After `Scene::apply_to(world, ...)`, the world's entity-id allocator is set to the scene's `engine_state.next_entity_id` if present, or to `max(entity.id) + 1` computed from the loaded entities otherwise.
 
-Covered by `tests/engine/test_entity.cpp`: the `id allocator after a scene apply` and `scene's next_entity_id is used after apply` tests.
-
-Bug resolved by this decision:
-
-> Old: no test asserted this. `allocate_entity_id` could collide after load.
+Implemented in `scene.cpp`'s `apply_json_to_world`. Covered by `tests/engine/test_entity.cpp`: the `id allocator after a scene apply` and `scene's next_entity_id is used after apply` tests.
 
 ---
 
@@ -159,13 +145,13 @@ See `docs/notes/WorldLifecycle.md` for the full note on the three empty operatio
 
 ---
 
-## Decision 8 — The `.lscene` format *(resolves Decision 5)*
+## Decision 8 — The `.lscene` format
 
 `.lscene` files are JSON. The engine's scene loader and saver read and write JSON via nlohmann/json. The scene format is an independent, engine-owned schema with its own version (`kSceneSchemaVersion`), its own schema header (`engine/include/engine/scene/scene_schema.h`), its own spec (`docs/notes/SceneFormat.md`), and its own evolution schedule.
 
 `.lucgraph` files are the Lucid format library's binary format for behavior graphs. They are read and written only by `lucid::serialization`.
 
-The two are different things. A scene is data — entities, components, cameras. A graph is behavior — nodes, subscriptions, phases. Their shapes are different, their lifetimes are different, their versioning is different. The only interface between them is a `Script` component that holds a `.lucgraph` file path. The scene neither compiles nor loads the graph; the runtime does, passing the same node registry that was used at compile time.
+The two are different things. A scene is data — entities, components, cameras. A graph is behavior — nodes, subscriptions, phases. Their shapes are different, their lifetimes are different, their versioning is different. The only interface between them is an `Engine_Script` component that holds a `.lucgraph` file path. The scene neither compiles nor loads the graph; the runtime does, passing the same node registry that was used at compile time.
 
 Rationale:
 
@@ -195,15 +181,13 @@ Preservation is a per-table flag, set by `World::mark_preserved(name)`. The flag
 
 The arrangement holds while there is exactly one engine-lifetime table and one engine-lifetime row. If a second appears, the right shape is a `World::clear_for_scene(callback)` that re-seeds engine-lifetime state through a callback. See `docs/notes/WorldLifecycle.md` for the full note.
 
-Resolved by this decision: the gap where `apply_to(Clear)` called `world.clear()` and removed the core schema, causing "Entity table not set up" on the next `create_entity`. The fix moved `apply_to(Clear)` to `clear_rows()` and re-seeded the state row.
-
 ---
 
 ## Decision 10 — Package composition
 
 A package contributes node types, executors, types (enums and handles), and tables (with component codecs). It registers them through `PackageBuilder` at startup. It is a C++ object, not a plugin and not a runtime object.
 
-A compound type (a vector, a matrix) is either a handle plus a table, with operations as nodes, or a C++ struct whose fields are declared to `.lucid` as primitives. A package cannot add a new primitive to the format library's type system.
+A compound type (a vector, a matrix) is either a handle plus a table, with operations as nodes, or a struct registered with `add_struct`. A struct's fields are declared in the registry; the C++ struct is the package's own type in a header the package ships, and the two are kept in sync by the package author. A package cannot add a new primitive to the format library's type system.
 
 A component table is registered with `add_component(table_name, table_creator, codec)`: one call registers the table and its codec. A table that is not an entity component (the camera table, a package's internal table) uses `add_table(name, table_creator)`, which registers no codec; the table's rows are not serialized by the scene loader and saver.
 
@@ -233,9 +217,9 @@ Rationale for the explicit call: a lazy load (the runtime polls `Engine_Script` 
 
 `apply(World&)` is what the game and the editor call: they want the tables. `apply_registration_only()` is for callers that only need the registry: the `default_registry()` shim, a test that checks node vocabulary, a tool that validates a package's registrations without creating a world.
 
-A manager does not create a scratch `World` to satisfy its own `apply` contract. The caller says which kind of apply it wants. A second call to either method logs a warning and returns `!has_conflicts()`; the manager's state is not corrupted.
+A manager never creates a `World` of its own. The caller says which kind of apply it wants. A second call to either method logs a warning and returns `!has_conflicts()`; the manager's state is not corrupted.
 
-Rationale: the scratch `World` — a `World` constructed inside `apply` purely to satisfy the parameter, then discarded — hides ownership and invites the reader to wonder who owns the tables. A named method that says "no world" is clearer.
+Rationale: a method that says "no world" makes the caller's intent explicit. A manager that built a `World` internally to satisfy `apply`'s parameter would hide who owns the tables.
 
 ---
 
@@ -267,38 +251,84 @@ Rationale: the `Entity` table is the world's identity table. It is not scene-spe
 
 ---
 
+## Decision 16 — Node type name convention
+
+A node type's name is `Provider_Operation[_ArgType]*_Node`.
+
+- `Provider` is the package's prefix.
+- `Operation` is one segment.
+- Each argument type is one segment, in argument order, using the type's base name (`Float`, `Bool`, `Vector2`, `BodyRef`).
+- `_Node` terminates the name.
+- A primitive constant node uses the type-form `Provider_Type_Node` (`Engine_Float_Node`). It has no operation; its `Operation` is `None`.
+
+Examples: `Engine_EveryFrame_Node`, `Engine_Print_Float_Node`, `Engine_LessThan_Int_Int_Node`, `Engine_If_Bool_Node`, `Engine_Add_Vector2_Vector2_Node`.
+
+The same operation over different argument types is a different node type. The registry is a flat namespace of names, so `Engine_Print_Float_Node` and `Engine_Print_Bool_Node` are two entries. Putting the argument types in the name makes each entry distinct and lets a reader of a `.lucid` file see which one is called without looking up a signature. The `_Node` suffix marks a name as a node type; enums, handles, structs, and tables do not carry it.
+
+The engine enforces only the prefix rule. The rest of the convention is followed by every engine package and recommended to every other package. The editor does not parse node type names; it reads the registry and the editor metadata (Decision 17).
+
+See `docs/notes/PackageNaming.md` §2.2.
+
+---
+
+## Decision 17 — Node editor metadata
+
+Display metadata for the editor is separate from the registry. The `lucid::sema::Registry` carries the format's vocabulary: type names, kinds, arguments. `NodeEditorInfo` and `TableEditorInfo` carry what the editor shows: display name, descriptions, icon id, example, and the node's operation.
+
+A package registers editor metadata with `PackageBuilder::add_node_editor_info` and `add_table_editor_info`. The metadata is optional; a node or table without it gets a default entry (display name from the base name, everything else empty). Metadata affects the palette and the inspector, never the runtime.
+
+The editor never parses a node type name to find out what the node does. The `operation` field says so.
+
+See `docs/notes/EditorMetadata.md`.
+
+---
+
+## Decision 18 — The operation table
+
+`engine/registry/operation.h` declares an `Operation` enum and a table that maps each well-known operation to a canonical name and a visual group.
+
+The enum has three categories of value: `None` (the node has no operation), `Custom` (the package supplies `custom_operation` and, optionally, `operation_group_override`), and the named operations (`Add`, `LessThan`, `If`, `Print`, and so on).
+
+A package names an operation by setting `NodeEditorInfo::operation`; it does not carry the operation's name or group inline. Changing a table entry updates every node that uses the operation. The editor resolves name and group from the table for named operations and from the package's fields for `Custom`.
+
+The recommended groups are engine data (`Arithmetic`, `Comparison`, `Logic`, `Conversion`, `Vector`, `Flow`, `Debug`, `Package`). The colors for those groups are the editor's.
+
+See `docs/notes/EditorMetadata.md`.
+
+---
+
 ## Gap table
 
-The fourteen gaps identified in Phase 0, with resolution status.
+The fourteen gaps identified in Phase 0, with how each is resolved.
 
-| #   | Gap                                    | Status                                                                                                                    |
-| --- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Scene ownership                        | Resolved — Decision 2. `Scene` is a value; `World` owns tables.                                                           |
-| 2   | Load additive vs. clear                | Resolved — Decision 2. `ApplyMode::Clear` is default; `Additive` is implemented (does not clear first).                   |
-| 3   | Active camera identity                 | Resolved — Decision 3. Name is canonical; `RowRef` is a transient lookup result.                                          |
-| 4   | Cameras as entities vs. table          | Resolved — Decision 3. Camera table, keyed by name. Not entities. `CameraTag` deleted.                                    |
-| 5   | Entity ID stability                    | Resolved — Decision 6. IDs are stable; allocator set from the scene or `max + 1`.                                         |
-| 6   | Parent references across load          | Resolved — scene loader does a two-pass load; child may reference a parent later in the file. Tested in `test_scene.cpp`. |
-| 7   | `.lscene` format                       | Resolved — Decision 8. JSON, engine-owned schema, versioned independently.                                                |
-| 8   | `Scene::clear()` semantics             | Resolved — Decision 9. `World::clear()` and `World::clear_rows()` are the two clears; `Scene` has no `clear()`.           |
-| 9   | Scene name vs. file name               | Resolved — Decision 2. `name` is a display string; the file path is identity.                                             |
-| 10  | `_EngineState`                         | Resolved — Decision 7. Core table `Engine_EngineState`; preserved across `clear()`; not scene data.                       |
-| 11  | `CameraData` / `Camera2D` / camera row | Resolved — Decision 3. Three types, three roles: `CameraDesc`, camera row, `Camera2D`.                                    |
-| 12  | Renderer camera source                 | Resolved — Decision 3. Engine loop bridges: reads camera row, converts to `Camera2D`, sets renderer.                      |
-| 13  | `SceneLoader` / `SceneSaver` friends   | Resolved — Decision 13. `Scene` is an aggregate; loader and saver are free functions. No friends.                         |
-| 14  | `Scene` vs. `SceneDesc` naming         | Resolved — Decision 4. `Desc` suffix on schema sub-types; top-level scene type stays `engine::Scene`.                     |
+| #   | Gap                                  | Status                                                                                                                    |
+| --- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Scene ownership                      | Resolved — Decision 2. `Scene` is a value; `World` owns tables.                                                           |
+| 2   | Load additive vs. clear              | Resolved — Decision 2. `ApplyMode::Clear` is default; `Additive` is implemented (does not clear first).                   |
+| 3   | Active camera identity               | Resolved — Decision 3. Name is canonical; `RowRef` is a transient lookup result.                                          |
+| 4   | Cameras as entities vs. table        | Resolved — Decision 3. Camera table, keyed by name. Not entities.                                                         |
+| 5   | Entity ID stability                  | Resolved — Decision 6. IDs are stable; allocator set from the scene or `max + 1`.                                         |
+| 6   | Parent references across load        | Resolved — scene loader does a two-pass load; child may reference a parent later in the file. Tested in `test_scene.cpp`. |
+| 7   | `.lscene` format                     | Resolved — Decision 8. JSON, engine-owned schema, versioned independently.                                                |
+| 8   | `Scene::clear()` semantics           | Resolved — Decision 9. `World::clear()` and `World::clear_rows()` are the two clears; `Scene` has no `clear()`.           |
+| 9   | Scene name vs. file name             | Resolved — Decision 2. `name` is a display string; the file path is identity.                                             |
+| 10  | Engine state table                   | Resolved — Decision 7. Core table `Engine_EngineState`; preserved across `clear()`; not scene data.                       |
+| 11  | Camera types and their roles         | Resolved — Decision 3. Three types, three roles: `CameraDesc`, camera row, `Camera2D`.                                    |
+| 12  | Renderer camera source               | Resolved — Decision 3. Engine loop bridges: reads camera row, converts to `Camera2D`, sets renderer.                      |
+| 13  | `SceneLoader` / `SceneSaver` friends | Resolved — Decision 13. `Scene` is an aggregate; loader and saver are free functions. No friends.                         |
+| 14  | `Scene` vs. `SceneDesc` naming       | Resolved — Decision 4. `Desc` suffix on schema sub-types; top-level scene type stays `engine::Scene`.                     |
 
 Gaps discovered and resolved after Phase 0:
 
-| #   | Gap                                         | Status                                                                                                            |
-| --- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 15  | `World::clear()` removes the core schema    | Resolved — Decision 9. `clear()` preserves marked tables; `apply_to(Clear)` uses `clear_rows()`.                  |
-| 16  | `Table::add_partial` inherits stale values  | Resolved — a reused slot resets every column to default before setting the named one. Tested in `test_table.cpp`. |
-| 17  | Five-place component ritual                 | Resolved — Decision 14. `ComponentRegistry` is the list; `add_component` registers table and codec together.      |
-| 18  | Scratch `World` in `default_registry`       | Resolved — Decision 12. `apply_registration_only()`.                                                              |
-| 19  | Graph load lifecycle unspecified            | Resolved — Decision 11. `runtime.load()` after `scene.apply_to`.                                                  |
-| 20  | `lucid_ecs` depended on `engine/core/log.h` | Resolved — Decision 15. The one log call became a throw; `lucid_ecs` is free of engine dependencies.              |
-| 21  | `CameraTag` was a misnamed constant         | Resolved — Decision 3. `kCameraTableName` in `component_tags.h`; not a tag.                                       |
+| #   | Gap                                                 | Status                                                                                                                                 |
+| --- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 15  | `World::clear()` removes the core schema            | Resolved — Decision 9. `clear()` preserves marked tables; `apply_to(Clear)` uses `clear_rows()`.                                       |
+| 16  | `Table::add_partial` inherits stale values          | Resolved — `add_partial` resets every column of a reused slot to its default before setting the named one. Tested in `test_table.cpp`. |
+| 17  | Five-place component ritual                         | Resolved — Decision 14. `ComponentRegistry` is the list; `add_component` registers table and codec together.                           |
+| 18  | `default_registry` needs a registry without a world | Resolved — Decision 12. `apply_registration_only()`.                                                                                   |
+| 19  | Graph load lifecycle unspecified                    | Resolved — Decision 11. `runtime.load()` after `scene.apply_to`.                                                                       |
+| 20  | `lucid_ecs` dependency on `engine/core/log.h`       | Resolved — Decision 15. `allocate_entity_id` throws; `lucid_ecs` is free of engine dependencies.                                       |
+| 21  | Name of the camera table constant                   | Resolved — Decision 3. `kCameraTableName` in `component_tags.h`; not a tag.                                                            |
 
 ---
 
@@ -306,4 +336,4 @@ Gaps discovered and resolved after Phase 0:
 
 - It is not a changelog. Each decision answers a question that was open. The commit history is the changelog.
 - It is not a design note. Where a topic needs more than a paragraph — the world's empty operations, the package policy, the trigger model, the dataflow model — the note exists and this file points at it.
-- It is not a plan. Decisions 1–15 are realized in the code. Where a decision describes a future extension (a second engine-lifetime row, a service on `Services`), it says so and points at the note.
+- It is not a plan. Decisions 1–18 are realized in the code. Where a decision describes a future extension (a second engine-lifetime row, a service on `Services`), it says so and points at the note.

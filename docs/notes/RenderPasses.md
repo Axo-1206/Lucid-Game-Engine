@@ -5,8 +5,9 @@ The renderer has two passes today: world 2D and UI. A third
 pass model, the viewport, and what the renderer does and does
 not do.
 
-See also `docs/notes/TriggerModel.md` for how a graph expresses
-control flow, and `docs/Decision.md` for the design decisions.
+See also `docs/notes/Dataflow.md` §7 for where rendering sits in the
+engine loop, `docs/notes/EditorMetadata.md` for what the editor reads
+from the engine, and `docs/Decision.md` for the design decisions.
 
 ---
 
@@ -58,14 +59,50 @@ into it.
 
 Uses:
 
-- **Editor preview panel.** `set_viewport(200, 100, 800, 600)`,
-  run the world pass, then `set_full_viewport()` and run the UI
-  pass.
-- **Split-screen.** `set_viewport(0, 0, w/2, h)` for the first
-  player, `set_viewport(w/2, 0, w/2, h)` for the second.
-- **Minimap.** `set_viewport(w-200, h-200, 200, 200)`, run the
-  world pass with a different camera, then `set_full_viewport()`
-  and continue.
+- **Editor preview panel.** A `World2D` view with the viewport
+  `(200, 100, 800, 600)`, followed by a `UI` view over the full
+  window.
+- **Split-screen.** Two `World2D` views: `(0, 0, w/2, h)` for the
+  first player, `(w/2, 0, w/2, h)` for the second.
+- **Minimap.** A `World2D` view with the viewport
+  `(w-200, h-200, 200, 200)` and a different camera.
+
+---
+
+## Views
+
+A `View` (`engine/render/view.h`) is the caller's arrangement of a
+pass, a viewport, a camera, and a world. The engine loop iterates a
+`std::vector<View>` between `begin_frame` and `end_frame`:
+
+    renderer.begin_frame(clear_color);
+    for (const View& view : views) {
+        renderer.set_viewport(view.x, view.y, view.w, view.h);
+        if (view.pass == View::Pass::World2D) {
+            renderer.set_camera_2d(to_camera2d(view.camera, view.w, view.h));
+            renderer.begin_world_2d();
+            render_system(ctx, dt);
+            renderer.end_world_2d();
+        } else {
+            renderer.begin_ui();
+            ui_system(ctx, dt);
+            renderer.end_ui();
+        }
+        renderer.set_full_viewport();
+    }
+    renderer.end_frame();
+    renderer.present();
+
+The renderer's `set_viewport`, `set_camera_2d`, and pass entry points
+(`begin_world_2d`, `begin_ui`) are driven by the view loop. The
+renderer does not choose a camera or a viewport on its own.
+
+A `View::Pass::World2D` view draws with the view's camera; a
+`View::Pass::UI` view draws in screen space. The game's `main.cpp`
+builds one `World2D` view and one `UI` view. An editor builds more:
+a scene view and a game view, each with its own viewport and camera.
+
+The frame is cleared once, by `begin_frame`, not once per view.
 
 ---
 

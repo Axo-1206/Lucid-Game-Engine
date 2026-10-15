@@ -12,6 +12,8 @@ See also:
   gains an `Engine_Body` component.
 - `docs/notes/PackageNaming.md` — how a physics package names
   its content.
+- `docs/notes/PackageComposition.md` — how a package registers
+  tables, nodes, and services.
 
 ---
 
@@ -200,12 +202,14 @@ Engine_Body
 └── tag: string         (for collision filtering)
 ```
 
-Serialized in the scene. Populated by the scene loader for
-entities with an `Engine_Body` component in the `.lscene` file,
-and by the `Engine_BodyNode` at runtime for entities created by a
-graph.
+Serialized in the scene. Registered with `add_component`, so the
+scene loader and saver handle it through the `ComponentRegistry`.
+Populated for entities with an `Engine_Body` component in the
+`.lscene` file, and by the graph at runtime for entities it
+creates.
 
 **`Engine_BodyRuntime` — the backend's state. Not serialized.**
+Registered with `add_table`, so it has no codec.
 
 ```
 Engine_BodyRuntime
@@ -236,24 +240,28 @@ description is stable.
 
 The `engine.physics_2d` package registers these node types.
 
+The node names follow the engine's naming convention
+(`Provider_Operation[_ArgType]*_Node`); see `PackageNaming.md` §2.2.
+
 **Value nodes:**
 
-- `Engine_BodyNode` — creates a body at runtime. Arguments:
-  type, shape, size, mass. Produces an `Engine_BodyRef`.
-- `Engine_BodyPositionNode(body)` — reads the body's position.
+- `Engine_CreateBody_Entity_Node(entity)` — creates a body at runtime
+  for the entity, from its `Engine_Body` row. Produces an
+  `Engine_BodyRef`.
+- `Engine_BodyPosition_BodyRef_Node(body)` — reads the body's position.
   Produces a `float32`.
-- `Engine_BodyVelocityNode(body)` — reads the body's velocity.
+- `Engine_BodyVelocity_BodyRef_Node(body)` — reads the body's velocity.
   Produces a `float32`.
 
 **Action nodes:**
 
-- `Engine_MoveBodyNode(body, dx, dy)` — teleports a body.
-- `Engine_ApplyForceNode(body, fx, fy)` — applies a force.
-- `Engine_ApplyImpulseNode(body, ix, iy)` — applies an impulse.
+- `Engine_MoveBody_BodyRef_Float_Float_Node(body, dx, dy)` — teleports a body.
+- `Engine_ApplyForce_BodyRef_Float_Float_Node(body, fx, fy)` — applies a force.
+- `Engine_ApplyImpulse_BodyRef_Float_Float_Node(body, ix, iy)` — applies an impulse.
 
 **Trigger nodes:**
 
-- `Engine_OnCollision(body, tag)` — fires when the body
+- `Engine_OnCollision_BodyRef_String_Node(body, tag)` — fires when the body
   collides with something tagged `tag`.
 
 **The `Engine_BodyRef` handle.** A body reference is a handle. A
@@ -308,9 +316,9 @@ package.
 6. (movement_system if it still exists; physics replaces it for
    bodies)
 7. hierarchy_system(ctx, dt)
-8. render begin
-9. render_system(ctx, dt)
-10. render end, present
+8. renderer.begin_frame
+9. for each View: render_system / ui_system
+10. renderer.end_frame, present
 ```
 
 The two physics systems run in that order, in that position.
@@ -334,13 +342,13 @@ Concretely:
   `Engine_Transform` each frame. Any value a graph wrote to
   `Engine_Transform` in the same tick is overwritten.
 
-- To move a physics body, a graph calls `Engine_MoveBodyNode`.
+- To move a physics body, a graph calls `Engine_MoveBody_BodyRef_Float_Float_Node`.
   That node tells the backend to teleport the body. The next
   `physics_sync_system` writes the new position to
   `Engine_Transform`.
 
 - Writing `Engine_Transform.x` directly (via a hypothetical
-  `Engine_SetTransformNode`) does **not** move the body. The
+  `Engine_SetTransform_Entity_Float_Float_Node`) does **not** move the body. The
   next sync overwrites it.
 
 **This is a deliberate policy.** A physics body is authoritative
@@ -364,14 +372,10 @@ expects `Engine_Transform` to be authoritative.
   `backend_id`. The first `physics_step_system` sees the row,
   creates the backend body, and stores the id.
 
-- **By a node.** `Engine_BodyNode`'s executor creates an
-  `Engine_BodyRuntime` row with a zero `backend_id`. The next
+- **By a node.** `Engine_CreateBody_Entity_Node` takes the entity as
+  an argument. Its executor writes an `Engine_BodyRuntime` row keyed
+  by that entity, with a zero `backend_id`. The next
   `physics_step_system` creates the backend body.
-
-  Actually — for a node to create a body, the node needs the
-  entity too. `Engine_BodyNode` takes the entity as an argument
-  (a `BodyRef` or a `RowRef`). Its executor writes
-  `Engine_BodyRuntime` keyed by that entity.
 
 **Destruction.**
 
@@ -381,7 +385,7 @@ expects `Engine_Transform` to be authoritative.
   a runtime row it knew about is gone and destroys the backend
   body.
 
-- **By a node.** If there is an `Engine_DestroyBodyNode` (not in
+- **By a node.** If there is an `Engine_DestroyBody_BodyRef_Node` (not in
   the initial node set), it removes the `Engine_Body` and
   `Engine_BodyRuntime` rows. The next step destroys the backend
   body.
@@ -429,7 +433,7 @@ fields:
 - `friction`: number. Default `0.5`.
 - `restitution`: number. Default `0.1`.
 - `tag`: string. Default `""`. Used for collision filtering
-  with `Engine_OnCollision`.
+  with `Engine_OnCollision_BodyRef_String_Node`.
 
 The body's initial position comes from the entity's
 `Engine_Transform`. Its initial velocity comes from the entity's
@@ -438,11 +442,10 @@ those.
 
 The `Engine_BodyRuntime` component is not serialized.
 
-**A note on serialization.** The scene loader hardcodes
-`Engine_Body` the way it hardcodes `Engine_Transform`. A future
-phase might make the loader generic (packages register their own
-component loaders), but that is a bigger change and not needed
-for Step 6.
+**A note on serialization.** `Engine_Body` is registered through
+`PackageBuilder::add_component` with a codec that reads and writes
+the JSON above. The scene loader and saver dispatch to it through
+the `ComponentRegistry`; neither names `Engine_Body` directly.
 
 ---
 
@@ -498,7 +501,7 @@ constructs a `Box2DBackend`, puts it in `Services`, and loads
 
 ## 11. Collision triggers (deferred)
 
-`Engine_OnCollision(body, tag)` is a trigger that fires when a
+`Engine_OnCollision_BodyRef_String_Node(body, tag)` is a trigger that fires when a
 body collides with something tagged `tag`.
 
 The node type is registered, but its firing semantics are
@@ -590,7 +593,7 @@ Summarized:
    `Engine_BodyRuntime` is the backend's state, not
    serialized.**
 4. **Physics owns the position of any entity with an
-   `Engine_Body` component.** `Engine_MoveBodyNode` is how a
+   `Engine_Body` component.** `Engine_MoveBody_BodyRef_Float_Float_Node` is how a
    graph moves a body.
 5. **Two systems: `physics_step_system` and
    `physics_sync_system`.** The first steps the backend; the
@@ -600,8 +603,9 @@ Summarized:
    `SystemContext` and `TickContext` gain access to it.
 7. **Collision trigger firing is deferred.** The node type
    exists; the firing semantics are a later step.
-8. **The scene loader hardcodes `Engine_Body` for now.** A
-   future version makes the loader generic.
+8. **`Engine_Body` is a component with a codec.** The package
+   registers it with `add_component`; the scene loader and saver
+   reach it through the `ComponentRegistry`.
 9. **Determinism is per-platform, not cross-platform.**
    Documented as a limitation.
 10. **The interface is small and backend-neutral.** Raycasts,
@@ -647,4 +651,3 @@ triggers are registered but do not fire.
   its content.
 - `docs/Decision.md` — the design decisions that led to this
   plan.
-```

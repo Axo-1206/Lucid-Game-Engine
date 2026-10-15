@@ -11,6 +11,10 @@ See also:
   initial state of the tables.
 - `docs/notes/PackageNaming.md` — how packages name their
   content.
+- `docs/notes/PackageComposition.md` — what a package contributes
+  and how packages compose.
+- `docs/notes/WorldLifecycle.md` — how a world is emptied and
+  what survives.
 - `docs/notes/PhysicsPlan.md` — how physics applies this model.
 
 ---
@@ -82,7 +86,10 @@ row is a value.
 
 The set of component tables a package registers is part of the
 package's vocabulary. A package's components, node types, enums,
-and handles are registered together. See `PackageNaming.md`.
+and handles are registered together. A package registers a
+component table with `add_component`, which registers the table and
+its scene codec in one call. See `PackageNaming.md` and
+`PackageComposition.md`.
 
 ---
 
@@ -105,12 +112,16 @@ kinds (see `TriggerModel.md` and the format library's
   - `graph` — the compiled graph. The executor can read its own
     node's arguments and subscribers if it needs to, but this is
     rare.
-  - `results` — the per-node result scratch. A Value node writes
-    its result here.
+  - `results` — one `CellValue` per node. A Value node writes its
+    result here.
   - `arg_values` — the resolved values of this node's arguments.
-  - `dt` — seconds since the last tick.
+  - `struct_results` — one byte buffer per node whose result type
+    is a struct. A node that produces a struct writes the bytes
+    here; a node that consumes a struct reads the producer's
+    buffer.
   - `services` — engine-wide services (physics backend, and
     future audio and rendering services).
+  - `dt` — seconds since the last tick.
 
 **A node's arguments are its inputs.** An argument is one of:
 
@@ -124,6 +135,13 @@ executor sees values, not node references.
 **A node's result is its output.** A Value node writes a value to
 `results[node_index]`. An Action node has no result. A Trigger
 node has no result.
+
+**Struct values.** A struct-typed value (for example
+`Engine_Vector2`) is not a `CellValue`. It is a run of bytes in
+`struct_results[node_index]`. A node that consumes a struct reads
+the producing node's buffer directly via
+`engine::graph::arg_node_index(ctx.graph, node, i)`. The graph
+runtime sizes each buffer from the registry's result type.
 
 **Nodes do not reach into other nodes.** A node cannot call
 another node's executor. A node cannot read another node's
@@ -158,6 +176,7 @@ Examples of systems:
   phase.)
 - `render_system` — builds a `RenderList` from the world's
   sprites and transforms.
+- `ui_system` — draws the UI pass.
 - `physics_step_system` (future) — steps the physics backend.
 - `physics_sync_system` (future) — copies body state to
   `Engine_Transform` and `Engine_Velocity`.
@@ -209,29 +228,38 @@ between phases; there is only the table store.
 The engine loop runs in a fixed order each frame:
 
 ```
-0. Scene setup. If a scene was loaded this frame, scene.apply_to(world)
-   runs and runtime.load() follows. load() walks the world's
-   Engine_Script table and loads each graph. It is idempotent; a
-   caller who reloads a scene calls it again. Nothing else in the
-   loop reads Engine_Scrip
+0. Scene setup. If a scene was loaded this frame,
+   scene.apply_to(world, components, ApplyMode::Clear) runs and
+   runtime.load() follows. load() walks the world's Engine_Script
+   table and loads each graph. It is idempotent; a caller who
+   reloads a scene calls it again. Nothing else in the loop reads
+   Engine_Script.
 1. Input is polled. The InputState is updated.
 2. runtime.tick(dt) is called. The graph's nodes execute:
    Value nodes evaluate; source triggers fire; gated triggers
    fire conditionally; fired actions run. Nodes read and write
    tables and call into services.
-3. Systems run, in a defined order:
+3. Systems that produce world state run once per frame, in a
+   defined order:
    - physics_step_system (future)
    - physics_sync_system (future)
    - hierarchy_system
    - movement_system (if it still exists)
    - hierarchy_system (again, after movement)
-4. The renderer begins a frame.
-5. render_system builds a RenderList and submits it.
-6. The renderer ends the frame and presents.
+4. renderer.begin_frame(clear_color).
+5. For each View in the view list:
+   - set_viewport(view.x, view.y, view.w, view.h).
+   - If World2D: set_camera_2d(to_camera2d(view.camera, view.w, view.h));
+     begin_world_2d(); render_system(ctx, dt); end_world_2d().
+   - If UI: begin_ui(); ui_system(ctx, dt); end_ui().
+   - set_full_viewport().
+6. renderer.end_frame(); renderer.present().
 ```
 
 > [!NOTE]
-> Scene setup and graph load. Scene::apply_to writes the scene's entities, components, and cameras into the world, including the Engine_Script rows. runtime.load() then reads those rows and loads each .lucgraph file. This is the only point in the loop where the Script table is read. The runtime does not poll the table; it does not notice a script added mid-frame. A caller that wants to hot-reload a graph writes a new Script row and calls runtime.load().
+> Scene setup and graph load. `Scene::apply_to` writes the scene's entities, components, and cameras into the world, including the `Engine_Script` rows. `runtime.load()` then reads those rows and loads each `.lucgraph` file. This is the only point in the loop where the `Engine_Script` table is read. The runtime does not poll the table; it does not notice a script added mid-frame. A caller that wants to hot-reload a graph writes a new `Engine_Script` row and calls `runtime.load()`.
+
+**Views.** A `View` (`engine/render/view.h`) is a scope of draws that share a world, a camera, a viewport, and a pass. The loop iterates a `std::vector<View>`. The game builds one `World2D` view of the scene's active camera, filling the window, and one `UI` view. An editor adds a scene view and a game view. The header describes each field; `RenderPasses.md` describes the passes.
 
 **Every step reads the tables left by the previous step.** A
 write by a node is visible to the systems. A write by a system
@@ -265,7 +293,9 @@ non-deterministic backends).
 - Call another node's executor.
 - Read another node's internal state.
 - Read another node's result unless it is declared as an
-  argument.
+  argument. This applies to struct results too: a node reads the
+  producer's struct buffer via `arg_node_index`, and only for a
+  declared argument.
 - Modify another node's arguments.
 - See the future. A node cannot read a value another node will
   write later in the same tick.
@@ -284,8 +314,7 @@ non-deterministic backends).
 write the package's tables, plus the engine's core tables
 (`Engine_Entity`, `Engine_Transform`, `Engine_WorldTransform`).
 A package that needs another package's data is a design question,
-not a runtime one. See `PackageNaming.md` and the eventual
-package dependency note.
+not a runtime one. See `PackageComposition.md` §8.
 
 ---
 
@@ -422,7 +451,10 @@ The engine loop orders the phases.**
   registry and the metadata.
 - `docs/notes/RenderPasses.md` — how the renderer draws, given
   the tables the systems have produced.
+- `docs/notes/PackageComposition.md` — what a package contributes
+  and how packages compose.
+- `docs/notes/WorldLifecycle.md` — how a world is emptied and
+  what survives.
 - `docs/notes/PhysicsPlan.md` — how physics applies this model.
 - `docs/Decision.md` — the design decisions that led to this
   model.
-```

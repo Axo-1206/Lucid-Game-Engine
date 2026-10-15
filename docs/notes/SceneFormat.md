@@ -2,7 +2,8 @@
 
 A `.lscene` file describes a scene: a list of entities, the components
 they carry, and one or more cameras. It is JSON. It is read and written
-by `engine/src/scene/scene_loader.cpp` and `scene_saver.cpp`.
+by the scene loader and saver (`SceneLoader_load`, `SceneSaver_save`,
+declared in `engine/scene/scene.h`).
 
 A `.lscene` file is **not** a `.lucgraph`. A `.lucgraph` describes
 behavior — a graph of nodes and subscriptions — and is read and written
@@ -134,6 +135,11 @@ A component's fields are all optional. A missing field keeps the table's
 default value (0 for numbers, `""` for strings, `false` for booleans).
 A missing component means the entity doesn't have it.
 
+The engine's core components are the five below, registered by
+`register_core_components`. Packages may register additional components
+via `PackageBuilder::add_component`; a scene that carries an unregistered
+component logs a warning and skips it.
+
 ### `Engine_Transform`
 
 A 2D transform. 3D will add columns or a sibling component; see
@@ -261,6 +267,7 @@ function. A table with no codec is skipped: the saver writes nothing for
 it, and the JSON for that entity has no key for the table. This is the
 mechanism by which `Engine_BodyRuntime` (a runtime table with no codec)
 is never serialized while `Engine_Body` (a component with a codec) is.
+See `docs/notes/PhysicsPlan.md`.
 
 The saver does not read the file. It writes a fresh JSON document from
 the world's rows. `SceneSaver_save(scene, path)` writes the `Scene`'s
@@ -344,8 +351,8 @@ Existing 2D scenes load unchanged when 3D support is added, because every
 The scene schema is backend-agnostic. Swapping the physics or graphics
 backend does not change the schema.
 
-- Components describe properties in engine-agnostic terms. A `Body`
-  component (future) describes mass, shape, type; a backend interprets
+- Components describe properties in engine-agnostic terms. An `Engine_Body`
+  component (see `PhysicsPlan.md`) describes mass, shape, type; a backend interprets
   it. Backend-specific runtime data — a Jolt body id, a GPU handle —
   is stored in runtime tables that are never serialized.
 - Assets are referenced by path. A texture is a `.png`; a future mesh

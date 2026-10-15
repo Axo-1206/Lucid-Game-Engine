@@ -299,6 +299,7 @@ format library's `lucid` CLI; they are not checked in.
 docs/
 ├── README.md            index of this folder
 ├── Decision.md          design decisions, one per phase
+├── LucidGraphFormat.md  about the script language
 ├── FileStructure.md     this file
 ├── notes/
 │   ├── Dataflow.md         States the model the engine runs on
