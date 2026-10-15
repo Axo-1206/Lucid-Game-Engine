@@ -189,6 +189,7 @@ apps/
 │   ├── CMakeLists.txt
 │   └── main.cpp
 ├── editor/
+│   ├── third_party/imgui/   imgui-1.92.9
 │   ├── include/editor/
 │   │   └── editor_app.h
 │   ├── src/
@@ -311,8 +312,8 @@ docs/
 │   ├── TriggerModel.md     how a Lucid graph expresses control flow
 │   ├── SceneFormat.md      the .lscene format spec and evolution rules
 │   └── WorldLifecycle.md   clear, clear_rows, and apply_to
-├── implementationPlans/
-│   └── kernelImplementationPlan.md
+├── plans/
+│   └── EditorPlan.md
 └── archive/             older design documents, kept for history
     ├── designs/
     │   └── ...
