@@ -1,6 +1,11 @@
 #include "editor/editor_app.h"
 #include "engine/core/log.h"
 
+#include "imgui.h"
+
+#include <glad/glad.h> // GLAD before GLFW (NOTE: DO NOT REMOVE THIS COMMENT)
+#include <GLFW/glfw3.h>
+
 namespace editor
 {
 
@@ -11,20 +16,22 @@ namespace editor
 
     EditorApp::~EditorApp() = default;
 
-    bool EditorApp::init(int width, int height, const std::string &title)
+    bool EditorApp::init()
     {
-        (void)width;
-        (void)height;
-        (void)title;
-
-        if (!window_.native_handle())
+        GLFWwindow *handle = static_cast<GLFWwindow *>(window_.native_handle());
+        if (!handle)
         {
             engine::log_error("EditorApp: window creation failed");
             return false;
         }
 
+        if (!imgui_.init(handle))
+        {
+            engine::log_error("EditorApp: ImGui initialization failed");
+            return false;
+        }
+
         initialized_ = true;
-        engine::log_info("Editor initialized");
         return true;
     }
 
@@ -42,10 +49,20 @@ namespace editor
         {
             clock_.start_frame();
             window_.poll_events();
-            // Step 3 will draw the editor UI here.
+
+            imgui_.begin_frame();
+
+            ImGui::Begin("Lucid Editor");
+            ImGui::Text("ImGui is working.");
+            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::End();
+
+            imgui_.end_frame();
+
             window_.swap_buffers();
         }
 
+        imgui_.shutdown();
         engine::log_info("Editor loop ended");
         return 0;
     }

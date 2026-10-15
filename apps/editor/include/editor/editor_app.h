@@ -2,29 +2,27 @@
 
 #include "engine/platform/window.h"
 #include "engine/core/clock.h"
+#include "editor/imgui_layer.h"
+
+#include <string>
 
 namespace editor
 {
 
-    // The editor application. Phase 0: opens a window, runs a loop, closes on Escape.
-    // Later: owns the runtime, renderer, scene, and panels.
     class EditorApp
     {
     public:
         EditorApp();
         ~EditorApp();
 
-        // Initialize the editor. Returns false on failure.
-        bool init(int width, int height, const std::string &title);
-
-        // Run the editor loop. Blocks until the window closes.
+        bool init();
         int run();
 
     private:
         engine::Window window_;
         engine::Clock clock_;
+        ImGuiLayer imgui_;
 
         bool initialized_ = false;
     };
-
-} // namespace editor
+}

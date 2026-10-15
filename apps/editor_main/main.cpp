@@ -9,7 +9,7 @@ int main()
     engine::log_info("Lucid Editor starting");
 
     editor::EditorApp app;
-    if (!app.init(1280, 720, "Lucid Editor"))
+    if (!app.init())
     {
         engine::log_error("Failed to initialize editor");
         return 1;

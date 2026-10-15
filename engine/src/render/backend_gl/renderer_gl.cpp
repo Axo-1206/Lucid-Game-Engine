@@ -72,15 +72,6 @@ void main() {
             return false;
         }
 
-        glfwMakeContextCurrent(window_);
-
-        if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
-        {
-            log_error("RendererGL: failed to load OpenGL functions");
-            return false;
-        }
-
-        log_info("OpenGL version: %s", glGetString(GL_VERSION));
         log_info("GPU renderer:   %s", glGetString(GL_RENDERER));
 
         glEnable(GL_BLEND);
