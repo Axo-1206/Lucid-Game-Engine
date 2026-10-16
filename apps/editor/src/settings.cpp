@@ -94,6 +94,8 @@ namespace editor
             s.default_new_project_parent =
                 j.value("default_new_project_parent",
                         s.default_new_project_parent);
+            s.project_roots =
+                j.value("project_roots", std::vector<std::string>{});
         }
         catch (const nlohmann::json::exception &)
         {
@@ -112,6 +114,7 @@ namespace editor
         j["font_size"] = settings.font_size;
         j["show_console_on_start"] = settings.show_console_on_start;
         j["default_new_project_parent"] = settings.default_new_project_parent;
+        j["project_roots"] = settings.project_roots;
 
         const std::string text = j.dump(2) + "\n";
         return write_text(paths::global_config_dir() / kSettingsFileName,

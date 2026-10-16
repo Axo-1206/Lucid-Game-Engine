@@ -23,4 +23,17 @@ namespace editor::paths
     std::filesystem::path global_config_dir();
     std::filesystem::path global_cache_dir();
 
+    // Where the editor puts new projects by default. The caller
+    // (ProjectRoots::load) creates the directory if it does not
+    // exist.
+    //
+    // Windows:  %USERPROFILE%/Lucid Projects/
+    // Linux:    ~/Lucid Projects/
+    // macOS:    ~/Lucid Projects/
+    //
+    // If the home directory cannot be determined, returns
+    // ./Lucid Projects/ in the current working directory. The
+    // editor logs a warning at startup in that case.
+    std::filesystem::path default_project_root();
+
 } // namespace editor::paths

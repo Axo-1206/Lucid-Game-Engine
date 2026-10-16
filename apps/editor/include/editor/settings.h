@@ -23,6 +23,11 @@ namespace editor
         // Empty means "use the OS default" (home directory, or
         // the OS's Documents folder).
         std::string default_new_project_parent;
+
+        // Extra roots the editor scans for projects. The platform
+        // default root is not stored here; it is computed from
+        // PlatformPaths on every launch.
+        std::vector<std::string> project_roots;
     };
 
     // One entry in the recent-projects list. `path` is the

@@ -199,6 +199,7 @@ apps/
 │   │   ├── editor_app.h
 │   │   ├── imgui_layer.h
 │   │   ├── platform_paths.h
+│   │   ├── project_roots.h
 │   │   ├── project.h
 │   │   ├── settings.h
 │   │   └── panels/
@@ -209,6 +210,7 @@ apps/
 │   │   ├── editor_app.cpp
 │   │   ├── imgui_layer.cpp
 │   │   ├── platform_paths.cpp
+│   │   ├── project_roots.cpp
 │   │   ├── project.cpp
 │   │   ├── settings.cpp
 │   │   └── panels/
@@ -267,6 +269,7 @@ tests/
 │   ├── test_console_panel.cpp
 │   ├── test_editor_app.cpp
 │   ├── test_platform_paths.cpp
+│   ├── test_project_roots.cpp
 │   ├── test_project.cpp
 │   └── test_settings.cpp
 └── CMakeLists.txt

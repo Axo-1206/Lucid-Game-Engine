@@ -34,16 +34,17 @@ TEST_CASE("launch_panel: set_callbacks stores callbacks",
     bool opened = false;
     bool created = false;
     bool quit = false;
+    bool refresh = false;
 
     p.set_callbacks(
         [&](const std::filesystem::path &)
         { opened = true; },
         [&](const std::filesystem::path &, const std::string &)
-        {
-            created = true;
-        },
+        { created = true; },
         [&]
-        { quit = true; });
+        { quit = true; },
+        [&]
+        { refresh = true; });
 
     // The callbacks are stored but not invoked by set_callbacks.
     REQUIRE_FALSE(opened);

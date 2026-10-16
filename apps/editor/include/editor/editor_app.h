@@ -1,10 +1,11 @@
 #pragma once
 
 #include "editor/imgui_layer.h"
+#include "editor/panels/console_panel.h"
 #include "editor/panels/launch_panel.h"
 #include "editor/panels/main_shell.h"
-#include "editor/panels/console_panel.h"
 #include "editor/project.h"
+#include "editor/project_roots.h"
 #include "editor/settings.h"
 
 #include "engine/core/clock.h"
@@ -32,36 +33,37 @@ namespace editor
             Project,
         };
 
-        // The frame. Dispatches on mode_.
         void frame();
 
-        // Mode transitions.
         void enter_project(std::unique_ptr<Project> project);
         void leave_project();
 
-        // Launch panel callbacks.
         void on_open_project(const std::filesystem::path &folder);
         void on_create_project(const std::filesystem::path &folder,
                                const std::string &name);
         void on_quit();
-
-        // Main shell callbacks.
         void on_about();
 
-        // The project state.
+        // Re-scan the project roots and hand the result to the
+        // launch panel. Called on init, on leave_project, and on
+        // the launch panel's Refresh button.
+        void refresh_launch_scan();
+
+        // Persist the current settings and roots.
+        void save_settings();
+        void save_recent();
+
         Mode mode_ = Mode::Launch;
         std::unique_ptr<Project> project_;
 
-        // Machine-local state.
         Settings settings_;
         RecentProjects recent_;
+        ProjectRoots roots_;
 
-        // Panels.
         LaunchPanel launch_;
         MainShell main_shell_;
         ConsolePanel console_;
 
-        // Engine-side.
         engine::Window window_;
         engine::Clock clock_;
         ImGuiLayer imgui_;

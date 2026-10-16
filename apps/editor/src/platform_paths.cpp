@@ -123,4 +123,12 @@ namespace editor::paths
 #endif
     }
 
+    std::filesystem::path default_project_root()
+    {
+        const std::string home = home_dir();
+        if (!home.empty())
+            return std::filesystem::path(home) / "Lucid Projects";
+        return std::filesystem::current_path() / "Lucid Projects";
+    }
+
 } // namespace editor::paths
