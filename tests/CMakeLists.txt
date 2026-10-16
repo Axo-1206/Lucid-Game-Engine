@@ -33,6 +33,7 @@ add_executable(lucid_tests
     engine/test_view.cpp
     engine/test_ui_system.cpp
     engine/test_operation.cpp
+    engine/test_script_compiler.cpp
 )
 
 target_link_libraries(lucid_tests

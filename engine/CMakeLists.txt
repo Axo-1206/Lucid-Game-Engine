@@ -38,6 +38,7 @@ add_library(luc_engine STATIC
     src/systems/movement_system.cpp
     src/systems/render_system.cpp
     src/systems/ui_system.cpp
+    src/script/compiler.cpp
 )
 
 target_include_directories(luc_engine

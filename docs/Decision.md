@@ -297,6 +297,57 @@ See `docs/notes/EditorMetadata.md`.
 
 ---
 
+## Decision 19 — The engine wraps the format library for non-engine callers
+
+The engine links the format library directly: `GraphRuntime` and
+`SceneLoader` call `lucid::serialization::deserialize`, and the
+package system calls into `lucid::sema`. That is correct — the
+engine is the format library's consumer, and the format library's
+types are part of the engine's implementation.
+
+A caller that must not see a `lucid::*` type (the editor) uses a
+small engine-side wrapper instead:
+
+    engine::check_source(source, filename, packages)
+        -> CompileCheckResult { ok, diagnostics }
+
+    engine::compile_to_bytes(source, filename, packages)
+        -> CompileBuildResult { ok, diagnostics, bytes }
+
+The wrapper defines `engine::CompileDiagnostic` (the format
+library's Diagnostic, translated to an engine type) and lives in
+`engine/script/compiler.{h,cpp}`. The header includes no
+`lucid/*` header. A caller that includes `engine/script/compiler.h`
+gets a compile API that returns engine types.
+
+The editor uses the wrapper. The engine's runtime does not; it
+calls the format library directly, because it is the format
+library's consumer.
+
+Rationale: the editor's dependency is on the engine, and only the
+engine. The format library is an implementation detail of the
+engine from the editor's point of view. The wrapper is small
+(about 100 lines) and it makes the boundary explicit.
+
+No runtime version check accompanies this. The editor and the
+engine are built together; the build enforces compatibility. The
+`.lucgraph` registry fingerprint is the runtime compatibility
+check for graph files, and it is already implemented.
+
+The engine wraps a format-library entry point if and only if:
+
+  1. A non-engine caller exists or is committed, and
+  2. The wrapper's signature contains no `lucid::*` type.
+
+Wrap what has a caller, not what might have one. `format`,
+`parse`, and `deserialize` are not wrapped today. Add
+`engine::format_source` when the editor gets format-on-save; add
+`engine::list_symbols` when the editor gets symbol search; add
+`engine::deserialize_graph` when the editor inspects `.lucgraph`
+files. Not before.
+
+---
+
 ## Gap table
 
 The fourteen gaps identified in Phase 0, with how each is resolved.

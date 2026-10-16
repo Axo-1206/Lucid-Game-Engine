@@ -335,6 +335,21 @@ ever stutters the UI, move the compile to a worker thread and post
 the result back — the `Diagnostic` struct is a value, so it is
 trivially movable.
 
+### Decision 14 — `Project` is a value, not an owner of engine state.
+`Project` describes a project on disk. It does not own a `PackageManager`, a `World`, a `Renderer`, or a `Window`. The editor's `EditorApp` owns those; `Project` just tells it which folder to look at and which packages to load.
+
+### Decision 15 — The project file is JSON with a versioned schema.
+`lucid.project.json` carries `format_version`. The editor refuses a project whose `format_version` is newer than what it understands. This mirrors the `.lscene` version policy: accept older, refuse newer.
+
+### Decision 16 — `Project::open` refuses anything that isn't a project.
+No "open folder" fallback. No partial open. If `lucid.project.json` is missing or malformed, `open` returns `nullptr` and the launch panel shows the error. This is the decision from `EditorPlan.md` §Decision 3, restated at the code level.
+
+### Decision 17 — `Project::create` writes the whole skeleton.
+Creating a project makes `lucid.project.json`, `assets/`, `scenes/`, `scripts/`, `packages/`, `.lucid/`, and `.lucid/cache/`, `.lucid/generated/`. It does not create a scene or a script. An empty project is a valid project.
+
+### Decision 18 — The project owns nothing at construction.
+Project's constructor is private. The only ways to get one are `Project::open` and `Project::create`. This makes it impossible to have a `Project` that doesn't correspond to a real folder on disk.
+
 ---
 
 ## 3. Panel inventory

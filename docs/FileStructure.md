@@ -74,7 +74,8 @@ engine/
 │   │   ├── clock.h
 │   │   ├── format_diagnostics.h
 │   │   ├── linear_allocator.h
-│   │   └── log.h
+│   │   ├── log.h
+│   │   └── version.h
 │   ├── graph/
 │   │   ├── arg_helpers.h
 │   │   ├── graph_runtime.h
@@ -118,6 +119,8 @@ engine/
 │   │   ├── component_registry.h
 │   │   ├── scene.h
 │   │   └── scene_schema.h
+│   ├── script/
+│   │   └── compiler.h
 │   └── systems/
 │       ├── system_context.h
 │       └── systems.h
@@ -161,6 +164,8 @@ engine/
     │   ├── scene.cpp
     │   ├── scene_loader.cpp
     │   └── scene_saver.cpp
+    ├── script/
+    │   └── compiler.cpp
     └── systems/
         ├── hierarchy_system.cpp
         ├── movement_system.cpp
@@ -228,6 +233,7 @@ tests/
 │   ├── test_operation.cpp
 │   ├── test_render_types.h
 │   ├── test_scene.cpp
+│   ├── test_script_compiler.cpp
 │   ├── test_systems.cpp
 │   ├── test_ui_system.cpp
 │   └── test_view.cpp
