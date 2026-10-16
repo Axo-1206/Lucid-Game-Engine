@@ -200,13 +200,19 @@ apps/
 │   │   ├── imgui_layer.h
 │   │   ├── platform_paths.h
 │   │   ├── project.h
-│   │   └── settings.h
+│   │   ├── settings.h
+│   │   └── panels.h
+│   │       ├── launch_panel.h
+│   │       └── main_shell.h
 │   ├── src/
 │   │   ├── editor_app.cpp
 │   │   ├── imgui_layer.cpp
 │   │   ├── platform_paths.cpp
 │   │   ├── project.cpp
-│   │   └── settings.cpp
+│   │   ├── settings.cpp
+│   │   └── panels.h
+│   │       ├── launch_panel.h
+│   │       └── main_shell.h
 │   └── CMakeLists.txt       target: luc_editor
 ├── editor_main/
 │   ├── CMakeLists.txt
@@ -256,9 +262,10 @@ tests/
 │   ├── test_math_manager.cpp
 │   └── test_package_manager.cpp
 ├── editor/
+│   ├── test_editor_app.cpp
 │   ├── test_platform_paths.cpp
-│   ├── test_settings.cpp
-│   └── test_project.cpp
+│   ├── test_project.cpp
+│   └── test_settings.cpp
 └── CMakeLists.txt
 ```
 
