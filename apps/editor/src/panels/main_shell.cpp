@@ -10,11 +10,24 @@ namespace editor
 
     void MainShell::set_callbacks(CloseProjectCallback on_close_project,
                                   QuitCallback on_quit,
-                                  AboutCallback on_about)
+                                  AboutCallback on_about,
+                                  SaveCallback on_save,
+                                  SaveAllCallback on_save_all)
     {
         on_close_project_ = std::move(on_close_project);
         on_quit_ = std::move(on_quit);
         on_about_ = std::move(on_about);
+        on_save_ = std::move(on_save);
+        on_save_all_ = std::move(on_save_all);
+    }
+
+    void MainShell::set_panel_visibility(bool *console_visible,
+                                         bool *explorer_visible,
+                                         bool *script_editor_visible)
+    {
+        console_visible_ = console_visible;
+        explorer_visible_ = explorer_visible;
+        script_editor_visible_ = script_editor_visible;
     }
 
     void MainShell::set_project(const Project *project)
@@ -25,13 +38,6 @@ namespace editor
     void MainShell::set_package_count(std::size_t count)
     {
         package_count_ = count;
-    }
-
-    void MainShell::set_panel_visibility(bool *console_visible,
-                                         bool *explorer_visible)
-    {
-        console_visible_ = console_visible;
-        explorer_visible_ = explorer_visible;
     }
 
     void MainShell::draw()
@@ -66,6 +72,17 @@ namespace editor
 
         if (ImGui::BeginMenu("File"))
         {
+            if (ImGui::MenuItem("Save", "Ctrl+S"))
+            {
+                if (on_save_)
+                    on_save_();
+            }
+            if (ImGui::MenuItem("Save All", "Ctrl+Shift+S"))
+            {
+                if (on_save_all_)
+                    on_save_all_();
+            }
+            ImGui::Separator();
             if (ImGui::MenuItem("Close Project"))
             {
                 if (on_close_project_)
@@ -90,15 +107,11 @@ namespace editor
         if (ImGui::BeginMenu("Window"))
         {
             if (explorer_visible_)
-            {
                 ImGui::MenuItem("Explorer", "Ctrl+Shift+E", explorer_visible_);
-            }
+            if (script_editor_visible_)
+                ImGui::MenuItem("Script Editor", nullptr, script_editor_visible_);
             if (console_visible_)
-            {
                 ImGui::MenuItem("Console", "Ctrl+Shift+C", console_visible_);
-            }
-            // Placeholders for panels that do not exist yet.
-            ImGui::MenuItem("Script Editor", nullptr, false, false);
             ImGui::MenuItem("Problems", nullptr, false, false);
             ImGui::MenuItem("Package", nullptr, false, false);
             ImGui::EndMenu();

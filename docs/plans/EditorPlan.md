@@ -639,6 +639,61 @@ bool. This avoids each panel having to know about the keyboard.
 launch. Persisting them goes in `settings.json` in step 11
 (layout persistence).
 
+### Decision 30 — Docking is on; the default layout is deferred
+
+The editor enables `ImGuiConfigFlags_DockingEnable` at
+`ImGuiLayer::init`. ImGui handles the dock-drag-and-drop
+mechanism: dragging a window's title bar over the dockspace
+shows a preview overlay, and dropping docks the window. ImGui
+records the result in its own `imgui.ini` file. The editor does
+not implement dock-zone detection or dock-state tracking.
+
+**The default layout is deferred to step 11.** Until then, a
+first-run user sees the panels floating and docks them by hand.
+Step 11 adds a `DockBuilder` sequence that runs once on first
+launch (when `imgui.ini` has no docking data) to place Explorer
+left, Console bottom, and the remaining panels center. The
+builder ratios are fractions of the dockspace's size, not pixels.
+
+**Rationale for the split:** the mechanism is ImGui's, and it
+costs one flag. The layout depends on which panels exist, so it
+is deferred until the panel set is complete. Deferring the
+layout does not defer the mechanism.
+
+### Decision 31 — The script editor is tabbed and prompts on unsaved changes
+
+The Script Editor panel opens text files in tabs. It owns its
+`Document`s; a `Document` is a path, a text buffer, and a dirty
+flag. The panel does not compile the buffer; the compile loop
+(step 9) reads from the documents.
+
+**Extensions.** The panel opens `.lucid`, `.lscene`, `.json`,
+`.txt`, `.md`, and `.cfg`. Other extensions are refused with an
+error logged to the Console. A "File > Open File..." action that
+bypasses the filter is deferred to phase 2.
+
+**Tabs.** `ImGui::BeginTabBar` with `Reorderable`,
+`AutoSelectNewTabs`, and `FittingPolicyScroll`. A dirty tab shows
+`*` after its name and sets the `UnsavedDocument` flag.
+
+**Unsaved changes.** Any action that would close dirty documents
+— closing a tab, closing the project, quitting the editor —
+routes through `request_close_tab` or `request_close_all`. If
+any document is dirty, the panel shows a modal prompt with
+**Save / Discard / Cancel**. The action's callback runs only
+after the prompt is resolved. Save tries to save all dirty
+documents; on a save failure, the prompt is dismissed and the
+action aborts.
+
+**Shortcuts.** `Ctrl+S` saves the active document. `Ctrl+Shift+S`
+saves all. Shortcuts are routed globally (`ImGuiInputFlags_RouteGlobal`)
+and are skipped while any popup is open (to prevent the save
+shortcut from firing inside the unsaved-changes prompt).
+
+**The panel does not get a toggle shortcut.** It is always open
+while a project is loaded. It appears in the Window menu without
+a shortcut.
+
 ---
 
 ## 3. Panel inventory

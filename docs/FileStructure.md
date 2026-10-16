@@ -206,7 +206,8 @@ apps/
 │   │       ├── console_panel.h
 │   │       ├── explorer_panel.h
 │   │       ├── launch_panel.h
-│   │       └── main_shell.h
+│   │       ├── main_shell.h
+│   │       └── script_editor_panel.h
 │   ├── src/
 │   │   ├── editor_app.cpp
 │   │   ├── imgui_layer.cpp
@@ -218,7 +219,8 @@ apps/
 │   │       ├── console_panel.cpp
 │   │       ├── explorer_panel.cpp
 │   │       ├── launch_panel.cpp
-│   │       └── main_shell.cpp
+│   │       ├── main_shell.cpp
+│   │       └── script_editor_panel.cpp
 │   └── CMakeLists.txt       target: luc_editor
 ├── editor_main/
 │   ├── CMakeLists.txt
@@ -269,6 +271,7 @@ tests/
 │   └── test_package_manager.cpp
 ├── editor/
 │   ├── test_console_panel.cpp
+│   ├── test_document.cpp
 │   ├── test_editor_app.cpp
 │   ├── test_explorer_panel.cpp
 │   ├── test_platform_paths.cpp

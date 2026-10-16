@@ -34,8 +34,6 @@ namespace editor
             return false;
         }
 
-        // Attach the console to the engine log before any other
-        // init logs happen, so the console catches them.
         console_.attach_to_log();
 
         settings_ = SettingsStore::load_global();
@@ -62,13 +60,15 @@ namespace editor
             [this]
             { on_quit(); },
             [this]
-            { on_about(); });
+            { on_about(); },
+            [this]
+            { on_save(); },
+            [this]
+            { on_save_all(); });
 
-        // Wire the Window menu's visibility toggles to the panels'
-        // own bools. The X buttons and the menu items write the
-        // same bool.
         main_shell_.set_panel_visibility(&console_.visible(),
-                                         &explorer_.visible());
+                                         &explorer_.visible(),
+                                         &script_editor_.visible());
 
         refresh_launch_scan();
 
@@ -106,6 +106,15 @@ namespace editor
 
     void EditorApp::process_shortcuts()
     {
+        // Do not process shortcuts while a modal is open. This
+        // prevents Ctrl+S from firing while the unsaved-changes
+        // prompt is up.
+        const bool any_popup = ImGui::IsPopupOpen(
+            nullptr,
+            ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+        if (any_popup)
+            return;
+
         if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_E,
                             ImGuiInputFlags_RouteGlobal))
         {
@@ -116,12 +125,20 @@ namespace editor
         {
             console_.visible() = !console_.visible();
         }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            on_save();
+        }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            on_save_all();
+        }
     }
 
     void EditorApp::frame()
     {
-        // Shortcuts are processed first so they work regardless of
-        // which window has focus.
         process_shortcuts();
 
         switch (mode_)
@@ -132,15 +149,17 @@ namespace editor
         case Mode::Project:
             main_shell_.draw();
             explorer_.draw();
+            script_editor_.draw();
             console_.draw();
 
-            // Consume any open request the Explorer recorded.
             if (auto request = explorer_.take_open_request())
             {
-                // The script editor (step 8) will handle this.
-                // For now, log it.
-                engine::log_info("Would open: %s",
-                                 request->string().c_str());
+                std::string error;
+                const int idx = script_editor_.open(*request, error);
+                if (idx < 0 && !error.empty())
+                {
+                    engine::log_error("%s", error.c_str());
+                }
             }
             break;
         }
@@ -195,6 +214,14 @@ namespace editor
 
     void EditorApp::leave_project()
     {
+        // Route through the script editor's prompt. If there are
+        // unsaved documents, the prompt shows first.
+        script_editor_.request_close_all([this]
+                                         { do_leave_project(); });
+    }
+
+    void EditorApp::do_leave_project()
+    {
         if (project_)
         {
             engine::log_info("Closed project '%s'",
@@ -236,13 +263,39 @@ namespace editor
 
     void EditorApp::on_quit()
     {
-        quit_requested_ = true;
+        if (mode_ == Mode::Project)
+        {
+            script_editor_.request_close_all([this]
+                                             { quit_requested_ = true; });
+        }
+        else
+        {
+            quit_requested_ = true;
+        }
     }
 
     void EditorApp::on_about()
     {
         engine::log_info("About: Lucid Editor, engine %s",
                          engine::kEngineVersion);
+    }
+
+    void EditorApp::on_save()
+    {
+        std::string error;
+        if (!script_editor_.save_active(error) && !error.empty())
+        {
+            engine::log_error("%s", error.c_str());
+        }
+    }
+
+    void EditorApp::on_save_all()
+    {
+        std::string error;
+        if (!script_editor_.save_all(error) && !error.empty())
+        {
+            engine::log_error("%s", error.c_str());
+        }
     }
 
 } // namespace editor

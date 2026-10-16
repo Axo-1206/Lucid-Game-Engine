@@ -5,6 +5,7 @@
 #include "editor/panels/explorer_panel.h"
 #include "editor/panels/launch_panel.h"
 #include "editor/panels/main_shell.h"
+#include "editor/panels/script_editor_panel.h"
 #include "editor/project.h"
 #include "editor/project_roots.h"
 #include "editor/settings.h"
@@ -35,19 +36,19 @@ namespace editor
         };
 
         void frame();
-
-        // Called once per frame, before any panel draws. Handles
-        // the keyboard shortcuts that toggle panel visibility.
         void process_shortcuts();
 
         void enter_project(std::unique_ptr<Project> project);
         void leave_project();
+        void do_leave_project();
 
         void on_open_project(const std::filesystem::path &folder);
         void on_create_project(const std::filesystem::path &folder,
                                const std::string &name);
         void on_quit();
         void on_about();
+        void on_save();
+        void on_save_all();
 
         void refresh_launch_scan();
         void save_settings();
@@ -64,6 +65,7 @@ namespace editor
         MainShell main_shell_;
         ConsolePanel console_;
         ExplorerPanel explorer_;
+        ScriptEditorPanel script_editor_;
 
         engine::Window window_;
         engine::Clock clock_;
