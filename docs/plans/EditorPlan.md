@@ -694,6 +694,63 @@ shortcut from firing inside the unsaved-changes prompt).
 while a project is loaded. It appears in the Window menu without
 a shortcut.
 
+### Decision 32 — The editor compiles .lucid files in-process via the engine wrapper
+
+The editor constructs a `PackageManager` at startup, loads the
+engine's default packages (`CorePackage`, `LogicPackage`,
+`MathPackage`, `RenderPackage`, `UiPackage`), and calls
+`apply_registration_only()`. The manager lives for the editor's
+lifetime. Its registry is what the compile loop uses.
+
+The editor does not include a `lucid/*` header. It calls
+`engine::check_source(source, filename, packages)` and reads
+`engine::CompileCheckResult`. The engine translates the format
+library's diagnostics to `engine::CompileDiagnostic`.
+
+**User packages are not loaded.** A `.lucid` file that imports a
+user package (`alice.math`) does not compile in the editor; the
+import is reported as an unresolved module. This is a known
+phase-1 limitation. The fix is a package-loading mechanism
+(dynamic library or manifest) — deferred.
+
+### Decision 33 — Compilation is debounced, and diagnostics go to the Problems panel
+
+The script editor compiles a document:
+
+- **On open**, immediately.
+- **On edit**, debounced by 300 ms after the last keystroke.
+- **On save**, immediately.
+
+The debounce runs in the panel's `draw`, after the input widget
+has had its chance to mark edits. The panel stores a
+`CompileState` per open document: `last_edit` timestamp and a
+`pending` flag. A pending compile fires when 300 ms have passed
+since the last edit.
+
+The result of a compile replaces all diagnostics for the file.
+The `DiagnosticStore::replace_for_file` removes the file's old
+entries and inserts the new ones. This means a fixed error
+disappears when the file is recompiled clean.
+
+Diagnostics go to the **Problems panel** and to a **summary
+line** above the input in the script editor. The summary shows
+"N errors, M warnings" and reads "(see Problems)".
+
+**Inline markers in the input are not drawn.** ImGui's
+`InputTextMultiline` does not support colored spans or a
+per-line gutter without a custom text widget. Gutter markers are
+deferred to a future commit if they become worth the effort. The
+Problems panel and the summary line cover the phase-1 need.
+
+**Click-to-jump.** Clicking a row in the Problems panel opens
+the file (if not open), focuses the script editor, and moves
+the cursor to the reported line. The panel stores a `JumpRequest`
+that the script editor applies on the next draw via an
+`ImGuiInputTextCallback`.
+
+**Shortcuts.** `Ctrl+Shift+P` toggles the Problems panel.
+`Ctrl+S` saves and recompiles the active document.
+
 ---
 
 ## 3. Panel inventory

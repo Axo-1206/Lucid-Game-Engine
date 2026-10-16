@@ -4,6 +4,12 @@
 #include "engine/core/log.h"
 #include "engine/core/version.h"
 
+#include "engine/registry/packages/core_package.h"
+#include "engine/registry/packages/logic_package.h"
+#include "engine/registry/packages/math_package.h"
+#include "engine/registry/packages/render_package.h"
+#include "engine/registry/packages/ui_package.h"
+
 #include "imgui.h"
 
 #include <glad/glad.h>
@@ -35,6 +41,36 @@ namespace editor
         }
 
         console_.attach_to_log();
+
+        // Build the engine registry. This is what the compile loop
+        // uses. The manager lives for the editor's lifetime.
+        package_manager_ = std::make_unique<engine::PackageManager>();
+        package_manager_->load_package(std::make_unique<engine::CorePackage>());
+        package_manager_->load_package(std::make_unique<engine::LogicPackage>());
+        package_manager_->load_package(std::make_unique<engine::MathPackage>());
+        package_manager_->load_package(std::make_unique<engine::RenderPackage>());
+        package_manager_->load_package(std::make_unique<engine::UIPackage>());
+
+        if (!package_manager_->apply_registration_only())
+        {
+            engine::log_error("EditorApp: package registration failed");
+            for (const auto &c : package_manager_->conflicts())
+                engine::log_error("  %s", c.c_str());
+            return false;
+        }
+
+        engine::log_info("Editor: registry ready (%zu node types)",
+                         package_manager_->registry().nodeTypes.size());
+
+        script_editor_.set_package_manager(package_manager_.get());
+        script_editor_.set_diagnostic_store(&diagnostics_);
+
+        problems_.set_store(&diagnostics_);
+        problems_.set_jump_callback(
+            [this](const std::filesystem::path &f, std::uint32_t l)
+            {
+                on_jump_to_diagnostic(f, l);
+            });
 
         settings_ = SettingsStore::load_global();
         recent_ = SettingsStore::load_recent();
@@ -68,7 +104,8 @@ namespace editor
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
-                                         &script_editor_.visible());
+                                         &script_editor_.visible(),
+                                         &problems_.visible());
 
         refresh_launch_scan();
 
@@ -135,6 +172,12 @@ namespace editor
         {
             on_save_all();
         }
+
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_P,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            problems_.visible() = !problems_.visible();
+        }
     }
 
     void EditorApp::frame()
@@ -150,6 +193,7 @@ namespace editor
             main_shell_.draw();
             explorer_.draw();
             script_editor_.draw();
+            problems_.draw();
             console_.draw();
 
             if (auto request = explorer_.take_open_request())
@@ -230,6 +274,7 @@ namespace editor
         project_.reset();
         main_shell_.set_project(nullptr);
         explorer_.clear();
+        diagnostics_.clear();
         launch_.set_error("");
         mode_ = Mode::Launch;
 
@@ -296,6 +341,12 @@ namespace editor
         {
             engine::log_error("%s", error.c_str());
         }
+    }
+
+    void EditorApp::on_jump_to_diagnostic(const std::filesystem::path &file,
+                                          std::uint32_t line)
+    {
+        script_editor_.request_jump(file, line);
     }
 
 } // namespace editor

@@ -23,11 +23,13 @@ namespace editor
 
     void MainShell::set_panel_visibility(bool *console_visible,
                                          bool *explorer_visible,
-                                         bool *script_editor_visible)
+                                         bool *script_editor_visible,
+                                         bool *problems_visible)
     {
         console_visible_ = console_visible;
         explorer_visible_ = explorer_visible;
         script_editor_visible_ = script_editor_visible;
+        problems_visible_ = problems_visible;
     }
 
     void MainShell::set_project(const Project *project)
@@ -112,6 +114,8 @@ namespace editor
                 ImGui::MenuItem("Script Editor", nullptr, script_editor_visible_);
             if (console_visible_)
                 ImGui::MenuItem("Console", "Ctrl+Shift+C", console_visible_);
+            if (problems_visible_)
+                ImGui::MenuItem("Problems", "Ctrl+Shift+P", problems_visible_);
             ImGui::MenuItem("Problems", nullptr, false, false);
             ImGui::MenuItem("Package", nullptr, false, false);
             ImGui::EndMenu();

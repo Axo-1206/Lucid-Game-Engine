@@ -28,7 +28,8 @@ namespace editor
 
         void set_panel_visibility(bool *console_visible,
                                   bool *explorer_visible,
-                                  bool *script_editor_visible);
+                                  bool *script_editor_visible,
+                                  bool *problems_visible);
 
         void draw();
 
@@ -40,6 +41,7 @@ namespace editor
         bool *console_visible_ = nullptr;
         bool *explorer_visible_ = nullptr;
         bool *script_editor_visible_ = nullptr;
+        bool *problems_visible_ = nullptr;
 
         CloseProjectCallback on_close_project_;
         QuitCallback on_quit_;

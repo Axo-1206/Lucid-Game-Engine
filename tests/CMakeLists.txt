@@ -65,4 +65,5 @@ lucid_add_test_group(lucid_tests_editor
     editor/test_project_roots.cpp
     editor/test_explorer_panel.cpp
     editor/test_document.cpp
+    editor/test_diagnostics.cpp
 )

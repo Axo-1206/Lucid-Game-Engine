@@ -196,6 +196,8 @@ apps/
 ├── editor/
 │   ├── third_party/imgui/   imgui-1.92.9
 │   ├── include/editor/
+│   │   ├── diagnostics.h
+│   │   ├── document.h
 │   │   ├── editor_app.h
 │   │   ├── imgui_layer.h
 │   │   ├── platform_paths.h
@@ -207,8 +209,11 @@ apps/
 │   │       ├── explorer_panel.h
 │   │       ├── launch_panel.h
 │   │       ├── main_shell.h
+│   │       ├── problems_panels.h
 │   │       └── script_editor_panel.h
 │   ├── src/
+│   │   ├── diagnostics.cpp
+│   │   ├── document.cpp
 │   │   ├── editor_app.cpp
 │   │   ├── imgui_layer.cpp
 │   │   ├── platform_paths.cpp
@@ -220,6 +225,7 @@ apps/
 │   │       ├── explorer_panel.cpp
 │   │       ├── launch_panel.cpp
 │   │       ├── main_shell.cpp
+│   │       ├── problems_panels.cpp
 │   │       └── script_editor_panel.cpp
 │   └── CMakeLists.txt       target: luc_editor
 ├── editor_main/
@@ -271,6 +277,7 @@ tests/
 │   └── test_package_manager.cpp
 ├── editor/
 │   ├── test_console_panel.cpp
+│   ├── test_diagnostics.cpp
 │   ├── test_document.cpp
 │   ├── test_editor_app.cpp
 │   ├── test_explorer_panel.cpp

@@ -9,7 +9,10 @@
 #include "editor/project.h"
 #include "editor/project_roots.h"
 #include "editor/settings.h"
+#include "editor/diagnostics.h"
+#include "editor/panels/problems_panel.h"
 
+#include "engine/registry/package_manager.h"
 #include "engine/core/clock.h"
 #include "engine/platform/window.h"
 
@@ -50,6 +53,9 @@ namespace editor
         void on_save();
         void on_save_all();
 
+        void on_jump_to_diagnostic(const std::filesystem::path &file,
+                                   std::uint32_t line);
+
         void refresh_launch_scan();
         void save_settings();
         void save_recent();
@@ -73,6 +79,10 @@ namespace editor
 
         bool initialized_ = false;
         bool quit_requested_ = false;
+
+        std::unique_ptr<engine::PackageManager> package_manager_;
+        DiagnosticStore diagnostics_;
+        ProblemsPanel problems_;
     };
 
 } // namespace editor

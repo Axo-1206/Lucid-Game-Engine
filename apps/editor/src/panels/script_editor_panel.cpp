@@ -13,6 +13,7 @@ namespace editor
 
     namespace
     {
+        constexpr int kCompileDebounceMs = 300;
 
         // Extensions the script editor will open. A small allowlist.
         bool is_text_extension(const std::string &ext)
@@ -45,11 +46,62 @@ namespace editor
             return ext;
         }
 
+        // Find the byte offset of the start of line N (1-based) in
+        // `text`. If line is 0 or past the end, returns 0 (start of
+        // file).
+        int line_start_offset(const std::string &text, std::uint32_t line)
+        {
+            if (line <= 1)
+                return 0;
+            std::uint32_t current = 1;
+            for (std::size_t i = 0; i < text.size(); ++i)
+            {
+                if (text[i] == '\n')
+                {
+                    ++current;
+                    if (current == line)
+                        return static_cast<int>(i + 1);
+                }
+            }
+            return 0;
+        }
+
+        // ImGuiInputTextCallback: on the first call, jump the cursor
+        // to the requested line.
+        struct JumpCallbackData
+        {
+            bool done = false;
+            int target_offset = 0;
+        };
+
+        int jump_callback(ImGuiInputTextCallbackData *data)
+        {
+            auto *jd = static_cast<JumpCallbackData *>(data->UserData);
+            if (jd && !jd->done && data->EventFlag == ImGuiInputTextFlags_CallbackAlways)
+            {
+                data->CursorPos = jd->target_offset;
+                data->SelectionStart = jd->target_offset;
+                data->SelectionEnd = jd->target_offset;
+                jd->done = true;
+            }
+            return 0;
+        }
+
     } // namespace
 
     ScriptEditorPanel::ScriptEditorPanel() = default;
 
     ScriptEditorPanel::~ScriptEditorPanel() = default;
+
+    void ScriptEditorPanel::set_package_manager(const engine::PackageManager *pm)
+    {
+        packages_ = pm;
+    }
+
+    void ScriptEditorPanel::set_diagnostic_store(DiagnosticStore *store)
+    {
+        diagnostics_ = store;
+    }
 
     bool ScriptEditorPanel::has_dirty() const
     {
@@ -59,8 +111,7 @@ namespace editor
         return false;
     }
 
-    int ScriptEditorPanel::open(const std::filesystem::path &path,
-                                std::string &error)
+    int ScriptEditorPanel::open(const std::filesystem::path &path, std::string &error)
     {
         if (!is_text_extension(lower_ext(path)))
         {
@@ -68,7 +119,6 @@ namespace editor
             return -1;
         }
 
-        // Existing tab? Focus it.
         for (std::size_t i = 0; i < documents_.size(); ++i)
         {
             if (documents_[i]->path() == path)
@@ -83,35 +133,52 @@ namespace editor
             return -1;
 
         documents_.push_back(std::move(doc));
+        compile_state_.push_back(CompileState{});
         active_tab_ = static_cast<int>(documents_.size() - 1);
+
+        // Compile immediately so the user sees errors on open.
+        compile_document(active_tab_);
         return active_tab_;
     }
 
     bool ScriptEditorPanel::save_active(std::string &error)
     {
-        if (active_tab_ < 0 || active_tab_ >= static_cast<int>(documents_.size()))
+        if (active_tab_ < 0 || active_tab_ >= (int)documents_.size())
         {
             error = "No active document.";
             return false;
         }
-        return documents_[active_tab_]->save(error);
+        if (!documents_[active_tab_]->save(error))
+            return false;
+
+        // Compile after save so the Problems panel is up to date.
+        compile_document(active_tab_);
+
+        return true;
     }
 
     bool ScriptEditorPanel::save_all(std::string &error)
     {
-        for (auto &doc : documents_)
+        for (std::size_t i = 0; i < documents_.size(); ++i)
         {
-            if (!doc->dirty())
+            if (!documents_[i]->dirty())
                 continue;
-            if (!doc->save(error))
+            if (!documents_[i]->save(error))
                 return false;
+            compile_document(i);
         }
         return true;
     }
 
     void ScriptEditorPanel::close_all()
     {
+        if (diagnostics_)
+        {
+            for (auto &doc : documents_)
+                diagnostics_->clear_for_file(doc->path());
+        }
         documents_.clear();
+        compile_state_.clear();
         active_tab_ = -1;
     }
 
@@ -120,7 +187,12 @@ namespace editor
         if (index >= documents_.size())
             return;
 
+        const auto path = documents_[index]->path();
+        if (diagnostics_)
+            diagnostics_->clear_for_file(path);
+
         documents_.erase(documents_.begin() + index);
+        compile_state_.erase(compile_state_.begin() + index);
 
         if (documents_.empty())
             active_tab_ = -1;
@@ -300,7 +372,7 @@ namespace editor
 
     void ScriptEditorPanel::draw_active_document()
     {
-        if (active_tab_ < 0 || active_tab_ >= static_cast<int>(documents_.size()))
+        if (active_tab_ < 0 || active_tab_ >= (int)documents_.size())
         {
             ImGui::TextDisabled("(no file open)");
             return;
@@ -308,16 +380,41 @@ namespace editor
 
         Document &doc = *documents_[active_tab_];
 
-        const ImVec2 avail = ImGui::GetContentRegionAvail();
+        draw_diagnostic_summary(doc);
 
+        const ImVec2 avail = ImGui::GetContentRegionAvail();
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
+
+        JumpCallbackData jd;
+        if (jump_.active && jump_.path == doc.path())
+        {
+            jd.target_offset = line_start_offset(doc.text(), jump_.line);
+            flags |= ImGuiInputTextFlags_CallbackAlways;
+            ImGui::SetKeyboardFocusHere();
+        }
 
         if (ImGui::InputTextMultiline("##content",
                                       &doc.mutable_text(),
                                       avail,
-                                      flags))
+                                      flags,
+                                      jump_.active && jump_.path == doc.path()
+                                          ? &jump_callback
+                                          : nullptr,
+                                      &jd))
         {
             doc.mark_dirty();
+            if (active_tab_ < (int)compile_state_.size())
+            {
+                compile_state_[active_tab_].last_edit =
+                    std::chrono::steady_clock::now();
+                compile_state_[active_tab_].pending = true;
+            }
+        }
+
+        // The jump is consumed after one frame.
+        if (jump_.active && jump_.path == doc.path())
+        {
+            jump_.active = false;
         }
     }
 
@@ -344,8 +441,141 @@ namespace editor
         }
 
         draw_prompt();
-
         ImGui::End();
+
+        // Compile after drawing the UI. The panel is drawn, the input
+        // has had its chance to mark edits, and the debounce timer
+        // runs here.
+        maybe_compile();
+    }
+
+    void ScriptEditorPanel::draw_diagnostic_summary(const Document &doc)
+    {
+        if (!diagnostics_)
+            return;
+
+        const auto entries = diagnostics_->for_file(doc.path());
+        if (entries.empty())
+            return;
+
+        int errors = 0;
+        int warnings = 0;
+        for (const auto &e : entries)
+        {
+            using S = engine::CompileDiagnostic::Severity;
+            if (e.severity == S::Error || e.severity == S::Fatal)
+                ++errors;
+            else if (e.severity == S::Warning)
+                ++warnings;
+        }
+
+        if (errors > 0)
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                               "%d error%s", errors, errors == 1 ? "" : "s");
+            ImGui::SameLine();
+        }
+        if (warnings > 0)
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
+                               "%d warning%s", warnings, warnings == 1 ? "" : "s");
+            ImGui::SameLine();
+        }
+        ImGui::TextDisabled("(see Problems)");
+        ImGui::Separator();
+    }
+
+    void ScriptEditorPanel::compile_document(std::size_t index)
+    {
+        if (index >= documents_.size())
+            return;
+        if (!packages_ || !diagnostics_)
+            return;
+
+        Document &doc = *documents_[index];
+
+        const auto result = engine::check_source(doc.text(),
+                                                 doc.path().string(),
+                                                 *packages_);
+
+        std::vector<DiagnosticEntry> entries;
+        entries.reserve(result.diagnostics.size());
+        for (const auto &d : result.diagnostics)
+        {
+            DiagnosticEntry e;
+            e.file = doc.path();
+            e.line = d.line;
+            e.column = d.column;
+            e.severity = d.severity;
+            e.message = d.message;
+            e.source = DiagnosticSource::Compiler;
+            entries.push_back(std::move(e));
+        }
+
+        diagnostics_->replace_for_file(doc.path(), std::move(entries));
+    }
+
+    void ScriptEditorPanel::maybe_compile()
+    {
+        if (active_tab_ < 0 || active_tab_ >= (int)documents_.size())
+            return;
+        if (active_tab_ >= (int)compile_state_.size())
+            return;
+
+        CompileState &cs = compile_state_[active_tab_];
+        if (!cs.pending)
+            return;
+
+        const auto now = std::chrono::steady_clock::now();
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 now - cs.last_edit)
+                                 .count();
+        if (elapsed < kCompileDebounceMs)
+            return;
+
+        compile_document(active_tab_);
+        cs.pending = false;
+    }
+
+    void ScriptEditorPanel::request_jump(const std::filesystem::path &path,
+                                         std::uint32_t line)
+    {
+        // If the file isn't open, open it.
+        bool found = false;
+        for (auto &doc : documents_)
+        {
+            if (doc->path() == path)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            std::string error;
+            if (open(path, error) < 0)
+            {
+                engine::log_error("%s", error.c_str());
+                return;
+            }
+        }
+        else
+        {
+            // Focus the existing tab.
+            for (std::size_t i = 0; i < documents_.size(); ++i)
+            {
+                if (documents_[i]->path() == path)
+                {
+                    active_tab_ = static_cast<int>(i);
+                    break;
+                }
+            }
+        }
+
+        jump_.path = path;
+        jump_.line = line;
+        jump_.active = true;
+        visible_ = true;
     }
 
 } // namespace editor
