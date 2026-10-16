@@ -6,7 +6,7 @@ add_library(luc_editor STATIC
     # Editor sources
     src/editor_app.cpp
     src/imgui_layer.cpp
-    # src/project.cpp
+    src/project.cpp
     # src/settings.cpp
     # src/platform_paths.cpp
 

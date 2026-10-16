@@ -196,9 +196,13 @@ apps/
 ├── editor/
 │   ├── third_party/imgui/   imgui-1.92.9
 │   ├── include/editor/
-│   │   └── editor_app.h
+│   │   ├── editor_app.h
+│   │   ├── imgui_layer.h
+│   │   └── project.h
 │   ├── src/
-│   │   └── editor_app.cpp
+│   │   ├── editor_app.cpp
+│   │   ├── imgui_layer.cpp
+│   │   └── project.cpp
 │   └── CMakeLists.txt       target: luc_editor
 ├── editor_main/
 │   ├── CMakeLists.txt
@@ -245,12 +249,12 @@ tests/
 │   └── test_stub_backend.cpp
 ├── registry/
 │   ├── test_default_registry.cpp
-│   └── test_math_manager.cpp
+│   ├── test_math_manager.cpp
 │   └── test_package_manager.cpp
+├── editor/
+│   └── test_project.cpp
 └── CMakeLists.txt
 ```
-
-All tests build into a single `lucid_tests` executable (Catch2). Run with:
 
 ```
 cmake --build build --config Debug
