@@ -751,6 +751,245 @@ that the script editor applies on the next draw via an
 **Shortcuts.** `Ctrl+Shift+P` toggles the Problems panel.
 `Ctrl+S` saves and recompiles the active document.
 
+### Decision 34 — The Package panel is read-only and shared across all packages
+
+The Package panel shows the loaded packages and their contents.
+It has three parts:
+
+- A list of packages, from `PackageManager::package_infos()`.
+  Each row shows the package's name and version. The default
+  selection is the first package.
+- A metadata block for the selected package: prefix, version,
+  author, description, and counts of node types, tables, enums,
+  handles, and structs.
+- A filterable list of every registered node type across all
+  packages, with the selected node's `NodeEditorInfo` shown
+  below the list.
+
+**Why "every node type", not "the selected package's node
+types":** `PackageInfo` has counts, not names. Filtering the
+registry by prefix is wrong when two packages share a prefix
+(the engine's five packages all use `Engine_`). A per-package
+node list would need a new engine API
+(`PackageManager::node_types_for_package`). The "all node types"
+view is more useful anyway — a developer browses by what they
+can do, not by which package provides it.
+
+**The panel is read-only.** Engine packages are immutable from
+the editor. A `[read-only]` badge appears next to every package.
+
+**No tests.** The panel is ImGui plus two trivial string
+predicates (`starts_with`, `icontains`). Testing them has low
+value. If the predicates grow, they move to a shared header
+and get tests.
+
+**The panel lives in Project mode only.** It could be shown in
+Launch mode (the manager exists before any project opens), but
+the launch panel is a project picker; adding a second panel
+there is scope creep. The Package panel appears after a project
+is opened.
+
+**The status bar's package count now reflects reality.**
+`EditorApp::init` calls `main_shell_.set_package_count(n)` where
+`n` is `package_manager_->package_infos().size()`. The count is
+constant for the editor's lifetime (packages do not change at
+runtime in phase 1).
+
+**Shortcut:** `Ctrl+Shift+G`.
+
+### Decision 35 — Layout is persisted by ImGui, one ini per project
+
+The editor uses ImGui's `io.IniFilename` mechanism for layout
+persistence. ImGui writes the dock tree, window positions,
+window sizes, dock assignments, tab orders, and collapsed state
+to the ini on every change (at `io.IniSavingRate`, default 5
+seconds).
+
+Two ini files:
+
+- **Launch mode:** `<global_config_dir>/launch.ini`. The launch
+  panel fills the viewport, so there is little to persist. The
+  file exists so the mechanism is uniform.
+- **Project mode:** `<project_root>/.lucid/editor.ini`. The
+  layout is per-project; a user can arrange the Script Editor
+  large on a code-heavy project and small on a scene-heavy one.
+  `.lucid/` is gitignored (Decision 4), so project layouts are
+  not committed.
+
+**Switching.** `EditorApp` sets a `pending_ini_` on project
+open and project close. `frame` applies it before drawing any
+panel. This defers the load to the start of a frame, avoiding
+mid-frame state changes.
+
+**Default layout.** `MainShell::draw_dockspace` checks whether
+the dockspace has any child nodes. If it does, the user has a
+saved layout; leave it. If not, build the default with
+`DockBuilderXXX`:
+
+- Explorer: left, 20% width.
+- Script Editor and Package: center, as tabs.
+- Console and Problems: bottom split, 50/50, 25% height.
+
+**Reset Layout.** `Window > Reset Layout` deletes the current
+ini, clears ImGui's in-memory settings, and lets the default
+rebuild on the next frame.
+
+**Not persisted here.** Open documents, scroll positions in
+the script editor, console filter state, and package filter
+state. These reset every launch. Session restore is a phase-2
+concern if it is ever wanted.
+
+### Decision 36 — The status bar shows project, scene, packages, build type, FPS
+
+The status bar reads, left to right:
+
+- The project name (or "(no project)").
+- The active scene (`active_scene` from `lucid.project.json`,
+  or "(none)").
+- The package count (`PackageManager::package_infos().size()`).
+- The build type (`Debug` or `Release`, from `#ifdef NDEBUG`).
+- FPS.
+
+The build type is a compile-time constant. It is displayed for
+the user's benefit: knowing which binary they are running
+matters when diagnosing performance and crashes.
+
+### Decision 37 — Registry string_views are never printed with %s
+
+The format library's `Registry` types (`NodeTypeInfo`,
+`EnumTypeInfo`, `EnumMemberInfo`, `HandleTypeInfo`,
+`StructTypeInfo`, `StructFieldInfo`, `NodeArgInfo`,
+`PhaseInfo`) store their names as `std::string_view`. A
+`string_view` is not null-terminated. Passing one to a
+`printf`-style `%s` reads past its end and prints garbage
+("??", "?a1?", or bytes from adjacent memory).
+
+The rule for the editor:
+
+- Print a `string_view` with
+  `ImGui::TextUnformatted(sv.data(), sv.data() + sv.size())`,
+  or with `%.*s` and `(int)sv.size(), sv.data()`.
+- Print a `const char*` or `std::string` with `%s`.
+
+The `Package` panel uses a local helper `text_unformatted` for
+every registry name. Any future panel that reads from the
+registry does the same. Engine `PackageInfo`, `NodeEditorInfo`,
+and `TableEditorInfo` fields are `std::string` and can use `%s`
+safely.
+
+### Decision 38 — The Package panel is a master-detail browser with tabs
+
+The Package panel is laid out as:
+
+- **Left column:** package list.
+- **Right top:** the selected package's metadata.
+- **Right middle:** a tab bar with one tab per collection
+  (Node Types, Tables, Enums, Handles, Structs). Tabs with no
+  content are hidden.
+- **Right main:** two columns. Filterable list on the left,
+  detail of the selected item on the right.
+
+Each collection is browsed independently. The filter and the
+selection are per-collection; switching tabs does not clear
+them (the user may want to return to the same place).
+
+**Per-package collections are not filtered.** The panel shows
+the engine's total vocabulary, not the selected package's
+subset. `PackageInfo` carries counts, not lists, so per-package
+filtering would require a new engine API. The tab-level
+grouping (Node Types / Tables / Enums / Handles / Structs) is
+the useful axis for phase 1.
+
+**Detail rendering:**
+
+- **Node Types:** display name, kind, category, operation name
+  and group, summary, long description, example. Sourced from
+  `NodeEditorInfo` and `Operation`.
+- **Tables:** display name and summary from `TableEditorInfo`;
+  raw name.
+- **Enums:** the member list (name and value).
+- **Handles:** the name only.
+- **Structs:** the field list (names only; the field types are
+  `TypeId` and require a helper to render).
+
+**The panel does not edit anything.** A `[read-only]` badge
+appears next to every package.
+
+### Decision 39 — PackageInfo carries the names a package registered
+
+`PackageInfo` (the editor's display DTO) gains five name lists:
+
+    std::vector<std::string> node_type_names;
+    std::vector<std::string> table_names;
+    std::vector<std::string> enum_names;
+    std::vector<std::string> handle_names;
+    std::vector<std::string> struct_names;
+
+The lists are populated by `PackageManager::apply` from
+`PackageBuilder::package_registrations()`, which `end_package`
+fills by slicing the flat registration lists since the last
+`begin_package`.
+
+**Why `PackageInfo` and not a separate type.** `PackageInfo` is
+already the display DTO: it's what the editor reads, and nothing
+else uses it. A second DTO for the same consumer would drift.
+Extending `PackageInfo` is the right move.
+
+**Why names, not full copies.** The registry holds the
+authoritative `NodeTypeInfo`, `EnumTypeInfo`, etc. Duplicating
+them into `PackageInfo` would create two sources of truth. The
+editor looks up detail in the registry by name. `PackageInfo`
+holds the *index* into the registry, not the content.
+
+**Per-package filtering in the panel.** Each tab shows only the
+selected package's items. A tab with zero items is not shown.
+
+**Argument and result types.** The registry exposes them via
+`NodeArgInfo` and `TypeId`. Rendering a `TypeId` as a string
+requires a helper that resolves the id against the registry's
+primitive/enum/handle/struct tables. If the format library
+provides one (`TypeId::toString` or similar), the panel uses it.
+If not, argument types are omitted for phase 1 and the panel
+shows only argument names.
+
+### Decision 40 — Package panel tabs are per-package
+
+Each tab in the Package panel lists the *selected package's*
+items, not the engine's global collection. The names come from
+`PackageInfo::node_type_names`, `table_names`, `enum_names`,
+`handle_names`, and `struct_names`. Full detail is looked up in
+the registry by name.
+
+**Why per-package.** The alternative — a global list per tab —
+is what the previous panel did. It showed every engine node
+under every engine package, because all five engine packages
+share the `Engine_` prefix. Per-package grouping is the axis
+the user wants: "What does `engine.math` provide?" is answered
+by looking at `engine.math`, not by filtering the union.
+
+**How the names get there.** `PackageBuilder::end_package`
+slices the flat registration lists since the last
+`begin_package` into a `PackageRegistration`. `PackageManager::apply`
+copies each `PackageRegistration` into the corresponding
+`PackageInfo`'s name lists and count fields.
+
+**Detail by lookup, not by copy.** `PackageInfo` holds names;
+the registry holds the authoritative `NodeTypeInfo`,
+`EnumTypeInfo`, etc. The panel looks up by name. Duplicating
+the registry's content into `PackageInfo` would create two
+sources of truth.
+
+**Which tabs appear.** A tab is shown only if the selected
+package's count for that collection is > 0. `engine.core` shows
+Node Types, Tables, Enums, Handles; `engine.math` shows Node
+Types and Structs.
+
+**Argument and result types.** `TypeId` has a `std::string
+name` field, so argument types and result type can be rendered
+directly (`arg.type.name`, `nt.resultType.name`). If the node
+detail block omits them, it is for brevity, not because the
+information is unavailable.
+
 ---
 
 ## 3. Panel inventory

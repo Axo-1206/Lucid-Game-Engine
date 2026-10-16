@@ -5,18 +5,21 @@
 #include "editor/panels/explorer_panel.h"
 #include "editor/panels/launch_panel.h"
 #include "editor/panels/main_shell.h"
+#include "editor/panels/package_panel.h"
+#include "editor/panels/problems_panel.h"
 #include "editor/panels/script_editor_panel.h"
+#include "editor/diagnostics.h"
 #include "editor/project.h"
 #include "editor/project_roots.h"
 #include "editor/settings.h"
-#include "editor/diagnostics.h"
-#include "editor/panels/problems_panel.h"
 
-#include "engine/registry/package_manager.h"
 #include "engine/core/clock.h"
 #include "engine/platform/window.h"
+#include "engine/registry/package_manager.h"
 
+#include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace editor
@@ -52,6 +55,7 @@ namespace editor
         void on_about();
         void on_save();
         void on_save_all();
+        void on_reset_layout();
 
         void on_jump_to_diagnostic(const std::filesystem::path &file,
                                    std::uint32_t line);
@@ -67,22 +71,25 @@ namespace editor
         RecentProjects recent_;
         ProjectRoots roots_;
 
+        std::unique_ptr<engine::PackageManager> package_manager_;
+        DiagnosticStore diagnostics_;
+
         LaunchPanel launch_;
         MainShell main_shell_;
         ConsolePanel console_;
         ExplorerPanel explorer_;
         ScriptEditorPanel script_editor_;
+        ProblemsPanel problems_;
+        PackagePanel package_panel_;
 
         engine::Window window_;
         engine::Clock clock_;
         ImGuiLayer imgui_;
 
+        std::optional<std::filesystem::path> pending_ini_;
+
         bool initialized_ = false;
         bool quit_requested_ = false;
-
-        std::unique_ptr<engine::PackageManager> package_manager_;
-        DiagnosticStore diagnostics_;
-        ProblemsPanel problems_;
     };
 
 } // namespace editor

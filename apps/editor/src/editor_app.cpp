@@ -1,9 +1,10 @@
 #include "editor/editor_app.h"
 
 #include "editor/platform_paths.h"
+#include "editor/platform_paths.h"
+
 #include "engine/core/log.h"
 #include "engine/core/version.h"
-
 #include "engine/registry/packages/core_package.h"
 #include "engine/registry/packages/logic_package.h"
 #include "engine/registry/packages/math_package.h"
@@ -62,6 +63,9 @@ namespace editor
         engine::log_info("Editor: registry ready (%zu node types)",
                          package_manager_->registry().nodeTypes.size());
 
+        package_panel_.set_manager(package_manager_.get());
+        main_shell_.set_package_count(package_manager_->package_infos().size());
+
         script_editor_.set_package_manager(package_manager_.get());
         script_editor_.set_diagnostic_store(&diagnostics_);
 
@@ -100,12 +104,15 @@ namespace editor
             [this]
             { on_save(); },
             [this]
-            { on_save_all(); });
+            { on_save_all(); },
+            [this]
+            { on_reset_layout(); });
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
                                          &script_editor_.visible(),
-                                         &problems_.visible());
+                                         &problems_.visible(),
+                                         &package_panel_.visible());
 
         refresh_launch_scan();
 
@@ -178,10 +185,22 @@ namespace editor
         {
             problems_.visible() = !problems_.visible();
         }
+
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_G,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            package_panel_.visible() = !package_panel_.visible();
+        }
     }
 
     void EditorApp::frame()
     {
+        if (pending_ini_)
+        {
+            imgui_.set_ini_file(*pending_ini_);
+            pending_ini_.reset();
+        }
+
         process_shortcuts();
 
         switch (mode_)
@@ -195,6 +214,7 @@ namespace editor
             script_editor_.draw();
             problems_.draw();
             console_.draw();
+            package_panel_.draw();
 
             if (auto request = explorer_.take_open_request())
             {
@@ -249,6 +269,9 @@ namespace editor
         main_shell_.set_project(project_.get());
         explorer_.set_root(project_->root());
 
+        // Switch to the project's ini. Applied on the next frame.
+        pending_ini_ = project_->lucid_dir() / "editor.ini";
+
         launch_.set_error("");
         mode_ = Mode::Project;
 
@@ -277,6 +300,9 @@ namespace editor
         diagnostics_.clear();
         launch_.set_error("");
         mode_ = Mode::Launch;
+
+        // Return to the launch ini.
+        pending_ini_ = paths::global_config_dir() / "launch.ini";
 
         refresh_launch_scan();
     }
@@ -347,6 +373,19 @@ namespace editor
                                           std::uint32_t line)
     {
         script_editor_.request_jump(file, line);
+    }
+
+    void EditorApp::on_reset_layout()
+    {
+        ImGuiIO &io = ImGui::GetIO();
+        if (io.IniFilename != nullptr)
+        {
+            std::error_code ec;
+            std::filesystem::remove(io.IniFilename, ec);
+        }
+        ImGui::LoadIniSettingsFromMemory("");
+
+        engine::log_info("Layout reset; default will be rebuilt.");
     }
 
 } // namespace editor

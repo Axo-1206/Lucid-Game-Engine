@@ -184,15 +184,24 @@ namespace engine
                 }
             }
 
-            // Package counts.
-            const auto &counts = builder.package_counts();
-            for (std::size_t i = 0; i < package_infos.size() && i < counts.size(); ++i)
+            // Package counts and per-package names.
+            const auto &registrations = builder.package_registrations();
+            for (std::size_t i = 0; i < package_infos.size() && i < registrations.size(); ++i)
             {
-                package_infos[i].node_type_count = counts[i].node_types;
-                package_infos[i].table_count = counts[i].tables;
-                package_infos[i].enum_count = counts[i].enums;
-                package_infos[i].handle_count = counts[i].handles;
-                package_infos[i].struct_count = counts[i].structs;
+                const auto &reg = registrations[i];
+                auto &info = package_infos[i];
+
+                info.node_type_count = reg.node_types.size();
+                info.table_count = reg.tables.size();
+                info.enum_count = reg.enums.size();
+                info.handle_count = reg.handles.size();
+                info.struct_count = reg.structs.size();
+
+                info.node_type_names = reg.node_types;
+                info.table_names = reg.tables;
+                info.enum_names = reg.enums;
+                info.handle_names = reg.handles;
+                info.struct_names = reg.structs;
             }
 
             engine::log_info("PackageManager: %zu node types registered, "

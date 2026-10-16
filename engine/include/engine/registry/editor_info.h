@@ -3,6 +3,7 @@
 #include "engine/registry/operation.h"
 
 #include <string>
+#include <vector>
 
 namespace engine
 {
@@ -107,6 +108,14 @@ namespace engine
         std::size_t enum_count = 0;
         std::size_t handle_count = 0;
         std::size_t struct_count = 0;
+
+        // The names this package registered, in registration order.
+        // The editor looks up full detail in the registry by name.
+        std::vector<std::string> node_type_names;
+        std::vector<std::string> table_names;
+        std::vector<std::string> enum_names;
+        std::vector<std::string> handle_names;
+        std::vector<std::string> struct_names;
     };
 
 } // namespace engine

@@ -16,6 +16,18 @@
 namespace engine
 {
 
+    // Per-package registration, filled by end_package(). The names
+    // a package registered, in registration order. The manager copies
+    // these into PackageInfo.
+    struct PackageRegistration
+    {
+        std::vector<std::string> node_types;
+        std::vector<std::string> tables;
+        std::vector<std::string> enums;
+        std::vector<std::string> handles;
+        std::vector<std::string> structs;
+    };
+
     // The accumulator for package registration. A Package calls the
     // add_* methods in register_into(). After all packages have
     // registered, the PackageManager reads the builder's content to
@@ -122,7 +134,7 @@ namespace engine
             std::size_t handles = 0;
             std::size_t structs = 0;
         };
-        const std::vector<PackageCounts> &package_counts() const { return package_counts_; }
+        const std::vector<PackageRegistration> &package_registrations() const { return package_registrations_; }
 
         void seal();
         bool is_sealed() const { return sealed_; }
@@ -161,7 +173,7 @@ namespace engine
         std::unordered_map<std::string, NodeEditorInfo> node_editor_infos_;
         std::unordered_map<std::string, TableEditorInfo> table_editor_infos_;
 
-        std::vector<PackageCounts> package_counts_;
+        std::vector<PackageRegistration> package_registrations_;
 
         std::vector<std::string> conflicts_;
 

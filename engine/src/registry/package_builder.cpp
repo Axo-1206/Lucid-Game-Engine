@@ -25,13 +25,29 @@ namespace engine
 
     void PackageBuilder::end_package()
     {
-        PackageCounts counts;
-        counts.node_types = node_types_.size() - begin_node_types_;
-        counts.tables = table_names_.size() - begin_tables_;
-        counts.enums = enums_.size() - begin_enums_;
-        counts.handles = handles_.size() - begin_handles_;
-        counts.structs = structs_.size() - begin_structs_;
-        package_counts_.push_back(counts);
+        PackageRegistration reg;
+
+        reg.node_types.reserve(node_types_.size() - begin_node_types_);
+        for (std::size_t i = begin_node_types_; i < node_types_.size(); ++i)
+            reg.node_types.emplace_back(node_types_[i].name);
+
+        reg.tables.reserve(table_names_.size() - begin_tables_);
+        for (std::size_t i = begin_tables_; i < table_names_.size(); ++i)
+            reg.tables.push_back(table_names_[i]);
+
+        reg.enums.reserve(enums_.size() - begin_enums_);
+        for (std::size_t i = begin_enums_; i < enums_.size(); ++i)
+            reg.enums.emplace_back(enums_[i].name);
+
+        reg.handles.reserve(handles_.size() - begin_handles_);
+        for (std::size_t i = begin_handles_; i < handles_.size(); ++i)
+            reg.handles.emplace_back(handles_[i].name);
+
+        reg.structs.reserve(structs_.size() - begin_structs_);
+        for (std::size_t i = begin_structs_; i < structs_.size(); ++i)
+            reg.structs.emplace_back(structs_[i].name);
+
+        package_registrations_.push_back(std::move(reg));
 
         current_package_name_.clear();
         current_prefix_.clear();

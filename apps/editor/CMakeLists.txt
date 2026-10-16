@@ -33,6 +33,7 @@ add_library(luc_editor STATIC
     src/panels/console_panel.cpp
     src/panels/explorer_panel.cpp
     src/panels/problems_panel.cpp
+    src/panels/package_panel.cpp
 )
 
 target_include_directories(luc_editor
