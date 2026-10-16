@@ -58,4 +58,6 @@ lucid_add_test_group(lucid_tests_engine
 
 lucid_add_test_group(lucid_tests_editor
     editor/test_project.cpp
+    editor/test_platform_paths.cpp
+    editor/test_settings.cpp
 )

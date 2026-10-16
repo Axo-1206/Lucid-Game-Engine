@@ -48,6 +48,9 @@ So the editor is built in this order:
 
 Steps 1–4 are phase 1. They are the whole product for a while.
 
+The six items above are the priority order. The panel inventory
+in §3 is the fuller list of what phase 1 builds.
+
 ---
 
 ## 2. Decisions
@@ -165,11 +168,14 @@ Two pipelines, two processes, one file crossing between them.
 **Compile pipeline (editor-driven, build-time):**
 
 ```
-.lucid source
-    → lucid::sema::compile(source, filename, registry)
+.lucid source (in-memory buffer)
+    → engine::check_source  /  engine::compile_to_bytes
+        (the engine's wrapper; see Decision 23)
+    → the engine calls lucid::sema::compile(source, filename, registry)
     → CompileResult { ok, graph, diagnostics }
     → if ok: lucid::serialization::serialize → .lucgraph bytes
-    → if !ok: surface diagnostics (file, line, column, code, severity)
+    → if !ok: the engine translates to engine::CompileDiagnostic
+               and returns it; the editor surfaces it
 ```
 
 **Deserialize pipeline (engine-driven, runtime):**
@@ -182,28 +188,35 @@ Two pipelines, two processes, one file crossing between them.
     → if !ok: log diagnostics (file-level, no source location)
 ```
 
-The editor **does not** retrieve diagnostics from the engine. It
-produces its own by calling `compile` in-process, on the in-memory
-buffer, in its own process. The engine produces its own by calling
-`deserialize` on the `.lucgraph` on disk, in its own process. The
-`lucid::diag::Diagnostic` struct is the single source of truth,
-and every consumer reads it in its own process.
+The editor **does not** include a `lucid/*` header. It calls
+`engine::check_source` and `engine::compile_to_bytes`, which
+return `engine::CompileCheckResult` and `engine::CompileBuildResult`.
+The engine translates the format library's diagnostics into
+`engine::CompileDiagnostic`. The editor produces its diagnostics
+by calling the engine on the in-memory buffer, in its own process;
+the engine calls the format library in-process. The engine's
+runtime calls `lucid::serialization::deserialize` directly on the
+`.lucgraph` on disk, in its own process, because the engine is the
+format library's consumer and its own code may include `lucid/*`.
 
 **The only artifact that crosses the process boundary is the
 `.lucgraph` file.** No diagnostics cross. No subprocess. No JSON
 interchange.
 
-**Consequence for the build action:** `compile_project` is a
-library function that both the editor's Build button and the
-`lucid build` CLI call. One implementation, two front ends.
+**Consequence for the build action (phase 2):** a
+`compile_project` function will be added in phase 2. It will
+walk `scripts/`, call `engine::compile_to_bytes` for each file,
+and write the `.lucgraph` next to the source. The editor's Build
+button and a future `lucid build` CLI will both call it — one
+implementation, two front ends. It does not exist in phase 1.
 
 ### Decision 6 — Two diagnostic streams, two panels
 
 The editor has two diagnostic streams, and they go to two panels.
 
-**Compile diagnostics** (from `lucid::sema::compile` and
-`lucid::formatter::format`): file, line, column, severity, code,
-message. These go to:
+**Compile diagnostics** (from `engine::check_source` and
+`engine::compile_to_bytes`, as `engine::CompileDiagnostic`): file,
+line, column, severity, code, message. These go to:
 
 - The **Problems panel** — structured, filterable, sortable,
   click-to-jump.
@@ -250,8 +263,8 @@ a phase-1 panel. The scene view is a phase-4 panel.
 The editor constructs a `PackageManager`, loads the engine's
 default packages (`CorePackage`, `LogicPackage`, `MathPackage`,
 `RenderPackage`, `UiPackage`), and calls
-`apply_registration_only()`. Its `lucid::sema::compile` calls use
-that registry.
+`apply_registration_only()`. Its `engine::check_source` and
+`engine::compile_to_bytes` calls use that registry.
 
 A user package (`alice.math`) is listed in the package panel if
 it is in the project file, but it is **not compilable in the
@@ -308,8 +321,9 @@ lucid_game.exe ─────┘
 ```
 
 - `luc_engine` provides the registry, the renderer interface, the
-  scene loader, the `View` type, the log. It has no editor
-  headers and no ImGui.
+  scene loader, the `View` type, the log, and the script compiler
+  wrapper (`engine::check_source`, `engine::compile_to_bytes`). It
+  has no editor headers and no ImGui.
 - `luc_editor` links `luc_engine` and ImGui. It provides the
   `EditorApp`, the panels, the project system.
 - `lucid_game` links `luc_engine` and the game's packages. It has
@@ -371,6 +385,96 @@ An empty project is a valid project.
 to have a `Project` that doesn't correspond to a real folder on
 disk.
 
+### Decision 19 — Machine-local state lives in the OS user folder
+
+Global editor settings, recent projects, themes, and layouts live
+in a single machine-local directory:
+
+```
+Windows:  %APPDATA%/Lucid/
+Linux:    $XDG_CONFIG_HOME/Lucid/ or ~/.config/Lucid/
+macOS:    ~/Library/Application Support/Lucid/
+```
+
+The path is computed by `editor::paths::global_config_dir()`. The
+function does not create the directory; the caller
+(`SettingsStore`) creates it on write.
+
+If the environment variable is unset, the function falls back to
+the platform's default. If that is also missing, it returns
+`./lucid_editor_config/` in the current working directory and the
+editor logs a warning at startup.
+
+### Decision 20 — Settings loads never fail
+
+`SettingsStore::load_global` and `load_recent` return a
+default-constructed value on any error: missing file, malformed
+JSON, wrong field type, I/O error. The editor starts with
+defaults rather than refusing to start because a user's settings
+file is corrupt.
+
+`save_global` and `save_recent` return `bool` and an
+out-parameter error. The caller reports the failure. A save that
+fails is a user-visible problem; a load that fails is not.
+
+### Decision 21 — The project file is the only sentinel
+
+A folder is a Lucid project if and only if it contains
+`lucid.project.json`. `Project::open` refuses anything else.
+There is no "open folder" fallback.
+
+This was Decision 16 in code; this decision restates the
+sentinel rule for the settings side. The recent-projects list
+stores paths to project folders, not to arbitrary folders; a
+stale entry whose project file has been deleted is dropped on
+the next successful open, or logged as missing when the user
+clicks it.
+
+### Decision 22 — `Settings` and `RecentProjects` are plain data
+
+Both are value types with public fields and no behavior beyond
+defaults. `SettingsStore` is a stateless collection of static
+functions. There is no `SettingsManager` object and no observer
+pattern. A caller that wants to react to a settings change reads
+the value again; a caller that wants to change a setting modifies
+a `Settings`, calls `save_global`, and notifies the panels that
+care. This is small and sufficient for phase 1; if the editor
+grows a need for change notification, that is a phase-2 decision.
+
+### Decision 23 — The editor calls the engine's script compiler wrapper
+
+The editor does not include a `lucid/*` header and does not call
+`lucid::sema::compile` directly. It calls two engine functions:
+
+```
+engine::check_source(source, filename, packages)
+    -> CompileCheckResult { ok, diagnostics }
+
+engine::compile_to_bytes(source, filename, packages)
+    -> CompileBuildResult { ok, diagnostics, bytes }
+```
+
+Both return `engine::CompileDiagnostic` (an engine type). The
+engine translates the format library's diagnostics behind the
+wrapper.
+
+Rationale: the editor's dependency is on the engine, and only the
+engine. The format library is an implementation detail of the
+engine from the editor's point of view. The wrapper is about 100
+lines and it makes the boundary explicit.
+
+The rule for future wrappers: the engine wraps a format-library
+entry point if and only if (a) a non-engine caller exists or is
+committed, and (b) the wrapper's signature contains no `lucid::*`
+type. Wrap what has a caller, not what might have one. `format`,
+`parse`, and `deserialize` are not wrapped today; add
+`engine::format_source` when the editor gets format-on-save, and
+`engine::list_symbols` when the editor gets symbol search.
+
+This decision is recorded in `docs/Decision.md` as Decision 19
+(engine-side). This entry is the editor-side counterpart; the two
+documents have independent numbering.
+
 ---
 
 ## 3. Panel inventory
@@ -399,28 +503,40 @@ with their phases.
 
 ## 4. Engine surface the editor uses
 
-| Editor need                     | Engine API                                    | Status |
-| ------------------------------- | --------------------------------------------- | ------ |
-| Compile a `.lucid` buffer       | `lucid::sema::compile` (library)              | exists |
-| Format a `.lucid` buffer        | `lucid::formatter::format` (library)          | exists |
-| Deserialize a `.lucgraph`       | `lucid::serialization::deserialize` (library) | exists |
-| Read the registry               | `PackageManager::registry()`                  | exists |
-| List packages                   | `PackageManager::package_infos()`             | exists |
-| Node display metadata           | `PackageManager::node_editor_info(type)`      | exists |
-| Table display metadata          | `PackageManager::table_editor_info(name)`     | exists |
-| Operation name and group        | `operation_name(op)`, `operation_group(op)`   | exists |
-| Registry conflicts              | `PackageManager::conflicts()`                 | exists |
-| Log stream                      | `engine::add_log_sink`, `LogRecord`           | exists |
-| Route format diagnostics to log | `engine::log_diagnostics`                     | exists |
-| Load a scene                    | `SceneLoader_load`, `Scene::apply_to`         | exists |
-| Render a view                   | `render_view(view, ctx, dt, renderer)`        | exists |
+| Editor need                           | Engine API                                    | Status          |
+| ------------------------------------- | --------------------------------------------- | --------------- |
+| Check a `.lucid` buffer (diagnostics) | `engine::check_source`                        | exists          |
+| Compile a `.lucid` buffer (bytes)     | `engine::compile_to_bytes`                    | exists          |
+| Engine version (About, project file)  | `engine::kEngineVersion`                      | exists          |
+| Format a `.lucid` buffer              | `lucid::formatter::format` (library)          | not wrapped yet |
+| Deserialize a `.lucgraph`             | `lucid::serialization::deserialize` (library) | not wrapped yet |
+| Read the registry                     | `PackageManager::registry()`                  | exists          |
+| List packages                         | `PackageManager::package_infos()`             | exists          |
+| Node display metadata                 | `PackageManager::node_editor_info(type)`      | exists          |
+| Table display metadata                | `PackageManager::table_editor_info(name)`     | exists          |
+| Operation name and group              | `operation_name(op)`, `operation_group(op)`   | exists          |
+| Registry conflicts                    | `PackageManager::conflicts()`                 | exists          |
+| Log stream                            | `engine::add_log_sink`, `LogRecord`           | exists          |
+| Route format diagnostics to log       | `engine::log_diagnostics`                     | exists          |
+| Load a scene                          | `SceneLoader_load`, `Scene::apply_to`         | exists          |
+| Render a view                         | `render_view(view, ctx, dt, renderer)`        | exists          |
 
-The editor adds no engine API. Every engine-side surface it needs
-already exists.
+The engine wraps the format library's compile path for the
+editor: `engine::check_source` and `engine::compile_to_bytes` are
+the editor's compile entry points, and they return
+`engine::CompileDiagnostic` (no `lucid/*` type in the editor's
+view). Format and deserialize are not wrapped until the editor has
+a caller for them (Decision 23). Every other engine-side surface
+the editor needs already exists.
 
 ---
 
 ## 5. Phases
+
+Phases are logical groupings of work, not commits. The commit
+sequence in §6 interleaves them; the ImGui vendor, for example,
+is a Phase 1 activity that ships before the Phase 0 project
+system in commit order. Both orderings are deliberate.
 
 ### Phase 0 — Project system and settings (no UI)
 
@@ -525,7 +641,9 @@ To prevent scope creep:
   slice (status, commit, diff).
 - **Not a general-purpose IDE.** The script editor edits
   `.lucid` and `.lscene` and `.json`. It does not need to edit
-  C++, and it does not need an LSP, at least not in phase 1.
+  C++. It does not implement an LSP; it calls
+  `engine::check_source` for diagnostics, and adds a small
+  `engine::list_symbols` if completion is needed later.
 - **Not cross-platform-polished.** GLFW + ImGui work on Windows,
   Linux, and macOS. The editor is developed on Windows first.
   Linux and macOS support are "should work" until proven

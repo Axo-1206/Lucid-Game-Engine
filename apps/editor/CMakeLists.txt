@@ -3,13 +3,6 @@
 # linked by the game executable.
 
 add_library(luc_editor STATIC
-    # Editor sources
-    src/editor_app.cpp
-    src/imgui_layer.cpp
-    src/project.cpp
-    # src/settings.cpp
-    # src/platform_paths.cpp
-
     # ImGui core
     third_party/imgui/imgui.cpp
     third_party/imgui/imgui_draw.cpp
@@ -22,6 +15,13 @@ add_library(luc_editor STATIC
     # ImGui backends
     third_party/imgui/backends/imgui_impl_glfw.cpp
     third_party/imgui/backends/imgui_impl_opengl3.cpp
+
+    # Editor sources
+    src/editor_app.cpp
+    src/imgui_layer.cpp
+    src/project.cpp
+    src/platform_paths.cpp
+    src/settings.cpp
 )
 
 target_include_directories(luc_editor

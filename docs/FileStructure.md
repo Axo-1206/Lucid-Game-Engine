@@ -198,11 +198,15 @@ apps/
 │   ├── include/editor/
 │   │   ├── editor_app.h
 │   │   ├── imgui_layer.h
-│   │   └── project.h
+│   │   ├── platform_paths.h
+│   │   ├── project.h
+│   │   └── settings.h
 │   ├── src/
 │   │   ├── editor_app.cpp
 │   │   ├── imgui_layer.cpp
-│   │   └── project.cpp
+│   │   ├── platform_paths.cpp
+│   │   ├── project.cpp
+│   │   └── settings.cpp
 │   └── CMakeLists.txt       target: luc_editor
 ├── editor_main/
 │   ├── CMakeLists.txt
@@ -252,6 +256,8 @@ tests/
 │   ├── test_math_manager.cpp
 │   └── test_package_manager.cpp
 ├── editor/
+│   ├── test_platform_paths.cpp
+│   ├── test_settings.cpp
 │   └── test_project.cpp
 └── CMakeLists.txt
 ```
