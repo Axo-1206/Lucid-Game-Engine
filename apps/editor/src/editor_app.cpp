@@ -32,7 +32,10 @@ namespace editor
             return false;
         }
 
-        // Load machine-local state.
+        // Attach the console to the engine log before any other init
+        // logs happen, so the console catches them.
+        console_.attach_to_log();
+
         settings_ = SettingsStore::load_global();
         recent_ = SettingsStore::load_recent();
 
@@ -98,6 +101,7 @@ namespace editor
             break;
         case Mode::Project:
             main_shell_.draw();
+            console_.draw();
             break;
         }
     }

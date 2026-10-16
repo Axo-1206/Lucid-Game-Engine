@@ -3,6 +3,7 @@
 #include "editor/imgui_layer.h"
 #include "editor/panels/launch_panel.h"
 #include "editor/panels/main_shell.h"
+#include "editor/panels/console_panel.h"
 #include "editor/project.h"
 #include "editor/settings.h"
 
@@ -58,6 +59,7 @@ namespace editor
         // Panels.
         LaunchPanel launch_;
         MainShell main_shell_;
+        ConsolePanel console_;
 
         // Engine-side.
         engine::Window window_;

@@ -61,4 +61,5 @@ lucid_add_test_group(lucid_tests_editor
     editor/test_platform_paths.cpp
     editor/test_settings.cpp
     editor/test_editor_app.cpp
+    editor/test_console_panel.cpp
 )

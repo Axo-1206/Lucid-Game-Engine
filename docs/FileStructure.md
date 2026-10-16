@@ -201,7 +201,8 @@ apps/
 │   │   ├── platform_paths.h
 │   │   ├── project.h
 │   │   ├── settings.h
-│   │   └── panels.h
+│   │   └── panels/
+│   │       ├── console_panel.h
 │   │       ├── launch_panel.h
 │   │       └── main_shell.h
 │   ├── src/
@@ -210,9 +211,10 @@ apps/
 │   │   ├── platform_paths.cpp
 │   │   ├── project.cpp
 │   │   ├── settings.cpp
-│   │   └── panels.h
-│   │       ├── launch_panel.h
-│   │       └── main_shell.h
+│   │   └── panels/
+│   │       ├── console_panel.cpp
+│   │       ├── launch_panel.cpp
+│   │       └── main_shell.cpp
 │   └── CMakeLists.txt       target: luc_editor
 ├── editor_main/
 │   ├── CMakeLists.txt
@@ -262,6 +264,7 @@ tests/
 │   ├── test_math_manager.cpp
 │   └── test_package_manager.cpp
 ├── editor/
+│   ├── test_console_panel.cpp
 │   ├── test_editor_app.cpp
 │   ├── test_platform_paths.cpp
 │   ├── test_project.cpp

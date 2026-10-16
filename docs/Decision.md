@@ -297,54 +297,154 @@ See `docs/notes/EditorMetadata.md`.
 
 ---
 
-## Decision 19 — The engine wraps the format library for non-engine callers
+### Decision 19 - Machine-local state lives in the OS user folder
 
-The engine links the format library directly: `GraphRuntime` and
-`SceneLoader` call `lucid::serialization::deserialize`, and the
-package system calls into `lucid::sema`. That is correct — the
-engine is the format library's consumer, and the format library's
-types are part of the engine's implementation.
+Global editor settings, recent projects, themes, and layouts live
+in a single machine-local directory:
 
-A caller that must not see a `lucid::*` type (the editor) uses a
-small engine-side wrapper instead:
+  Windows:  %APPDATA%/Lucid/
+  Linux:    $XDG_CONFIG_HOME/Lucid/ or ~/.config/Lucid/
+  macOS:    ~/Library/Application Support/Lucid/
 
-    engine::check_source(source, filename, packages)
-        -> CompileCheckResult { ok, diagnostics }
+The path is computed by `editor::paths::global_config_dir()`. The
+function does not create the directory; the caller
+(`SettingsStore`) creates it on write.
 
-    engine::compile_to_bytes(source, filename, packages)
-        -> CompileBuildResult { ok, diagnostics, bytes }
+If the environment variable is unset, the function falls back to
+the platform's default. If that is also missing, it returns
+`./lucid_editor_config/` in the current working directory and the
+editor logs a warning at startup.
 
-The wrapper defines `engine::CompileDiagnostic` (the format
-library's Diagnostic, translated to an engine type) and lives in
-`engine/script/compiler.{h,cpp}`. The header includes no
-`lucid/*` header. A caller that includes `engine/script/compiler.h`
-gets a compile API that returns engine types.
+### Decision 20 - Settings loads never fail
 
-The editor uses the wrapper. The engine's runtime does not; it
-calls the format library directly, because it is the format
-library's consumer.
+`SettingsStore::load_global` and `load_recent` return a
+default-constructed value on any error: missing file, malformed
+JSON, wrong field type, I/O error. The editor starts with
+defaults rather than refusing to start because a user's settings
+file is corrupt.
+
+`save_global` and `save_recent` return `bool` and an
+out-parameter error. The caller reports the failure. A save that
+fails is a user-visible problem; a load that fails is not.
+
+### Decision 21 - The project file is the only sentinel
+
+A folder is a Lucid project if and only if it contains
+`lucid.project.json`. `Project::open` refuses anything else.
+There is no "open folder" fallback.
+
+This was Decision 16 in code; this decision restates the
+sentinel rule for the settings side. The recent-projects list
+stores paths to project folders, not to arbitrary folders; a
+stale entry whose project file has been deleted is dropped on
+the next successful open, or logged as missing when the user
+clicks it.
+
+### Decision 22 - `Settings` and `RecentProjects` are plain data
+
+Both are value types with public fields and no behavior beyond
+defaults. `SettingsStore` is a stateless collection of static
+functions. There is no `SettingsManager` object and no observer
+pattern. A caller that wants to react to a settings change reads
+the value again; a caller that wants to change a setting modifies
+a `Settings`, calls `save_global`, and notifies the panels that
+care. This is small and sufficient for phase 1; if the editor
+grows a need for change notification, that is a phase-2 decision.
+
+### Decision 23 - The editor calls the engine's script compiler wrapper
+
+The editor does not include a `lucid/*` header and does not call
+`lucid::sema::compile` directly. It calls two engine functions:
+
+  engine::check_source(source, filename, packages)
+      -> CompileCheckResult { ok, diagnostics }
+
+  engine::compile_to_bytes(source, filename, packages)
+      -> CompileBuildResult { ok, diagnostics, bytes }
+
+Both return `engine::CompileDiagnostic` (an engine type). The
+engine translates the format library's diagnostics behind the
+wrapper.
 
 Rationale: the editor's dependency is on the engine, and only the
 engine. The format library is an implementation detail of the
-engine from the editor's point of view. The wrapper is small
-(about 100 lines) and it makes the boundary explicit.
+engine from the editor's point of view. The wrapper is about 100
+lines and it makes the boundary explicit.
 
-No runtime version check accompanies this. The editor and the
-engine are built together; the build enforces compatibility. The
-`.lucgraph` registry fingerprint is the runtime compatibility
-check for graph files, and it is already implemented.
+The rule for future wrappers: the engine wraps a format-library
+entry point if and only if (a) a non-engine caller exists or is
+committed, and (b) the wrapper's signature contains no `lucid::*`
+type. Wrap what has a caller, not what might have one. `format`,
+`parse`, and `deserialize` are not wrapped today; add
+`engine::format_source` when the editor gets format-on-save, and
+`engine::list_symbols` when the editor gets symbol search.
 
-The engine wraps a format-library entry point if and only if:
+This decision is recorded in `docs/Decision.md` as Decision 19
+(engine-side). This entry is the editor-side counterpart.
 
-  1. A non-engine caller exists or is committed, and
-  2. The wrapper's signature contains no `lucid::*` type.
+### Decision 24 — The launch panel and main shell are the first UI
 
-Wrap what has a caller, not what might have one. `format`,
-`parse`, and `deserialize` are not wrapped today. Add
-`engine::format_source` when the editor gets format-on-save; add
-`engine::list_symbols` when the editor gets symbol search; add
-`engine::deserialize_graph` when the editor inspects `.lucgraph`
-files. Not before.
+The editor has two modes:
+
+- **Launch** — no project loaded. A single full-viewport panel
+  with a recent-projects list, "Open Project", "New Project",
+  and "Quit". The user is choosing what to open.
+- **Project** — a project loaded. A menu bar, a toolbar, a
+  full-viewport dockspace, and a status bar. The panels that
+  fill the dockspace arrive in later commits.
+
+`EditorApp` owns the mode and the transition. `LaunchPanel` and
+`MainShell` are panels; they draw and call back, they do not
+own the project or the settings.
+
+**File dialogs.** "Open Project" and "New Project" use an ImGui
+modal with a text field, not a native file dialog. Native dialogs
+are a phase-2 concern. The modal is cross-platform, adds no
+dependency, and is sufficient for the developer-facing editor.
+
+### Decision 25 — The editor uses the ImGui docking branch, not master
+
+The editor's panel layout requires docking. ImGui's docking API
+(`ImGui::DockSpace`, `ImGuiDockNodeFlags_*`, `ImGuiWindowFlags_DockNodeHost`)
+is not in the master branch; it lives on the `docking` branch.
+
+The vendored copy at `apps/editor/third_party/imgui/` is from the
+docking branch, pinned to a specific commit. The commit hash is
+recorded in `apps/editor/third_party/imgui/VERSION.txt`. Updates
+are deliberate: read the changelog, pick a new commit, replace
+the folder, rebuild.
+
+This mirrors the master-branch vendoring decision (Decision 2),
+with one addition: the commit hash is recorded, because the
+docking branch has no release tags.
+
+### Decision 26 — The console is fed by the engine's log sink
+
+The Console panel registers a sink with `engine::add_log_sink` at
+`EditorApp::init` and removes it in its destructor. The sink
+copies each `LogRecord` into a `ConsoleBuffer`, a ring buffer
+capped at 10,000 lines.
+
+The buffer is thread-safe: the sink may be called from any
+thread that logs, so `ConsoleBuffer::push` locks a mutex. The
+panel takes a snapshot under the lock and draws without holding
+it.
+
+**Filtering.** A single minimum-level combo (Trace / Debug / Info
+/ Warn / Error / Fatal, default Info) plus a substring text
+filter. No per-level checkboxes; the combo is simpler and matches
+how most consoles work.
+
+**Auto-scroll.** The panel auto-scrolls to the bottom while the
+user is at the bottom. If the user scrolls up, auto-scroll
+pauses; when the user scrolls back to the bottom, it resumes.
+The state is a single bool, not a complex scroll-position
+heuristic.
+
+**Where the panel draws.** The Console is an ImGui window named
+"Console". It is not a child of the main shell. It floats over
+the shell by default; the user docks it into the dockspace, or a
+default layout docks it in step 11.
 
 ---
 
