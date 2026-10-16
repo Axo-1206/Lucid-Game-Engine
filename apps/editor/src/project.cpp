@@ -18,25 +18,25 @@ namespace editor
         // orthographic camera, no entities. The .lscene schema
         // is documented in docs/notes/SceneFormat.md.
         constexpr const char *kDefaultSceneJson = R"({
-  "version": 1,
-  "name": "main",
-  "cameras": [
-    {
-      "name": "main",
-      "pos": [0.0, 0.0, 10.0],
-      "target": [0.0, 0.0, 0.0],
-      "fov": 60.0,
-      "near": 0.1,
-      "far": 1000.0,
-      "is_orthographic": true,
-      "ortho_size": 5.0,
-      "clear_color": [0.1, 0.1, 0.15, 1.0]
-    }
-  ],
-  "entities": [],
-  "engine_state": { "next_entity_id": 1 }
-}
-)";
+            "version": 1,
+            "name": "main",
+            "cameras": [
+                {
+                "name": "main",
+                "pos": [0.0, 0.0, 10.0],
+                "target": [0.0, 0.0, 0.0],
+                "fov": 60.0,
+                "near": 0.1,
+                "far": 1000.0,
+                "is_orthographic": true,
+                "ortho_size": 5.0,
+                "clear_color": [0.1, 0.1, 0.15, 1.0]
+                }
+            ],
+            "entities": [],
+            "engine_state": { "next_entity_id": 1 }
+            }
+        )";
 
         // The standard directories every project has. Project::create
         // makes them; Project::open warns if one is missing.
