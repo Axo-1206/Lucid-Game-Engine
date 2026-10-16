@@ -3,7 +3,7 @@
 #include "engine/core/version.h"
 
 #include "imgui.h"
-#include "imgui_internal.h" // for DockSpaceOverViewport
+#include "imgui_internal.h" // for ImGuiDockNodeFlags_PassthruCentralNode
 
 namespace editor
 {
@@ -25,6 +25,13 @@ namespace editor
     void MainShell::set_package_count(std::size_t count)
     {
         package_count_ = count;
+    }
+
+    void MainShell::set_panel_visibility(bool *console_visible,
+                                         bool *explorer_visible)
+    {
+        console_visible_ = console_visible;
+        explorer_visible_ = explorer_visible;
     }
 
     void MainShell::draw()
@@ -82,9 +89,18 @@ namespace editor
 
         if (ImGui::BeginMenu("Window"))
         {
-            // Placeholders. Wired when the panels exist.
-            ImGui::MenuItem("Explorer", nullptr, false, false);
-            ImGui::MenuItem("Console", nullptr, false, false);
+            if (explorer_visible_)
+            {
+                ImGui::MenuItem("Explorer", "Ctrl+Shift+E", explorer_visible_);
+            }
+            if (console_visible_)
+            {
+                ImGui::MenuItem("Console", "Ctrl+Shift+C", console_visible_);
+            }
+            // Placeholders for panels that do not exist yet.
+            ImGui::MenuItem("Script Editor", nullptr, false, false);
+            ImGui::MenuItem("Problems", nullptr, false, false);
+            ImGui::MenuItem("Package", nullptr, false, false);
             ImGui::EndMenu();
         }
 
@@ -122,10 +138,10 @@ namespace editor
     void MainShell::draw_dockspace()
     {
         // A full-area dockspace under the toolbar. Panels dock
-        // into it in later commits. The default flags give a
-        // passthru central node.
+        // into it. The default flags give a passthru central node.
         const ImGuiID id = ImGui::GetID("LucidDockspace");
-        ImGui::DockSpace(id, ImVec2(0.0f, -ImGui::GetFrameHeightWithSpacing()),
+        ImGui::DockSpace(id,
+                         ImVec2(0.0f, -ImGui::GetFrameHeightWithSpacing()),
                          ImGuiDockNodeFlags_PassthruCentralNode);
     }
 

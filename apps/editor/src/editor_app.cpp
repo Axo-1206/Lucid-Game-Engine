@@ -4,6 +4,8 @@
 #include "engine/core/log.h"
 #include "engine/core/version.h"
 
+#include "imgui.h"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -62,6 +64,12 @@ namespace editor
             [this]
             { on_about(); });
 
+        // Wire the Window menu's visibility toggles to the panels'
+        // own bools. The X buttons and the menu items write the
+        // same bool.
+        main_shell_.set_panel_visibility(&console_.visible(),
+                                         &explorer_.visible());
+
         refresh_launch_scan();
 
         initialized_ = true;
@@ -96,8 +104,26 @@ namespace editor
         return 0;
     }
 
+    void EditorApp::process_shortcuts()
+    {
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_E,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            explorer_.visible() = !explorer_.visible();
+        }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_C,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            console_.visible() = !console_.visible();
+        }
+    }
+
     void EditorApp::frame()
     {
+        // Shortcuts are processed first so they work regardless of
+        // which window has focus.
+        process_shortcuts();
+
         switch (mode_)
         {
         case Mode::Launch:
@@ -105,7 +131,17 @@ namespace editor
             break;
         case Mode::Project:
             main_shell_.draw();
+            explorer_.draw();
             console_.draw();
+
+            // Consume any open request the Explorer recorded.
+            if (auto request = explorer_.take_open_request())
+            {
+                // The script editor (step 8) will handle this.
+                // For now, log it.
+                engine::log_info("Would open: %s",
+                                 request->string().c_str());
+            }
             break;
         }
     }
@@ -137,13 +173,9 @@ namespace editor
 
     void EditorApp::enter_project(std::unique_ptr<Project> project)
     {
-        // Record the parent as a root if it isn't already one.
-        // This is what makes a project outside the default root
-        // discoverable on the next launch.
         roots_.add_root(project->root().parent_path());
         save_settings();
 
-        // Record in the recent-projects list.
         SettingsStore::push_recent(recent_,
                                    project->root().string(),
                                    project->name(),
@@ -152,6 +184,8 @@ namespace editor
 
         project_ = std::move(project);
         main_shell_.set_project(project_.get());
+        explorer_.set_root(project_->root());
+
         launch_.set_error("");
         mode_ = Mode::Project;
 
@@ -168,11 +202,10 @@ namespace editor
         }
         project_.reset();
         main_shell_.set_project(nullptr);
+        explorer_.clear();
         launch_.set_error("");
         mode_ = Mode::Launch;
 
-        // Re-scan; the user may have created a project elsewhere,
-        // or deleted one.
         refresh_launch_scan();
     }
 

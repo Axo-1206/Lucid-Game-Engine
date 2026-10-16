@@ -475,6 +475,170 @@ This decision is recorded in `docs/Decision.md` as Decision 19
 (engine-side). This entry is the editor-side counterpart; the two
 documents have independent numbering.
 
+### Decision 24 — The launch panel and main shell are the first UI
+
+The editor has two modes:
+
+- **Launch** — no project loaded. A single full-viewport panel
+  with a recent-projects list, "Open Project", "New Project",
+  and "Quit". The user is choosing what to open.
+- **Project** — a project loaded. A menu bar, a toolbar, a
+  full-viewport dockspace, and a status bar. The panels that
+  fill the dockspace arrive in later commits.
+
+`EditorApp` owns the mode and the transition. `LaunchPanel` and
+`MainShell` are panels; they draw and call back, they do not
+own the project or the settings.
+
+**File dialogs.** "Open Project" and "New Project" use an ImGui
+modal with a text field, not a native file dialog. Native dialogs
+are a phase-2 concern. The modal is cross-platform, adds no
+dependency, and is sufficient for the developer-facing editor.
+
+### Decision 25 — The editor uses the ImGui docking branch, not master
+
+The editor's panel layout requires docking. ImGui's docking API
+(`ImGui::DockSpace`, `ImGuiDockNodeFlags_*`, `ImGuiWindowFlags_DockNodeHost`)
+is not in the master branch; it lives on the `docking` branch.
+
+The vendored copy at `apps/editor/third_party/imgui/` is from the
+docking branch, pinned to a specific commit. The commit hash is
+recorded in `apps/editor/third_party/imgui/VERSION.txt`. Updates
+are deliberate: read the changelog, pick a new commit, replace
+the folder, rebuild.
+
+This mirrors the master-branch vendoring decision (Decision 2),
+with one addition: the commit hash is recorded, because the
+docking branch has no release tags.
+
+### Decision 26 — The console is fed by the engine's log sink
+
+The Console panel registers a sink with `engine::add_log_sink` at
+`EditorApp::init` and removes it in its destructor. The sink
+copies each `LogRecord` into a `ConsoleBuffer`, a ring buffer
+capped at 10,000 lines.
+
+The buffer is thread-safe: the sink may be called from any
+thread that logs, so `ConsoleBuffer::push` locks a mutex. The
+panel takes a snapshot under the lock and draws without holding
+it.
+
+**Filtering.** A single minimum-level combo (Trace / Debug / Info
+/ Warn / Error / Fatal, default Info) plus a substring text
+filter. No per-level checkboxes; the combo is simpler and matches
+how most consoles work.
+
+**Auto-scroll.** The panel auto-scrolls to the bottom while the
+user is at the bottom. If the user scrolls up, auto-scroll
+pauses; when the user scrolls back to the bottom, it resumes.
+The state is a single bool, not a complex scroll-position
+heuristic.
+
+**Where the panel draws.** The Console is an ImGui window named
+"Console". It is not a child of the main shell. It floats over
+the shell by default; the user docks it into the dockspace, or a
+default layout docks it in step 11.
+
+### Decision 27 — The editor has project roots
+
+The editor discovers projects by scanning **project roots**. A
+root is a directory the editor looks in for project folders. The
+editor scans each root one level deep; a subdirectory that
+contains `lucid.project.json` is a project.
+
+Two kinds of root:
+
+- **The platform default root.** A per-platform directory the
+  editor creates on first use:
+  - Windows: `%USERPROFILE%/Lucid Projects/`
+  - Linux: `~/Lucid Projects/`
+  - macOS: `~/Lucid Projects/`
+
+  New projects are created here by default. It is never removed.
+
+- **User roots.** Any directory a project has been opened from,
+  or the user has added. Recorded in `settings.json` under
+  `project_roots`. A root whose directory no longer exists is
+  dropped on load; a root that exists but contains no projects
+  is kept.
+
+The launch panel shows the union of:
+
+- Every project found by scanning the roots.
+- Every project in the recent-projects list that is not under
+  any current root.
+
+When a project is opened or created, the editor records the
+project's parent directory as a user root if it isn't already
+one. This means a project outside the default root is
+discoverable on the next launch, not just via the recents list.
+
+The scan is shallow (one level). Recursive scanning is rejected:
+a root like `~/Lucid Projects/` might contain arbitrary nested
+content, and scanning it recursively would be unpredictable and
+slow. A user who wants a deeper tree adds a specific project's
+parent as a root.
+
+The scan parses each `lucid.project.json` only to read its
+`name` field. A malformed project file yields an entry marked
+invalid, so the user sees the folder and can click it to see
+the error. The scan does not otherwise validate the project.
+
+Scanning happens on launch, on project close, and on a Refresh
+button. Not every frame.
+
+### Decision 28 — The Explorer is rooted at the project folder
+
+The Explorer shows the project's file tree, rooted at the project
+folder (the folder that contains `lucid.project.json`). It is
+not rooted at the engine, the editor, or any user home
+directory. A user opening two projects sees two different
+Explorers.
+
+The tree is built eagerly when the project is opened and rebuilt
+on a Refresh button. It is not rebuilt per frame.
+
+The walk skips:
+
+- Hidden directories: any name starting with `.`
+- Common build/tool directories: `build`, `out`, `node_modules`
+- Compiled output: `*.lucgraph`
+- Temp files: `*.tmp`, `*.bak`, `*~`
+- Symlinks: not followed, not shown
+
+The Explorer does not filter by file extension. It shows every
+file (except the skipped ones). The script editor (step 8)
+decides what it can open.
+
+Double-clicking a file records an open request.
+`EditorApp::frame` consumes the request with
+`take_open_request()`. Before step 8, the request is logged and
+discarded. Step 8 replaces the log with an editor tab.
+
+### Decision 29 — Every panel has a menu toggle and a shortcut
+
+Every dockable panel has a close button (ImGui's `Begin` with
+`&visible_`), a Window menu toggle (a `MenuItem` bound to the
+same bool), and a keyboard shortcut.
+
+The shortcuts match VS Code where a convention exists:
+
+- Explorer: `Ctrl+Shift+E`
+- Console:  `Ctrl+Shift+C`
+- Problems: `Ctrl+Shift+P`  (arrives in step 9)
+- Package:  `Ctrl+Shift+G`  (arrives in step 10)
+
+The `Window` menu's items show their shortcut text on the right.
+The checkmark reflects the panel's visibility.
+
+**Shortcuts are processed centrally in `EditorApp::frame`**, not
+inside the panels. Each shortcut flips the panel's `visible_`
+bool. This avoids each panel having to know about the keyboard.
+
+**Visibility is not persisted yet.** Panels reset to visible on
+launch. Persisting them goes in `settings.json` in step 11
+(layout persistence).
+
 ---
 
 ## 3. Panel inventory

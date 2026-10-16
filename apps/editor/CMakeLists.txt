@@ -27,6 +27,7 @@ add_library(luc_editor STATIC
     src/panels/main_shell.cpp
     src/panels/console_panel.cpp
     src/project_roots.cpp
+    src/panels/explorer_panel.cpp
 )
 
 target_include_directories(luc_editor

@@ -2,6 +2,7 @@
 
 #include "editor/imgui_layer.h"
 #include "editor/panels/console_panel.h"
+#include "editor/panels/explorer_panel.h"
 #include "editor/panels/launch_panel.h"
 #include "editor/panels/main_shell.h"
 #include "editor/project.h"
@@ -35,6 +36,10 @@ namespace editor
 
         void frame();
 
+        // Called once per frame, before any panel draws. Handles
+        // the keyboard shortcuts that toggle panel visibility.
+        void process_shortcuts();
+
         void enter_project(std::unique_ptr<Project> project);
         void leave_project();
 
@@ -44,12 +49,7 @@ namespace editor
         void on_quit();
         void on_about();
 
-        // Re-scan the project roots and hand the result to the
-        // launch panel. Called on init, on leave_project, and on
-        // the launch panel's Refresh button.
         void refresh_launch_scan();
-
-        // Persist the current settings and roots.
         void save_settings();
         void save_recent();
 
@@ -63,6 +63,7 @@ namespace editor
         LaunchPanel launch_;
         MainShell main_shell_;
         ConsolePanel console_;
+        ExplorerPanel explorer_;
 
         engine::Window window_;
         engine::Clock clock_;
