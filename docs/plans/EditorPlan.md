@@ -990,6 +990,123 @@ directly (`arg.type.name`, `nt.resultType.name`). If the node
 detail block omits them, it is for brevity, not because the
 information is unavailable.
 
+### Decision 41 — The Build action compiles every script in the project
+
+`Project > Build` (Ctrl+B) and the toolbar's Build button invoke
+`editor::compile_project(project_root, packages, diagnostics_store)`.
+The function:
+
+1. Walks `<project_root>/scripts/` recursively, collecting every
+   `.lucid` file. Sorted for determinism.
+2. Compiles each with `engine::compile_to_bytes`.
+3. On success, writes a `.lucgraph` next to the source (same
+   directory, `.lucid` replaced with `.lucgraph`).
+4. On failure, records the diagnostics in the store and continues.
+5. Returns a `BuildResult` with counts and the aggregate
+   diagnostics.
+
+**`.lucgraph` files go next to their source.** The scene's
+`Engine_Script` component references them by path relative to the
+project root. Putting them in `.lucid/generated/` would require
+either a different path in the scene or a build-directory
+override in `GraphRuntime`. Next to the source is simpler.
+`*.lucgraph` is gitignored: sources are committed, artifacts are
+not.
+
+**The build is sequential and synchronous.** For a project with
+tens of scripts, it takes milliseconds. A background thread with
+progress is a phase-2 concern if a project ever has hundreds of
+scripts.
+
+**The build never aborts.** A file that fails to read, fails to
+compile, or fails to write is recorded and skipped; the walk
+continues.
+
+**The DiagnosticsStore is the source of truth.** The build
+replaces each compiled file's entries in the store, exactly as
+the per-file compile does. The Problems panel updates without
+any build-specific UI. `BuildResult::diagnostics` is a
+convenience duplicate for the summary line.
+
+**The status bar shows the last build result:**
+`Build: OK (14/14)` on success, `Build: 1 failed` on failure.
+The string is cleared when a project is opened or closed.
+
+**No Build menu for a single file.** A future addition. For
+phase 1, Build is project-wide. The per-file compile already
+runs on save and on edit (debounced), so the user sees errors as
+they type; the explicit Build is for producing the artifacts.
+
+### Decision 42 — Themes and fonts are deferred; panels use style colors
+
+The editor does not implement a theme system or a font system in
+phase 1 or phase 2. It uses ImGui's default dark style and its
+embedded font.
+
+**What panels must do:**
+
+- Use `ImGui::PushStyleColor` / `PushStyleColor` with
+  `ImGuiCol_*` entries, not hard-coded `ImVec4` values, for
+  every color that is not a **semantic accent**.
+- Semantic accents (error red, warning yellow, success green) may
+  be hard-coded in one place — a small helper — and reused.
+  They are the editor's own signals, not theme colors.
+
+**What this buys:** when a theme system arrives (phase 3 at the
+earliest, when a real user complains), it is a matter of setting
+`ImGuiStyle::Colors[]` in `ImGuiLayer::init`. No panel changes.
+
+**What this does not do:** it does not prevent a theme from
+looking bad on the wrong monitor, from clashing with the OS
+accent color, or from being hard to read at small sizes. Those
+are the theme system's problems, not the panel's.
+
+**Fonts:** the editor uses ImGui's default font. A monospace font
+for the Script Editor and a better UI font are a single commit
+when they become worth doing. The trigger is a user complaint
+about readability, not a checkbox on a plan.
+
+### Decision 43 — The first "camera" is the game's, not the editor's
+
+Phase 2 adds a **Run action** that launches `lucid_game.exe` as
+a subprocess with the project's path. The game's own window is
+the first "camera": it renders the scene with the engine's
+renderer, and the user sees it while the game runs.
+
+Phase 4 adds a **Scene view**: a `World2D` view drawn *inside*
+an ImGui panel, with pan, zoom, selection, and gizmos. It is a
+new panel named "Scene", docked into the central node alongside
+the Script Editor and Package.
+
+**The two are different features with different purposes.**
+Phase 2's Run is for testing scripts: write, build, run, watch.
+Phase 4's Scene view is for editing scenes: place, select, move.
+
+**The default layout in phase 4** puts "Scene" in the central
+node's tabs alongside "Script Editor" and "Package". The user
+can split the central node to see them at once; the arrangement
+persists per project. The editor does not force a fixed layout.
+
+### Decision 44 — Phase 2 priorities, in order
+
+1. **Run action.** Launch the game subprocess, stream stdout
+   to the Console. Small; closes the write-build-run loop.
+2. **Reload Packages.** Re-run `register_into` on every loaded
+   package, rebuild the registry, refresh the Package panel and
+   the Script Editor's compile loop.
+3. **Diagnostics panel.** Structured runtime diagnostics — the
+   ones that come from the engine's log, not the compile.
+4. **Symbol search.** `Ctrl+P` file finder; `Ctrl+Shift+O` symbol
+   finder. Even a regex-based indexer is enough.
+5. **Find in files.** `Ctrl+Shift+F`.
+6. **Preferences window.** Edit `settings.json` in the UI.
+7. **Hot reload scripts.** File watcher on `scripts/`;
+   recompile changed files; call `runtime.load()` in the
+   running game. Requires Run to work first.
+
+Items 1–4 are the phase-2 core. Items 5–7 are polish and can
+slip to phase 2.5 if a different priority emerges.
+
 ---
 
 ## 3. Panel inventory
