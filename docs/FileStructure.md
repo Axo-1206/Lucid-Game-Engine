@@ -211,7 +211,7 @@ apps/
 │   │       ├── launch_panel.h
 │   │       ├── main_shell.h
 │   │       ├── package_panel.h
-│   │       ├── problems_panels.h
+│   │       ├── problems_panel.h
 │   │       └── script_editor_panel.h
 │   ├── src/
 │   │   ├── build.cpp
@@ -229,7 +229,7 @@ apps/
 │   │       ├── launch_panel.cpp
 │   │       ├── main_shell.cpp
 │   │       ├── package_panel.cpp
-│   │       ├── problems_panels.cpp
+│   │       ├── problems_panel.cpp
 │   │       └── script_editor_panel.cpp
 │   └── CMakeLists.txt       target: luc_editor
 ├── editor_main/
