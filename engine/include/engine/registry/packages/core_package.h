@@ -6,7 +6,7 @@ namespace engine
 {
 
     // The engine's core package: the fundamental nodes that every
-    // game relies on. Engine_Float32Node, Engine_Int32Node,
+    // game relies on. Engine_Float32_Node, Engine_Int32_Node,
     // Engine_EveryFrame, Engine_PrintNode.
     class CorePackage : public Package
     {
