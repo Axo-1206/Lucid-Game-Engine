@@ -3,6 +3,7 @@
 #include "engine/graph/arg_helpers.h"
 #include "engine/core/format_diagnostics.h"
 #include "engine/core/log.h"
+#include "engine/core/diagnostics.h"
 #include "engine/ecs/core/component_tags.h"
 
 #include "sema/Literal.hpp"
@@ -196,6 +197,30 @@ namespace engine::graph
             return 0; // unknown struct
         }
 
+        // Translate a lucid::diag::Severity to the engine's log
+        // vocabulary. The same mapping log_diagnostic uses; factored
+        // out so the GraphRuntime path can build RuntimeDiagnostics
+        // directly (it needs to set `file`, which log_diagnostic
+        // cannot).
+        engine::LogLevel map_lucid_severity(lucid::diag::Severity s)
+        {
+            using S = lucid::diag::Severity;
+            switch (s)
+            {
+            case S::Hint:
+                return engine::LogLevel::Trace;
+            case S::Note:
+                return engine::LogLevel::Info;
+            case S::Warning:
+                return engine::LogLevel::Warn;
+            case S::Error:
+                return engine::LogLevel::Error;
+            case S::Fatal:
+                return engine::LogLevel::Fatal;
+            }
+            return engine::LogLevel::Info;
+        }
+
         // =============================================================================
         // Firing and ticking
         // =============================================================================
@@ -376,7 +401,29 @@ namespace engine::graph
         if (!dr.ok) {
             engine::log_error("GraphRuntime: failed to deserialize '%s'",
                               full.string().c_str());
-            engine::log_diagnostics(dr.diagnostics);
+
+            // Emit each structured diagnostic. The `file` field is
+            // the .lucgraph path; the diagnostic's own location is
+            // empty for file-level Ser_* errors, which is correct
+            // (there is no source line in a binary file).
+            //
+            // log_diagnostics would also fire emit_diagnostic for
+            // each diagnostic, but it would leave `file` empty
+            // (InternedString resolution needs the StringPool). The
+            // path matters more than the code, so build the
+            // RuntimeDiagnostic directly.
+            for (const auto &d : dr.diagnostics)
+            {
+                engine::RuntimeDiagnostic rd;
+                rd.code = engine::diagnostic_code_raw(d);
+                rd.severity = map_lucid_severity(d.severity);
+                rd.file = full.string();
+                rd.line = d.location.line();
+                rd.column = d.location.column();
+                rd.message = d.message;
+                engine::emit_diagnostic(rd);
+            }
+
             all_ok = false;
             return;
         }

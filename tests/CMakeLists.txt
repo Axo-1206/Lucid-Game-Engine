@@ -57,6 +57,7 @@ lucid_add_test_group(lucid_tests_engine
     engine/test_view.cpp
     engine/test_ui_system.cpp
     engine/test_operation.cpp
+    engine/test_diagnostics.cpp
 )
 
 lucid_add_test_group(lucid_tests_editor

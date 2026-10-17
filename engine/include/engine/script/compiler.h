@@ -33,6 +33,12 @@ namespace engine
         std::uint32_t line = 0;   // 1-based; 0 means "unknown"
         std::uint32_t column = 0; // 1-based; 0 means "unknown"
         std::string message;
+
+        // The raw DiagCode value (e.g. 4001 for Type_Mismatch). 0 for
+        // free-text diagnostics. The engine's wrapper translates the
+        // format library's diagnostic but preserves its code, so callers
+        // that must not include lucid/* headers can still show it.
+        std::uint32_t code = 0;
     };
 
     // The result of a diagnostics-only compile. The compiled graph

@@ -2,6 +2,7 @@
 #include "engine/scene/scene_schema.h"
 #include "engine/scene/component_registry.h"
 #include "engine/core/log.h"
+#include "engine/core/diagnostics.h"
 
 #include <nlohmann/json.hpp>
 
@@ -17,6 +18,19 @@ namespace engine
 
         using json = nlohmann::json;
 
+        // Emit a scene-load failure as a runtime diagnostic and log
+        // the same line. The Console sees the log; the Diagnostics
+        // panel (phase 2) sees the diagnostic, with the file name.
+        void report_scene_load_error(const std::string &path,
+                                     const std::string &message)
+        {
+            engine::RuntimeDiagnostic d;
+            d.severity = engine::LogLevel::Error;
+            d.file = path;
+            d.message = message;
+            engine::emit_diagnostic(d); // fires sinks, then logs the line
+        }
+
     } // namespace
 
     Scene SceneLoader_load(const std::string &path)
@@ -26,7 +40,7 @@ namespace engine
         std::ifstream file(path);
         if (!file.is_open())
         {
-            log_error("Failed to open scene file: %s", path.c_str());
+            report_scene_load_error(path, "Failed to open scene file: " + path);
             return s;
         }
 
@@ -41,15 +55,22 @@ namespace engine
         }
         catch (const std::exception &ex)
         {
-            log_error("Failed to parse scene file '%s': %s", path.c_str(), ex.what());
+            report_scene_load_error(
+                path,
+                "Failed to parse scene file '" + path + "': " + ex.what());
             return s;
         }
 
         const int version = j.value("version", 1);
         if (version > kSceneSchemaVersion)
         {
-            log_error("Scene file '%s' is version %d; this engine supports up to version %d. Refusing to load.",
-                      path.c_str(), version, kSceneSchemaVersion);
+            report_scene_load_error(
+                path,
+                "Scene file '" + path + "' is version " +
+                    std::to_string(version) +
+                    "; this engine supports up to version " +
+                    std::to_string(kSceneSchemaVersion) +
+                    ". Refusing to load.");
             return s;
         }
         if (version < kSceneSchemaVersion)

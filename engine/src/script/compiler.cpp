@@ -36,6 +36,7 @@ namespace engine
             CompileDiagnostic out;
             out.severity = translate_severity(d.severity);
             out.message = d.message;
+            out.code = lucid::diag::raw(d.code);
             if (d.location.isKnown())
             {
                 out.line = static_cast<std::uint32_t>(d.location.line());

@@ -37,4 +37,24 @@ namespace engine
     // CLI output, so an engine log line and a `lucid check` line agree.
     const char *diagnostic_severity_name(lucid::diag::Severity s);
 
+    // The raw DiagCode value, as a plain uint32_t. For callers that
+    // must not include lucid/* headers (the editor). Returns 0 for
+    // free-text diagnostics.
+    std::uint32_t diagnostic_code_raw(const lucid::diag::Diagnostic &d);
+
+    // The human-readable band name for a code, derived from the
+    // code's numeric range (DiagCode.hpp's bands):
+    //   "Lexical", "Syntax", "Name", "Type", "Attribute", "Import",
+    //   "Trigger", "Serialization", "Registry", "Internal",
+    //   "Warning", "FreeText", "Unknown".
+    //
+    // Returns "FreeText" for code 0 and "Unknown" for codes that do
+    // not fall in any band. Never returns nullptr.
+    //
+    // The exact enum spelling (e.g. "Ser_FingerprintMismatch") is
+    // deferred: a full spelling switch is 60 cases and must be kept
+    // in sync with DiagCode.hpp's enum. The band is enough for the
+    // Diagnostics panel's first version.
+    const char *diagnostic_code_name(std::uint32_t code);
+
 } // namespace engine

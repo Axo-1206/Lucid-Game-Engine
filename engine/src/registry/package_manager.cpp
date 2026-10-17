@@ -1,6 +1,7 @@
 #include "engine/registry/package_manager.h"
 #include "engine/graph/tick_context.h"
 #include "engine/core/log.h"
+#include "engine/core/diagnostics.h"
 
 #include <cassert>
 
@@ -233,7 +234,22 @@ namespace engine
         const auto &creators = builder_.table_creators();
         for (std::size_t i = 0; i < creators.size(); ++i)
         {
-            creators[i](world);
+            try
+            {
+                creators[i](world);
+            }
+            catch (const std::exception &ex)
+            {
+                engine::log_error("PackageManager: table creator %zu threw: %s",
+                                  i, ex.what());
+
+                RuntimeDiagnostic d;
+                d.severity = LogLevel::Error;
+                d.message = std::string("table creator ") +
+                            std::to_string(i) + " threw: " + ex.what();
+                emit_diagnostic(d);
+                return false;
+            }
         }
         engine::log_info("PackageManager: %zu tables created", creators.size());
 
@@ -263,6 +279,11 @@ namespace engine
             for (const auto &c : builder_.conflicts())
             {
                 engine::log_error("PackageManager: %s", c.c_str());
+
+                RuntimeDiagnostic d;
+                d.severity = LogLevel::Error;
+                d.message = c;
+                emit_diagnostic(d);
             }
             return false;
         }

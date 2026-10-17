@@ -72,6 +72,7 @@ engine/
 ├── include/engine/
 │   ├── core/
 │   │   ├── clock.h
+│   │   ├── diagnostics.h
 │   │   ├── format_diagnostics.h
 │   │   ├── linear_allocator.h
 │   │   ├── log.h
@@ -127,6 +128,7 @@ engine/
 └── src/
     ├── core/
     │   ├── clock.cpp
+    │   ├── diagnostics.cpp
     │   ├── format_diagnostics.cpp
     │   ├── linear_allocator.cpp
     │   └── log.cpp
@@ -259,6 +261,7 @@ tests/
 ├── engine/
 │   ├── stub_renderer.h
 │   ├── test_clock.cpp
+│   ├── test_diagnostics.cpp
 │   ├── test_entity.cpp
 │   ├── test_format_diagnostic.cpp
 │   ├── test_input.cpp

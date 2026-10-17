@@ -2,6 +2,7 @@ add_library(luc_engine STATIC
     src/core/log.cpp
     src/core/clock.cpp
     src/core/format_diagnostics.cpp
+    src/core/diagnostics.cpp
     
     src/graph/graph_runtime.cpp
 
