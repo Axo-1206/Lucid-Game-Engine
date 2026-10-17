@@ -14,7 +14,9 @@ namespace editor
                                   SaveCallback on_save,
                                   SaveAllCallback on_save_all,
                                   ResetLayoutCallback on_reset_layout,
-                                  BuildCallback on_build)
+                                  BuildCallback on_build,
+                                  RunCallback on_run,
+                                  StopCallback on_stop)
     {
         on_close_project_ = std::move(on_close_project);
         on_quit_ = std::move(on_quit);
@@ -23,6 +25,8 @@ namespace editor
         on_save_all_ = std::move(on_save_all);
         on_reset_layout_ = std::move(on_reset_layout);
         on_build_ = std::move(on_build);
+        on_run_ = std::move(on_run);
+        on_stop_ = std::move(on_stop);
     }
 
     void MainShell::set_project(const Project *project)
@@ -186,9 +190,23 @@ namespace editor
             ImGui::EndDisabled();
 
         ImGui::SameLine();
-        ImGui::BeginDisabled();
-        ImGui::Button("Run");
-        ImGui::EndDisabled();
+        const bool running = run_status_ == "Running";
+        if (running)
+        {
+            if (ImGui::Button("Stop"))
+            {
+                if (on_stop_)
+                    on_stop_();
+            }
+        }
+        else
+        {
+            if (ImGui::Button("Run"))
+            {
+                if (on_run_)
+                    on_run_();
+            }
+        }
     }
 
     void MainShell::build_default_layout(unsigned int dockspace_id,
@@ -242,6 +260,11 @@ namespace editor
         build_status_ = std::move(status);
     }
 
+    void MainShell::set_run_status(std::string status)
+    {
+        run_status_ = std::move(status);
+    }
+
     void MainShell::draw_status_bar()
     {
         ImGui::Separator();
@@ -277,6 +300,17 @@ namespace editor
         ImGui::TextDisabled("|");
         ImGui::SameLine();
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+
+        if (!run_status_.empty())
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("|");
+            ImGui::SameLine();
+            if (run_status_ == "Running")
+                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", run_status_.c_str());
+            else
+                ImGui::Text("%s", run_status_.c_str());
+        }
 
         if (!build_status_.empty())
         {

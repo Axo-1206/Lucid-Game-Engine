@@ -3,6 +3,7 @@
 #include "editor/platform_paths.h"
 #include "editor/platform_paths.h"
 #include "editor/build.h"
+#include "editor/run.h"
 
 #include "engine/core/log.h"
 #include "engine/core/version.h"
@@ -96,20 +97,24 @@ namespace editor
             { refresh_launch_scan(); });
 
         main_shell_.set_callbacks(
-            [this]
+            /*close_project=*/[this]
             { leave_project(); },
-            [this]
+            /*quit=*/[this]
             { on_quit(); },
-            [this]
+            /*about=*/[this]
             { on_about(); },
-            [this]
+            /*save=*/[this]
             { on_save(); },
-            [this]
+            /*save_all=*/[this]
             { on_save_all(); },
-            [this]
+            /*reset_layout=*/[this]
             { on_reset_layout(); },
-            [this]
-            { on_build(); });
+            /*build=*/[this]
+            { on_build(); },
+            /*run=*/[this]
+            { on_run(); },
+            /*stop=*/[this]
+            { on_stop(); });
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
@@ -151,6 +156,23 @@ namespace editor
         return 0;
     }
 
+    void EditorApp::update_run_status()
+    {
+        if (run_.is_running())
+        {
+            run_status_ = "Running";
+        }
+        else if (run_.has_exited())
+        {
+            run_status_ = "Exited (" + std::to_string(run_.exit_code()) + ")";
+        }
+        else
+        {
+            run_status_ = "";
+        }
+        main_shell_.set_run_status(run_status_);
+    }
+
     void EditorApp::process_shortcuts()
     {
         // Do not process shortcuts while a modal is open. This
@@ -182,23 +204,31 @@ namespace editor
         {
             on_save_all();
         }
-
         if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_P,
                             ImGuiInputFlags_RouteGlobal))
         {
             problems_.visible() = !problems_.visible();
         }
-
         if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_G,
                             ImGuiInputFlags_RouteGlobal))
         {
             package_panel_.visible() = !package_panel_.visible();
         }
-
         if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_B,
                             ImGuiInputFlags_RouteGlobal))
         {
             on_build();
+        }
+        if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal))
+        {
+            if (run_.is_running())
+                on_stop();
+            else
+                on_run();
+        }
+        if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_F5, ImGuiInputFlags_RouteGlobal))
+        {
+            on_stop();
         }
     }
 
@@ -211,6 +241,9 @@ namespace editor
         }
 
         process_shortcuts();
+
+        run_.poll(console_.buffer());
+        update_run_status();
 
         switch (mode_)
         {
@@ -306,6 +339,12 @@ namespace editor
             engine::log_info("Closed project '%s'",
                              project_->name().c_str());
         }
+
+        if (run_.is_running())
+            run_.stop();
+        run_status_.clear();
+        main_shell_.set_run_status(run_status_);
+
         project_.reset();
         main_shell_.set_project(nullptr);
         explorer_.clear();
@@ -439,6 +478,47 @@ namespace editor
         }
 
         main_shell_.set_build_status(build_status_);
+    }
+
+    void EditorApp::on_run()
+    {
+        if (mode_ != Mode::Project || !project_)
+            return;
+
+        if (run_.is_running())
+            return; // already running; the toolbar shows Stop
+
+        const std::filesystem::path game_exe =
+            paths::executable_dir() / "lucid_game"
+#if defined(_WIN32)
+                                      ".exe"
+#endif
+            ;
+
+        std::string error;
+        if (!run_.start(game_exe,
+                        {project_->root().string()},
+                        /*working_dir=*/project_->root(),
+                        error))
+        {
+            engine::log_error("Run failed: %s", error.c_str());
+            run_status_ = "Run failed";
+            main_shell_.set_run_status(run_status_);
+            return;
+        }
+
+        run_status_ = "Running";
+        main_shell_.set_run_status(run_status_);
+        engine::log_info("Started game: pid %llu",
+                         static_cast<unsigned long long>(run_.pid()));
+    }
+
+    void EditorApp::on_stop()
+    {
+        if (!run_.is_running())
+            return;
+        run_.stop();
+        update_run_status();
     }
 
 } // namespace editor

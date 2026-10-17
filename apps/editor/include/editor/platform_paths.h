@@ -36,4 +36,18 @@ namespace editor::paths
     // editor logs a warning at startup in that case.
     std::filesystem::path default_project_root();
 
+    // The directory containing the running executable. Used to
+    // locate sibling binaries (lucid_game alongside lucid_editor)
+    // and to resolve relative paths that must survive a CWD change.
+    //
+    // Windows:  the directory of GetModuleFileNameW(nullptr, ...)
+    // Linux:    /proc/self/exe, or argv[0]'s parent if /proc is absent
+    // macOS:    _NSGetExecutablePath
+    //
+    // If none of the platform mechanisms yield a path, returns the
+    // current working directory and logs a warning once. The caller
+    // gets a usable directory either way; a wrong answer is better
+    // than an empty path.
+    std::filesystem::path executable_dir();
+
 } // namespace editor::paths

@@ -19,6 +19,8 @@ namespace editor
         using SaveAllCallback = std::function<void()>;
         using ResetLayoutCallback = std::function<void()>;
         using BuildCallback = std::function<void()>;
+        using RunCallback = std::function<void()>;
+        using StopCallback = std::function<void()>;
 
         void set_callbacks(CloseProjectCallback on_close_project,
                            QuitCallback on_quit,
@@ -26,9 +28,12 @@ namespace editor
                            SaveCallback on_save,
                            SaveAllCallback on_save_all,
                            ResetLayoutCallback on_reset_layout,
-                           BuildCallback on_build);
+                           BuildCallback on_build,
+                           RunCallback on_run,
+                           StopCallback on_stop);
 
         void set_build_status(std::string status);
+        void set_run_status(std::string status);
 
         void set_project(const Project *project);
         void set_active_scene(std::string scene);
@@ -46,6 +51,7 @@ namespace editor
         const Project *project_ = nullptr;
         std::string active_scene_;
         std::string build_status_;
+        std::string run_status_;
         std::size_t package_count_ = 0;
         bool show_about_ = false;
 
@@ -62,6 +68,8 @@ namespace editor
         SaveAllCallback on_save_all_;
         ResetLayoutCallback on_reset_layout_;
         BuildCallback on_build_;
+        RunCallback on_run_;
+        StopCallback on_stop_;
 
         void draw_menu_bar();
         void draw_toolbar();

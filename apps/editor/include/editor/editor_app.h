@@ -12,6 +12,7 @@
 #include "editor/project.h"
 #include "editor/project_roots.h"
 #include "editor/settings.h"
+#include "editor/run.h"
 
 #include "engine/core/clock.h"
 #include "engine/platform/window.h"
@@ -93,6 +94,13 @@ namespace editor
 
         void on_build();
         std::string build_status_;
+
+        RunProcess run_;
+        std::string run_status_;
+
+        void on_run();
+        void on_stop();
+        void update_run_status();
     };
 
 } // namespace editor

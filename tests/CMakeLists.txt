@@ -22,6 +22,9 @@ function(lucid_add_test_group name)
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
+add_executable(test_helper_echo editor/helper_echo.cpp)
+
+
 lucid_add_test_group(lucid_tests_ecs
     ecs/test_world.cpp
     ecs/test_table.cpp
@@ -67,4 +70,5 @@ lucid_add_test_group(lucid_tests_editor
     editor/test_document.cpp
     editor/test_diagnostics.cpp
     editor/test_build.cpp
+    editor/test_run.cpp
 )

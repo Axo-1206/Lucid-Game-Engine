@@ -10,6 +10,12 @@
 namespace editor
 {
 
+    enum class ConsoleSource
+    {
+        Engine,  // engine::log_* / LogRecord
+        Process, // subprocess stdout/stderr
+    };
+
     // One line in the console. A copy of the log record's
     // fields we care about, plus the level.
     struct ConsoleLine
@@ -17,6 +23,7 @@ namespace editor
         engine::LogLevel level;
         std::string timestamp;
         std::string message;
+        ConsoleSource source = ConsoleSource::Engine;
     };
 
     // The console's ring buffer. Plain data, no ImGui. The panel
@@ -31,6 +38,14 @@ namespace editor
 
         // Called from the log sink. Thread-safe.
         void push(const engine::LogRecord &record);
+
+        // Called by RunProcess when it has a complete line. Thread-safe.
+        // `timestamp` empty means "use wall-clock time" (RunProcess
+        // passes empty).
+        void push_raw(ConsoleSource source,
+                      engine::LogLevel level,
+                      std::string timestamp,
+                      std::string message);
 
         // Thread-safe. Copies out a snapshot of the buffer.
         std::deque<ConsoleLine> snapshot() const;
@@ -52,6 +67,10 @@ namespace editor
     {
     public:
         ConsolePanel();
+
+        // Returns the current wall-clock time formatted as "HH:MM:SS".
+        // Called by ConsoleBuffer::push_raw when no timestamp is supplied.
+        static std::string make_timestamp();
         ~ConsolePanel();
 
         // Register/unregister the log sink. Called by EditorApp.
@@ -81,6 +100,8 @@ namespace editor
         engine::LogLevel min_level_ = engine::LogLevel::Info;
         char text_filter_[128] = {};
         bool auto_scroll_ = true;
+        bool show_engine_ = true;
+        bool show_process_ = true;
 
         void draw_filter_bar();
         void draw_lines();

@@ -204,6 +204,7 @@ apps/
 │   │   ├── platform_paths.h
 │   │   ├── project_roots.h
 │   │   ├── project.h
+│   │   ├── run.h
 │   │   ├── settings.h
 │   │   └── panels/
 │   │       ├── console_panel.h
@@ -222,6 +223,7 @@ apps/
 │   │   ├── platform_paths.cpp
 │   │   ├── project_roots.cpp
 │   │   ├── project.cpp
+│   │   ├── run.cpp
 │   │   ├── settings.cpp
 │   │   └── panels/
 │   │       ├── console_panel.cpp
@@ -280,6 +282,7 @@ tests/
 │   ├── test_math_manager.cpp
 │   └── test_package_manager.cpp
 ├── editor/
+│   ├── helper_echo.cpp
 │   ├── test_build.cpp
 │   ├── test_console_panel.cpp
 │   ├── test_diagnostics.cpp
@@ -289,6 +292,7 @@ tests/
 │   ├── test_platform_paths.cpp
 │   ├── test_project_roots.cpp
 │   ├── test_project.cpp
+│   └── test_run.cpp
 │   └── test_settings.cpp
 └── CMakeLists.txt
 ```

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ctime>
 
 namespace editor
 {
@@ -32,6 +33,26 @@ namespace editor
         }
     }
 
+    void ConsoleBuffer::push_raw(ConsoleSource source,
+                                 engine::LogLevel level,
+                                 std::string timestamp,
+                                 std::string message)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        ConsoleLine line;
+        line.source = source;
+        line.level = level;
+        line.timestamp = timestamp.empty()
+                             ? ConsolePanel::make_timestamp() // or a free function
+                             : std::move(timestamp);
+        line.message = std::move(message);
+
+        lines_.push_back(std::move(line));
+        while (lines_.size() > max_lines_)
+            lines_.pop_front();
+    }
+
     std::deque<ConsoleLine> ConsoleBuffer::snapshot() const
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -51,6 +72,20 @@ namespace editor
     }
 
     // ---- ConsolePanel ----
+
+    std::string ConsolePanel::make_timestamp()
+    {
+        const std::time_t now = std::time(nullptr);
+        std::tm tm_buf{};
+#if defined(_WIN32)
+        localtime_s(&tm_buf, &now);
+#else
+        localtime_r(&now, &tm_buf);
+#endif
+        char buf[9]; // "HH:MM:SS\0"
+        std::strftime(buf, sizeof(buf), "%H:%M:%S", &tm_buf);
+        return buf;
+    }
 
     ConsolePanel::ConsolePanel() = default;
 
@@ -82,6 +117,11 @@ namespace editor
 
     bool ConsolePanel::passes_filter(const ConsoleLine &line) const
     {
+        if (line.source == ConsoleSource::Engine && !show_engine_)
+            return false;
+        if (line.source == ConsoleSource::Process && !show_process_)
+            return false;
+
         // Level filter: show lines at or above min_level_.
         if (static_cast<int>(line.level) < static_cast<int>(min_level_))
             return false;
@@ -122,6 +162,11 @@ namespace editor
         ImGui::Checkbox("Auto-scroll", &auto_scroll_);
 
         ImGui::Separator();
+
+        ImGui::SameLine();
+        ImGui::Checkbox("Engine", &show_engine_);
+        ImGui::SameLine();
+        ImGui::Checkbox("Process", &show_process_);
     }
 
     void ConsolePanel::draw_lines()
@@ -165,8 +210,11 @@ namespace editor
             }
 
             ImGui::PushStyleColor(ImGuiCol_Text, color);
-            ImGui::TextUnformatted(line.timestamp.c_str());
-            ImGui::SameLine();
+            if (!line.timestamp.empty())
+            {
+                ImGui::TextUnformatted(line.timestamp.c_str());
+                ImGui::SameLine();
+            }
             ImGui::TextUnformatted(line.message.c_str());
             ImGui::PopStyleColor();
         }

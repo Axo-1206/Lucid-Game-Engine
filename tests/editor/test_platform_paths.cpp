@@ -51,3 +51,54 @@ TEST_CASE("platform_paths: config and cache dirs differ on this platform",
         REQUIRE(cfg.filename() == "lucid_editor_config");
     }
 }
+
+TEST_CASE("platform_paths: executable dir is non-empty, absolute, a directory",
+          "[platform_paths]")
+{
+    const auto p = paths::executable_dir();
+    REQUIRE_FALSE(p.empty());
+    REQUIRE(p.is_absolute());
+    // It must name an existing directory. If the platform mechanism
+    // failed and fell back to CWD, CWD should at least be a real
+    // directory — degraded but not broken.
+    REQUIRE(std::filesystem::is_directory(p));
+}
+
+TEST_CASE("platform_paths: executable dir is not the CWD by accident",
+          "[platform_paths]")
+{
+    // A broken executable_dir() typically falls back to CWD (or
+    // /proc/self/exe fails and the fallback is taken). That fallback
+    // is acceptable only when the binary actually lives in CWD.
+    //
+    // Example bug this catches: executable_dir() returns build/ while
+    // the binaries are in build/bin/. ctest runs from build/, so CWD
+    // is build/. executable_dir() == CWD, but build/lucid_editor doesn't
+    // exist => test fails => bug exposed.
+    const auto dir = paths::executable_dir();
+    const auto cwd = std::filesystem::current_path();
+
+    if (dir != cwd)
+        return; // Not using the CWD fallback; nothing to check.
+
+    const auto editor_exe = cwd /
+#if defined(_WIN32)
+        "lucid_editor.exe";
+#else
+        "lucid_editor";
+#endif
+
+    const auto game_exe = cwd /
+#if defined(_WIN32)
+        "lucid_game.exe";
+#else
+        "lucid_game";
+#endif
+
+    const bool has_sibling =
+        std::filesystem::exists(editor_exe) ||
+        std::filesystem::exists(game_exe);
+
+    INFO("executable_dir() == CWD (" << cwd.string() << ")");
+    REQUIRE(has_sibling);
+}
