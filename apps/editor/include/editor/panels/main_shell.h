@@ -23,6 +23,7 @@ namespace editor
         using StopCallback = std::function<void()>;
         using ReloadPackagesCallback = std::function<void()>;
         using OpenFileFinderCallback = std::function<void()>;
+        using OpenSymbolFinderCallback = std::function<void()>;
 
         void set_callbacks(CloseProjectCallback on_close_project,
                            QuitCallback on_quit,
@@ -34,7 +35,8 @@ namespace editor
                            RunCallback on_run,
                            StopCallback on_stop,
                            ReloadPackagesCallback on_reload_packages,
-                           OpenFileFinderCallback on_open_file_finder);
+                           OpenFileFinderCallback on_open_file_finder,
+                           OpenSymbolFinderCallback on_open_symbol_finder);
 
         void set_build_status(std::string status);
         void set_run_status(std::string status);
@@ -78,6 +80,7 @@ namespace editor
         StopCallback on_stop_;
         ReloadPackagesCallback on_reload_packages_;
         OpenFileFinderCallback on_open_file_finder_;
+        OpenSymbolFinderCallback on_open_symbol_finder_;
 
         void draw_menu_bar();
         void draw_toolbar();

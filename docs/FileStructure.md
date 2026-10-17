@@ -209,6 +209,7 @@ apps/
 │   │   ├── run.h
 │   │   ├── runtime_diagnostic.h
 │   │   ├── settings.h
+│   │   ├── symbol_index.h
 │   │   └── panels/
 │   │       ├── console_panel.h
 │   │       ├── diagnostics_panel.h
@@ -218,7 +219,8 @@ apps/
 │   │       ├── main_shell.h
 │   │       ├── package_panel.h
 │   │       ├── problems_panel.h
-│   │       └── script_editor_panel.h
+│   │       ├── script_editor_panel.h
+│   │       └── symbol_finder.h
 │   ├── src/
 │   │   ├── build.cpp
 │   │   ├── diagnostics.cpp
@@ -231,6 +233,7 @@ apps/
 │   │   ├── run.cpp
 │   │   ├── runtime_diagnostic.cpp
 │   │   ├── settings.cpp
+│   │   ├── symbol_index.cpp
 │   │   └── panels/
 │   │       ├── console_panel.cpp
 │   │       ├── diagnostics_panel.cpp
@@ -240,7 +243,8 @@ apps/
 │   │       ├── main_shell.cpp
 │   │       ├── package_panel.cpp
 │   │       ├── problems_panel.cpp
-│   │       └── script_editor_panel.cpp
+│   │       ├── script_editor_panel.cpp
+│   │       └── symbol_finder.cpp
 │   └── CMakeLists.txt       target: luc_editor
 ├── editor_main/
 │   ├── CMakeLists.txt

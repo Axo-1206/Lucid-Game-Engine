@@ -18,7 +18,8 @@ namespace editor
                                   RunCallback on_run,
                                   StopCallback on_stop,
                                   ReloadPackagesCallback on_reload_packages,
-                                  OpenFileFinderCallback on_open_file_finder)
+                                  OpenFileFinderCallback on_open_file_finder,
+                                  OpenSymbolFinderCallback on_open_symbol_finder)
     {
         on_close_project_ = std::move(on_close_project);
         on_quit_ = std::move(on_quit);
@@ -31,6 +32,7 @@ namespace editor
         on_stop_ = std::move(on_stop);
         on_reload_packages_ = std::move(on_reload_packages);
         on_open_file_finder_ = std::move(on_open_file_finder);
+        on_open_symbol_finder_ = std::move(on_open_symbol_finder);
     }
 
     void MainShell::set_project(const Project *project)
@@ -184,6 +186,17 @@ namespace editor
                     on_open_file_finder_();
             }
             if (!can_find)
+                ImGui::EndDisabled();
+
+            const bool can_find_symbol = on_open_symbol_finder_ != nullptr;
+            if (!can_find_symbol)
+                ImGui::BeginDisabled();
+            if (ImGui::MenuItem("Go to Symbol...", "Ctrl+Shift+O"))
+            {
+                if (on_open_symbol_finder_)
+                    on_open_symbol_finder_();
+            }
+            if (!can_find_symbol)
                 ImGui::EndDisabled();
             ImGui::EndMenu();
         }

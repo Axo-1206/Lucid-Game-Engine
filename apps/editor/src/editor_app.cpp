@@ -120,7 +120,9 @@ namespace editor
             /*reload_packages=*/[this]
             { on_reload_packages(); },
             /*open_file_finder=*/[this]
-            { open_file_finder(); });
+            { open_file_finder(); },
+            /*open_symbol_finder=*/[this]
+            { open_symbol_finder(); });
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
@@ -242,7 +244,8 @@ namespace editor
             else
                 on_run();
         }
-        if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_F5, ImGuiInputFlags_RouteGlobal))
+        if (ImGui::Shortcut(ImGuiMod_Shift | ImGuiKey_F5,
+                            ImGuiInputFlags_RouteGlobal))
         {
             on_stop();
         }
@@ -254,7 +257,14 @@ namespace editor
         if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_P,
                             ImGuiInputFlags_RouteGlobal))
         {
-            open_file_finder();
+            if (!file_finder_.is_open())
+                open_file_finder();
+        }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_O,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            if (!symbol_finder_.is_open())
+                open_symbol_finder();
         }
     }
 
@@ -284,8 +294,8 @@ namespace editor
             diagnostics_panel_.draw();
             console_.draw();
             package_panel_.draw();
-            file_finder_.draw();
 
+            file_finder_.draw();
             if (auto chosen = file_finder_.take_open_request())
             {
                 std::string error;
@@ -294,6 +304,21 @@ namespace editor
                 {
                     engine::log_error("%s", error.c_str());
                 }
+            }
+
+            file_finder_.draw();
+            if (auto chosen = file_finder_.take_open_request())
+            {
+                std::string error;
+                const int idx = script_editor_.open(*chosen, error);
+                if (idx < 0 && !error.empty())
+                    engine::log_error("%s", error.c_str());
+            }
+
+            symbol_finder_.draw();
+            if (auto chosen = symbol_finder_.take_open_request())
+            {
+                script_editor_.request_jump(chosen->first, chosen->second);
             }
 
             if (auto request = explorer_.take_open_request())
@@ -349,6 +374,10 @@ namespace editor
         main_shell_.set_project(project_.get());
         explorer_.set_root(project_->root());
 
+        symbol_index_.rebuild(project_->root());
+        engine::log_info("Symbol index: %zu entries",
+                         symbol_index_.size());
+
         build_status_.clear();
         main_shell_.set_build_status(build_status_);
 
@@ -390,6 +419,7 @@ namespace editor
         runtime_diagnostics_.clear();
         build_status_.clear();
         main_shell_.set_build_status(build_status_);
+        symbol_index_.clear();
         launch_.set_error("");
         mode_ = Mode::Launch;
 
@@ -429,6 +459,18 @@ namespace editor
         std::sort(files.begin(), files.end());
 
         file_finder_.open(std::move(files));
+    }
+
+    void EditorApp::open_symbol_finder()
+    {
+        if (mode_ != Mode::Project)
+            return;
+
+        // The index is already built (enter_project built it, save
+        // refreshes per-file). Find with an empty query returns
+        // the full list.
+        auto matches = symbol_index_.find("");
+        symbol_finder_.open(std::move(matches));
     }
 
     void EditorApp::on_open_project(const std::filesystem::path &folder)
@@ -481,7 +523,10 @@ namespace editor
         if (!script_editor_.save_active(error) && !error.empty())
         {
             engine::log_error("%s", error.c_str());
+            return;
         }
+        if (mode_ == Mode::Project && project_)
+            symbol_index_.rebuild(project_->root());
     }
 
     void EditorApp::on_save_all()
@@ -490,7 +535,10 @@ namespace editor
         if (!script_editor_.save_all(error) && !error.empty())
         {
             engine::log_error("%s", error.c_str());
+            return;
         }
+        if (mode_ == Mode::Project && project_)
+            symbol_index_.rebuild(project_->root());
     }
 
     void EditorApp::on_jump_to_diagnostic(const std::filesystem::path &file,

@@ -10,12 +10,14 @@
 #include "editor/panels/script_editor_panel.h"
 #include "editor/panels/diagnostics_panel.h"
 #include "editor/panels/file_finder.h"
+#include "editor/panels/symbol_finder.h"
 #include "editor/diagnostics.h"
 #include "editor/project.h"
 #include "editor/project_roots.h"
 #include "editor/settings.h"
 #include "editor/run.h"
 #include "editor/runtime_diagnostics.h"
+#include "editor/symbol_index.h"
 
 #include "engine/core/clock.h"
 #include "engine/platform/window.h"
@@ -55,6 +57,8 @@ namespace editor
         void do_leave_project();
 
         void open_file_finder();
+        void open_symbol_finder();
+
         void on_open_project(const std::filesystem::path &folder);
         void on_create_project(const std::filesystem::path &folder,
                                const std::string &name);
@@ -91,6 +95,9 @@ namespace editor
         PackagePanel package_panel_;
         DiagnosticsPanel diagnostics_panel_;
         FileFinderPanel file_finder_;
+
+        SymbolIndex symbol_index_;
+        SymbolFinderPanel symbol_finder_;
 
         engine::Window window_;
         engine::Clock clock_;
