@@ -11,6 +11,7 @@
 #include "editor/panels/diagnostics_panel.h"
 #include "editor/panels/file_finder.h"
 #include "editor/panels/symbol_finder.h"
+#include "editor/panels/find_in_files_panel.h"
 #include "editor/diagnostics.h"
 #include "editor/project.h"
 #include "editor/project_roots.h"
@@ -18,6 +19,7 @@
 #include "editor/run.h"
 #include "editor/runtime_diagnostics.h"
 #include "editor/symbol_index.h"
+#include "editor/find_in_files.h"
 
 #include "engine/core/clock.h"
 #include "engine/platform/window.h"
@@ -95,6 +97,7 @@ namespace editor
         PackagePanel package_panel_;
         DiagnosticsPanel diagnostics_panel_;
         FileFinderPanel file_finder_;
+        FindInFilesPanel find_in_files_;
 
         SymbolIndex symbol_index_;
         SymbolFinderPanel symbol_finder_;
@@ -118,6 +121,8 @@ namespace editor
         void on_run();
         void on_stop();
         void on_reload_packages();
+        void open_find_in_files();
+        void on_find_in_files(const std::string &query, bool case_sensitive);
     };
 
 } // namespace editor

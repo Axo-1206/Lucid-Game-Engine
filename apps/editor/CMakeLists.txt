@@ -41,6 +41,8 @@ add_library(luc_editor STATIC
     src/panels/diagnostics_panel.cpp
     src/panels/file_finder.cpp
     src/panels/symbol_finder.cpp
+    src/find_in_files.cpp
+    src/panels/find_in_files_panel.cpp
 )
 
 target_include_directories(luc_editor

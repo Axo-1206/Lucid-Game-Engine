@@ -19,7 +19,8 @@ namespace editor
                                   StopCallback on_stop,
                                   ReloadPackagesCallback on_reload_packages,
                                   OpenFileFinderCallback on_open_file_finder,
-                                  OpenSymbolFinderCallback on_open_symbol_finder)
+                                  OpenSymbolFinderCallback on_open_symbol_finder,
+                                  FindInFilesCallback on_find_in_files)
     {
         on_close_project_ = std::move(on_close_project);
         on_quit_ = std::move(on_quit);
@@ -33,6 +34,7 @@ namespace editor
         on_reload_packages_ = std::move(on_reload_packages);
         on_open_file_finder_ = std::move(on_open_file_finder);
         on_open_symbol_finder_ = std::move(on_open_symbol_finder);
+        on_find_in_files_ = std::move(on_find_in_files);
     }
 
     void MainShell::set_project(const Project *project)
@@ -55,7 +57,8 @@ namespace editor
                                          bool *script_editor_visible,
                                          bool *problems_visible,
                                          bool *package_visible,
-                                         bool *diganostics_visible)
+                                         bool *diganostics_visible,
+                                         bool *find_in_files_visible)
     {
         console_visible_ = console_visible;
         explorer_visible_ = explorer_visible;
@@ -63,6 +66,7 @@ namespace editor
         problems_visible_ = problems_visible;
         package_visible_ = package_visible;
         diagnostics_visible_ = diganostics_visible;
+        find_in_files_visible_ = find_in_files_visible;
     }
 
     void MainShell::draw()
@@ -165,6 +169,8 @@ namespace editor
                 ImGui::MenuItem("Package", "Ctrl+Shift+G", package_visible_);
             if (diagnostics_visible_)
                 ImGui::MenuItem("Diagnostics", "Ctrl+Shift+D", diagnostics_visible_);
+            if (find_in_files_visible_)
+                ImGui::MenuItem("Find Results", "Ctrl+Shift+F", find_in_files_visible_);
 
             ImGui::Separator();
             if (ImGui::MenuItem("Reset Layout"))
@@ -199,6 +205,17 @@ namespace editor
             if (!can_find_symbol)
                 ImGui::EndDisabled();
             ImGui::EndMenu();
+
+            const bool can_find_in_files = on_find_in_files_ != nullptr;
+            if (!can_find_in_files)
+                ImGui::BeginDisabled();
+            if (ImGui::MenuItem("Find in Files...", "Ctrl+Shift+F"))
+            {
+                if (on_find_in_files_)
+                    on_find_in_files_();
+            }
+            if (!can_find_in_files)
+                ImGui::EndDisabled();
         }
 
         if (ImGui::BeginMenu("Help"))
@@ -296,6 +313,7 @@ namespace editor
         // Bottom-right: Problems, with Diagnostics as a second tab.
         ImGui::DockBuilderDockWindow("Problems", bottom_right);
         ImGui::DockBuilderDockWindow("Diagnostics", bottom_right);
+        ImGui::DockBuilderDockWindow("Find Results", bottom_right);
 
         ImGui::DockBuilderFinish(dockspace_id);
     }

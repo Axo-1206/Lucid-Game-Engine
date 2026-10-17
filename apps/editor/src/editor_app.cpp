@@ -53,6 +53,13 @@ namespace editor
             { on_jump_to_diagnostic(f, l); });
         diagnostics_panel_.attach_to_engine();
 
+        find_in_files_.set_search_callback(
+            [this](const std::string &query, bool case_sensitive)
+            { on_find_in_files(query, case_sensitive); });
+        find_in_files_.set_jump_callback(
+            [this](const std::filesystem::path &f, std::uint32_t l)
+            { on_jump_to_diagnostic(f, l); });
+
         package_manager_ = std::make_unique<engine::PackageManager>();
         load_default_packages(*package_manager_);
 
@@ -122,14 +129,17 @@ namespace editor
             /*open_file_finder=*/[this]
             { open_file_finder(); },
             /*open_symbol_finder=*/[this]
-            { open_symbol_finder(); });
+            { open_symbol_finder(); },
+            /*open_find_in_files=*/[this]
+            { open_find_in_files(); });
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
                                          &script_editor_.visible(),
                                          &problems_.visible(),
                                          &package_panel_.visible(),
-                                         &diagnostics_panel_.visible());
+                                         &diagnostics_panel_.visible(),
+                                         &find_in_files_.visible());
 
         refresh_launch_scan();
 
@@ -266,6 +276,11 @@ namespace editor
             if (!symbol_finder_.is_open())
                 open_symbol_finder();
         }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_F,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            open_find_in_files();
+        }
     }
 
     void EditorApp::frame()
@@ -294,6 +309,7 @@ namespace editor
             diagnostics_panel_.draw();
             console_.draw();
             package_panel_.draw();
+            find_in_files_.draw();
 
             file_finder_.draw();
             if (auto chosen = file_finder_.take_open_request())
@@ -471,6 +487,15 @@ namespace editor
         // the full list.
         auto matches = symbol_index_.find("");
         symbol_finder_.open(std::move(matches));
+    }
+
+    void EditorApp::open_find_in_files()
+    {
+        if (mode_ != Mode::Project)
+            return;
+
+        find_in_files_.visible() = true;
+        find_in_files_.focus_query();
     }
 
     void EditorApp::on_open_project(const std::filesystem::path &folder)
@@ -685,6 +710,49 @@ namespace editor
                          package_manager_->package_infos().size(),
                          package_manager_->package_infos().size() == 1 ? "" : "s",
                          package_manager_->registry().nodeTypes.size());
+    }
+
+    void EditorApp::on_find_in_files(const std::string &query,
+                                     bool case_sensitive)
+    {
+        if (mode_ != Mode::Project || !project_)
+            return;
+
+        if (query.empty())
+        {
+            find_in_files_.set_results("", {});
+            return;
+        }
+
+        // Walk the Explorer's tree, same skip rules as the file
+        // finder. Flatten to a sorted list, then search each file.
+        std::vector<std::filesystem::path> files;
+        files.reserve(256);
+        std::function<void(const ExplorerEntry &)> walk =
+            [&](const ExplorerEntry &e)
+        {
+            if (e.kind == ExplorerEntryKind::File)
+                files.push_back(e.path);
+            else
+                for (const auto &child : e.children)
+                    walk(child);
+        };
+        walk(explorer_.tree());
+        std::sort(files.begin(), files.end());
+
+        FindOptions opts;
+        opts.case_sensitive = case_sensitive;
+
+        std::vector<FindMatch> matches;
+        search_files(files, query, opts, matches);
+
+        engine::log_info(
+            "Find in files: \"%s\" -> %zu match%s in %zu file%s",
+            query.c_str(),
+            matches.size(), matches.size() == 1 ? "" : "es",
+            files.size(), files.size() == 1 ? "" : "s");
+
+        find_in_files_.set_results(query, std::move(matches));
     }
 
 } // namespace editor

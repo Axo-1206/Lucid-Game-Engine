@@ -76,4 +76,5 @@ lucid_add_test_group(lucid_tests_editor
     editor/test_diagnostics_panel.cpp
     editor/test_file_finder.cpp
     editor/test_symbol_index.cpp
+    editor/test_find_in_files.cpp
 )

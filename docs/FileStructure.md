@@ -202,6 +202,7 @@ apps/
 │   │   ├── diagnostics.h
 │   │   ├── document.h
 │   │   ├── editor_app.h
+│   │   ├── find_in_files.h
 │   │   ├── imgui_layer.h
 │   │   ├── platform_paths.h
 │   │   ├── project_roots.h
@@ -215,6 +216,7 @@ apps/
 │   │       ├── diagnostics_panel.h
 │   │       ├── explorer_panel.h
 │   │       ├── file_finder.h
+│   │       ├── find_in_files_panel.h
 │   │       ├── launch_panel.h
 │   │       ├── main_shell.h
 │   │       ├── package_panel.h
@@ -226,6 +228,7 @@ apps/
 │   │   ├── diagnostics.cpp
 │   │   ├── document.cpp
 │   │   ├── editor_app.cpp
+│   │   ├── find_in_files.h
 │   │   ├── imgui_layer.cpp
 │   │   ├── platform_paths.cpp
 │   │   ├── project_roots.cpp
@@ -239,6 +242,7 @@ apps/
 │   │       ├── diagnostics_panel.cpp
 │   │       ├── explorer_panel.cpp
 │   │       ├── file_finder.cpp
+│   │       ├── find_in_files_panel.cpp
 │   │       ├── launch_panel.cpp
 │   │       ├── main_shell.cpp
 │   │       ├── package_panel.cpp
