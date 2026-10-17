@@ -13,7 +13,8 @@ namespace editor
                                   AboutCallback on_about,
                                   SaveCallback on_save,
                                   SaveAllCallback on_save_all,
-                                  ResetLayoutCallback on_reset_layout)
+                                  ResetLayoutCallback on_reset_layout,
+                                  BuildCallback on_build)
     {
         on_close_project_ = std::move(on_close_project);
         on_quit_ = std::move(on_quit);
@@ -21,6 +22,7 @@ namespace editor
         on_save_ = std::move(on_save);
         on_save_all_ = std::move(on_save_all);
         on_reset_layout_ = std::move(on_reset_layout);
+        on_build_ = std::move(on_build);
     }
 
     void MainShell::set_project(const Project *project)
@@ -110,6 +112,18 @@ namespace editor
 
         if (ImGui::BeginMenu("Project"))
         {
+            const bool can_build = on_build_ != nullptr;
+            if (!can_build)
+                ImGui::BeginDisabled();
+            if (ImGui::MenuItem("Build", "Ctrl+B"))
+            {
+                if (on_build_)
+                    on_build_();
+            }
+            if (!can_build)
+                ImGui::EndDisabled();
+
+            ImGui::Separator();
             ImGui::MenuItem("Reload Packages", nullptr, false, false);
             ImGui::EndMenu();
         }
@@ -158,9 +172,21 @@ namespace editor
         ImGui::TextDisabled("|");
         ImGui::SameLine();
 
-        ImGui::BeginDisabled();
-        ImGui::Button("Build");
+        // Build is enabled when a project is loaded and the
+        // callback is set.
+        const bool can_build = project_ != nullptr && on_build_ != nullptr;
+        if (!can_build)
+            ImGui::BeginDisabled();
+        if (ImGui::Button("Build"))
+        {
+            if (on_build_)
+                on_build_();
+        }
+        if (!can_build)
+            ImGui::EndDisabled();
+
         ImGui::SameLine();
+        ImGui::BeginDisabled();
         ImGui::Button("Run");
         ImGui::EndDisabled();
     }
@@ -211,6 +237,11 @@ namespace editor
         }
     }
 
+    void MainShell::set_build_status(std::string status)
+    {
+        build_status_ = std::move(status);
+    }
+
     void MainShell::draw_status_bar()
     {
         ImGui::Separator();
@@ -246,6 +277,14 @@ namespace editor
         ImGui::TextDisabled("|");
         ImGui::SameLine();
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+
+        if (!build_status_.empty())
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("|");
+            ImGui::SameLine();
+            ImGui::Text("%s", build_status_.c_str());
+        }
     }
 
     void MainShell::draw_about_modal()

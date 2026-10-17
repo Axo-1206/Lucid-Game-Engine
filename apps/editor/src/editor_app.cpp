@@ -2,6 +2,7 @@
 
 #include "editor/platform_paths.h"
 #include "editor/platform_paths.h"
+#include "editor/build.h"
 
 #include "engine/core/log.h"
 #include "engine/core/version.h"
@@ -106,7 +107,9 @@ namespace editor
             [this]
             { on_save_all(); },
             [this]
-            { on_reset_layout(); });
+            { on_reset_layout(); },
+            [this]
+            { on_build(); });
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
@@ -191,6 +194,12 @@ namespace editor
         {
             package_panel_.visible() = !package_panel_.visible();
         }
+
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_B,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            on_build();
+        }
     }
 
     void EditorApp::frame()
@@ -269,6 +278,9 @@ namespace editor
         main_shell_.set_project(project_.get());
         explorer_.set_root(project_->root());
 
+        build_status_.clear();
+        main_shell_.set_build_status(build_status_);
+
         // Switch to the project's ini. Applied on the next frame.
         pending_ini_ = project_->lucid_dir() / "editor.ini";
 
@@ -298,6 +310,8 @@ namespace editor
         main_shell_.set_project(nullptr);
         explorer_.clear();
         diagnostics_.clear();
+        build_status_.clear();
+        main_shell_.set_build_status(build_status_);
         launch_.set_error("");
         mode_ = Mode::Launch;
 
@@ -386,6 +400,45 @@ namespace editor
         ImGui::LoadIniSettingsFromMemory("");
 
         engine::log_info("Layout reset; default will be rebuilt.");
+    }
+
+    void EditorApp::on_build()
+    {
+        if (mode_ != Mode::Project || !project_ || !package_manager_)
+            return;
+
+        const auto result = compile_project(project_->root(),
+                                            *package_manager_,
+                                            diagnostics_);
+
+        // Log a one-line summary.
+        const double kb = static_cast<double>(result.bytes_written) / 1024.0;
+        if (result.files_total == 0)
+        {
+            engine::log_info("Build: no .lucid files to compile.");
+            build_status_ = "Build: nothing to compile";
+        }
+        else if (result.files_failed == 0)
+        {
+            engine::log_info(
+                "Build: %zu file%s, %zu succeeded, %.1f KB written.",
+                result.files_total, result.files_total == 1 ? "" : "s",
+                result.files_ok, kb);
+            build_status_ = "Build: OK (" +
+                            std::to_string(result.files_ok) + "/" +
+                            std::to_string(result.files_total) + ")";
+        }
+        else
+        {
+            engine::log_warn(
+                "Build: %zu file%s, %zu succeeded, %zu failed, %.1f KB written.",
+                result.files_total, result.files_total == 1 ? "" : "s",
+                result.files_ok, result.files_failed, kb);
+            build_status_ = "Build: " +
+                            std::to_string(result.files_failed) + " failed";
+        }
+
+        main_shell_.set_build_status(build_status_);
     }
 
 } // namespace editor

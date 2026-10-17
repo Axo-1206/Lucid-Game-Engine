@@ -196,6 +196,7 @@ apps/
 ├── editor/
 │   ├── third_party/imgui/   imgui-1.92.9
 │   ├── include/editor/
+│   │   ├── build.h
 │   │   ├── diagnostics.h
 │   │   ├── document.h
 │   │   ├── editor_app.h
@@ -213,6 +214,7 @@ apps/
 │   │       ├── problems_panels.h
 │   │       └── script_editor_panel.h
 │   ├── src/
+│   │   ├── build.cpp
 │   │   ├── diagnostics.cpp
 │   │   ├── document.cpp
 │   │   ├── editor_app.cpp
@@ -278,6 +280,7 @@ tests/
 │   ├── test_math_manager.cpp
 │   └── test_package_manager.cpp
 ├── editor/
+│   ├── test_build.cpp
 │   ├── test_console_panel.cpp
 │   ├── test_diagnostics.cpp
 │   ├── test_document.cpp

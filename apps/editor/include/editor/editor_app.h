@@ -90,6 +90,9 @@ namespace editor
 
         bool initialized_ = false;
         bool quit_requested_ = false;
+
+        void on_build();
+        std::string build_status_;
     };
 
 } // namespace editor
