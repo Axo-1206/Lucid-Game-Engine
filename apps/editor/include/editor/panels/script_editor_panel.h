@@ -35,6 +35,7 @@ namespace editor
         int open(const std::filesystem::path &path, std::string &error);
         bool save_active(std::string &error);
         bool save_all(std::string &error);
+        void recompile_all();
         void request_close_tab(std::size_t index,
                                std::function<void()> on_done = nullptr);
         void request_close_all(std::function<void()> on_done = nullptr);

@@ -36,6 +36,8 @@ namespace editor
         int run();
 
     private:
+        static void load_default_packages(engine::PackageManager &mgr);
+
         enum class Mode
         {
             Launch,
@@ -101,6 +103,7 @@ namespace editor
         void on_run();
         void on_stop();
         void update_run_status();
+        void on_reload_packages();
     };
 
 } // namespace editor

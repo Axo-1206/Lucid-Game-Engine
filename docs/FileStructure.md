@@ -292,6 +292,7 @@ tests/
 │   ├── test_platform_paths.cpp
 │   ├── test_project_roots.cpp
 │   ├── test_project.cpp
+│   └── test_reload_packages.cpp
 │   └── test_run.cpp
 │   └── test_settings.cpp
 └── CMakeLists.txt

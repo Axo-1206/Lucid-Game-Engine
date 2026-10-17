@@ -6,8 +6,11 @@ namespace engine
 {
 
     // The engine's core package: the fundamental nodes that every
-    // game relies on. Engine_Float32_Node, Engine_Int32_Node,
-    // Engine_EveryFrame, Engine_PrintNode.
+    // game relies on. The registered names are:
+    //   Engine_Float_Node, Engine_Int_Node, Engine_EveryFrame_Node,
+    //   Engine_Print_Float_Node, Engine_Print_Bool_Node.
+    // (The "Engine_<Type>Node" spelling in earlier docs is stale;
+    //  the source of truth is core_package.cpp's kNodeTypes.)
     class CorePackage : public Package
     {
     public:

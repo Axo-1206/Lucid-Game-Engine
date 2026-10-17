@@ -21,6 +21,7 @@ namespace editor
         using BuildCallback = std::function<void()>;
         using RunCallback = std::function<void()>;
         using StopCallback = std::function<void()>;
+        using ReloadPackagesCallback = std::function<void()>;
 
         void set_callbacks(CloseProjectCallback on_close_project,
                            QuitCallback on_quit,
@@ -30,7 +31,8 @@ namespace editor
                            ResetLayoutCallback on_reset_layout,
                            BuildCallback on_build,
                            RunCallback on_run,
-                           StopCallback on_stop);
+                           StopCallback on_stop,
+                           ReloadPackagesCallback on_reload_packages);
 
         void set_build_status(std::string status);
         void set_run_status(std::string status);
@@ -70,6 +72,7 @@ namespace editor
         BuildCallback on_build_;
         RunCallback on_run_;
         StopCallback on_stop_;
+        ReloadPackagesCallback on_reload_packages_;
 
         void draw_menu_bar();
         void draw_toolbar();

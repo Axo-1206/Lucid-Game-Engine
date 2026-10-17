@@ -170,6 +170,15 @@ namespace editor
         return true;
     }
 
+    void ScriptEditorPanel::recompile_all()
+    {
+        if (!packages_ || !diagnostics_)
+            return;
+
+        for (std::size_t i = 0; i < documents_.size(); ++i)
+            compile_document(i);
+    }
+
     void ScriptEditorPanel::close_all()
     {
         if (diagnostics_)

@@ -122,3 +122,31 @@ TEST_CASE("script_compiler: compile_to_bytes on invalid source "
     REQUIRE(result.bytes.empty());
     REQUIRE_FALSE(result.diagnostics.empty());
 }
+
+TEST_CASE("engine::check_source is idempotent", "[reload][engine]")
+{
+    engine::PackageManager pm;
+    REQUIRE(pm.load_package(std::make_unique<engine::CorePackage>()));
+    REQUIRE(pm.apply_registration_only());
+
+    const std::string src = "node A = Engine_Float_Node(1.0)\n";
+
+    const auto a = engine::check_source(src, "a.lucid", pm);
+    const auto b = engine::check_source(src, "a.lucid", pm);
+    const auto c = engine::check_source(src, "a.lucid", pm);
+
+    UNSCOPED_INFO("a: ok=" << a.ok << " diags=" << a.diagnostics.size());
+    UNSCOPED_INFO("b: ok=" << b.ok << " diags=" << b.diagnostics.size());
+    UNSCOPED_INFO("c: ok=" << c.ok << " diags=" << c.diagnostics.size());
+    for (const auto &d : a.diagnostics)
+        UNSCOPED_INFO("a diag: " << d.message);
+    for (const auto &d : b.diagnostics)
+        UNSCOPED_INFO("b diag: " << d.message);
+    for (const auto &d : c.diagnostics)
+        UNSCOPED_INFO("c diag: " << d.message);
+
+    REQUIRE(a.ok == b.ok);
+    REQUIRE(a.ok == c.ok);
+    REQUIRE(a.diagnostics.size() == b.diagnostics.size());
+    REQUIRE(a.diagnostics.size() == c.diagnostics.size());
+}

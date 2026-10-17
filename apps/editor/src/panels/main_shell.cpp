@@ -16,7 +16,8 @@ namespace editor
                                   ResetLayoutCallback on_reset_layout,
                                   BuildCallback on_build,
                                   RunCallback on_run,
-                                  StopCallback on_stop)
+                                  StopCallback on_stop,
+                                  ReloadPackagesCallback on_reload_packages)
     {
         on_close_project_ = std::move(on_close_project);
         on_quit_ = std::move(on_quit);
@@ -27,6 +28,7 @@ namespace editor
         on_build_ = std::move(on_build);
         on_run_ = std::move(on_run);
         on_stop_ = std::move(on_stop);
+        on_reload_packages_ = std::move(on_reload_packages);
     }
 
     void MainShell::set_project(const Project *project)
@@ -128,7 +130,18 @@ namespace editor
                 ImGui::EndDisabled();
 
             ImGui::Separator();
-            ImGui::MenuItem("Reload Packages", nullptr, false, false);
+
+            const bool can_reload = on_reload_packages_ != nullptr;
+            if (!can_reload)
+                ImGui::BeginDisabled();
+            if (ImGui::MenuItem("Reload Packages"))
+            {
+                if (on_reload_packages_)
+                    on_reload_packages_();
+            }
+            if (!can_reload)
+                ImGui::EndDisabled();
+
             ImGui::EndMenu();
         }
 

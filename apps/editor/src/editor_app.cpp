@@ -45,14 +45,8 @@ namespace editor
 
         console_.attach_to_log();
 
-        // Build the engine registry. This is what the compile loop
-        // uses. The manager lives for the editor's lifetime.
         package_manager_ = std::make_unique<engine::PackageManager>();
-        package_manager_->load_package(std::make_unique<engine::CorePackage>());
-        package_manager_->load_package(std::make_unique<engine::LogicPackage>());
-        package_manager_->load_package(std::make_unique<engine::MathPackage>());
-        package_manager_->load_package(std::make_unique<engine::RenderPackage>());
-        package_manager_->load_package(std::make_unique<engine::UIPackage>());
+        load_default_packages(*package_manager_);
 
         if (!package_manager_->apply_registration_only())
         {
@@ -114,7 +108,9 @@ namespace editor
             /*run=*/[this]
             { on_run(); },
             /*stop=*/[this]
-            { on_stop(); });
+            { on_stop(); },
+            /*reload_packages=*/[this]
+            { on_reload_packages(); });
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
@@ -154,6 +150,15 @@ namespace editor
         imgui_.shutdown();
         engine::log_info("Editor loop ended");
         return 0;
+    }
+
+    void EditorApp::load_default_packages(engine::PackageManager &mgr)
+    {
+        mgr.load_package(std::make_unique<engine::CorePackage>());
+        mgr.load_package(std::make_unique<engine::LogicPackage>());
+        mgr.load_package(std::make_unique<engine::MathPackage>());
+        mgr.load_package(std::make_unique<engine::RenderPackage>());
+        mgr.load_package(std::make_unique<engine::UIPackage>());
     }
 
     void EditorApp::update_run_status()
@@ -519,6 +524,53 @@ namespace editor
             return;
         run_.stop();
         update_run_status();
+    }
+
+    void EditorApp::on_reload_packages()
+    {
+        if (mode_ != Mode::Project)
+            return;
+
+        engine::log_info("Reloading packages...");
+
+        if (run_.is_running())
+            engine::log_warn("Reload Packages does not affect the running game; "
+                             "stop and run again to apply changes.");
+
+        // Build the replacement first. If apply fails, keep the
+        // current manager: a failed reload should not leave the
+        // editor in a worse state than before.
+        auto new_manager = std::make_unique<engine::PackageManager>();
+        load_default_packages(*new_manager);
+
+        if (!new_manager->apply_registration_only())
+        {
+            engine::log_error("Reload failed: package registration failed");
+            for (const auto &c : new_manager->conflicts())
+                engine::log_error("  %s", c.c_str());
+            return;
+        }
+
+        // Re-point every consumer of the old manager BEFORE
+        // replacing package_manager_. The old manager is destroyed
+        // on the assignment below; any consumer still holding a
+        // pointer to it would dangle.
+        package_panel_.set_manager(new_manager.get());
+        script_editor_.set_package_manager(new_manager.get());
+        main_shell_.set_package_count(new_manager->package_infos().size());
+
+        // Replace. The old manager is destroyed here.
+        package_manager_ = std::move(new_manager);
+
+        // Recompile every open document against the new registry.
+        // The file text is unchanged; only the diagnostics are
+        // recomputed. This updates the Problems panel via the store.
+        script_editor_.recompile_all();
+
+        engine::log_info("Packages reloaded: %zu package%s, %zu node types",
+                         package_manager_->package_infos().size(),
+                         package_manager_->package_infos().size() == 1 ? "" : "s",
+                         package_manager_->registry().nodeTypes.size());
     }
 
 } // namespace editor

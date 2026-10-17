@@ -209,3 +209,19 @@ TEST_CASE("package_manager: node editor info carries the operation",
     REQUIRE(if_info != nullptr);
     REQUIRE(if_info->operation == Operation::If);
 }
+
+TEST_CASE("PackageManager: two managers in one process", "[reload]")
+{
+    engine::PackageManager a;
+    a.load_package(std::make_unique<engine::CorePackage>());
+    REQUIRE(a.apply_registration_only());
+    const auto count_a = a.registry().nodeTypes.size();
+
+    engine::PackageManager b;
+    b.load_package(std::make_unique<engine::CorePackage>());
+    REQUIRE(b.apply_registration_only());
+    const auto count_b = b.registry().nodeTypes.size();
+
+    REQUIRE(count_a == count_b);
+    REQUIRE(count_a > 0);
+}
