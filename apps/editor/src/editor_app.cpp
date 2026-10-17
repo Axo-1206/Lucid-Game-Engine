@@ -118,7 +118,9 @@ namespace editor
             /*stop=*/[this]
             { on_stop(); },
             /*reload_packages=*/[this]
-            { on_reload_packages(); });
+            { on_reload_packages(); },
+            /*open_file_finder=*/[this]
+            { open_file_finder(); });
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
@@ -249,6 +251,11 @@ namespace editor
         {
             diagnostics_panel_.visible() = !diagnostics_panel_.visible();
         }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_P,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            open_file_finder();
+        }
     }
 
     void EditorApp::frame()
@@ -277,6 +284,17 @@ namespace editor
             diagnostics_panel_.draw();
             console_.draw();
             package_panel_.draw();
+            file_finder_.draw();
+
+            if (auto chosen = file_finder_.take_open_request())
+            {
+                std::string error;
+                const int idx = script_editor_.open(*chosen, error);
+                if (idx < 0 && !error.empty())
+                {
+                    engine::log_error("%s", error.c_str());
+                }
+            }
 
             if (auto request = explorer_.take_open_request())
             {
@@ -379,6 +397,38 @@ namespace editor
         pending_ini_ = paths::global_config_dir() / "launch.ini";
 
         refresh_launch_scan();
+    }
+
+    void EditorApp::open_file_finder()
+    {
+        if (mode_ != Mode::Project)
+            return;
+
+        // Flatten the Explorer's current tree. This is the same set
+        // of files the Explorer shows; the finder does not re-walk
+        // the project.
+        std::vector<std::filesystem::path> files;
+        files.reserve(256);
+
+        const ExplorerEntry &tree = explorer_.tree();
+        std::function<void(const ExplorerEntry &)> walk =
+            [&](const ExplorerEntry &e)
+        {
+            if (e.kind == ExplorerEntryKind::File)
+            {
+                files.push_back(e.path);
+            }
+            else
+            {
+                for (const auto &child : e.children)
+                    walk(child);
+            }
+        };
+        walk(tree);
+
+        std::sort(files.begin(), files.end());
+
+        file_finder_.open(std::move(files));
     }
 
     void EditorApp::on_open_project(const std::filesystem::path &folder)

@@ -38,6 +38,7 @@ add_library(luc_editor STATIC
     src/panels/problems_panel.cpp
     src/panels/package_panel.cpp
     src/panels/diagnostics_panel.cpp
+    src/panels/file_finder.cpp
 )
 
 target_include_directories(luc_editor

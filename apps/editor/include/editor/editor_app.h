@@ -9,6 +9,7 @@
 #include "editor/panels/problems_panel.h"
 #include "editor/panels/script_editor_panel.h"
 #include "editor/panels/diagnostics_panel.h"
+#include "editor/panels/file_finder.h"
 #include "editor/diagnostics.h"
 #include "editor/project.h"
 #include "editor/project_roots.h"
@@ -53,6 +54,7 @@ namespace editor
         void leave_project();
         void do_leave_project();
 
+        void open_file_finder();
         void on_open_project(const std::filesystem::path &folder);
         void on_create_project(const std::filesystem::path &folder,
                                const std::string &name);
@@ -88,6 +90,7 @@ namespace editor
         ProblemsPanel problems_;
         PackagePanel package_panel_;
         DiagnosticsPanel diagnostics_panel_;
+        FileFinderPanel file_finder_;
 
         engine::Window window_;
         engine::Clock clock_;
@@ -103,10 +106,10 @@ namespace editor
 
         RunProcess run_;
         std::string run_status_;
+        void update_run_status();
 
         void on_run();
         void on_stop();
-        void update_run_status();
         void on_reload_packages();
     };
 

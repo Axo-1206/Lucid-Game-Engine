@@ -213,6 +213,7 @@ apps/
 │   │       ├── console_panel.h
 │   │       ├── diagnostics_panel.h
 │   │       ├── explorer_panel.h
+│   │       ├── file_finder.h
 │   │       ├── launch_panel.h
 │   │       ├── main_shell.h
 │   │       ├── package_panel.h
@@ -234,6 +235,7 @@ apps/
 │   │       ├── console_panel.cpp
 │   │       ├── diagnostics_panel.cpp
 │   │       ├── explorer_panel.cpp
+│   │       ├── file_finder.cpp
 │   │       ├── launch_panel.cpp
 │   │       ├── main_shell.cpp
 │   │       ├── package_panel.cpp
@@ -297,6 +299,7 @@ tests/
 │   ├── test_document.cpp
 │   ├── test_editor_app.cpp
 │   ├── test_explorer_panel.cpp
+│   ├── test_file_finder.cpp
 │   ├── test_platform_paths.cpp
 │   ├── test_project_roots.cpp
 │   ├── test_project.cpp

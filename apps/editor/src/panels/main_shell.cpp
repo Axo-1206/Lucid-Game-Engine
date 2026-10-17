@@ -17,7 +17,8 @@ namespace editor
                                   BuildCallback on_build,
                                   RunCallback on_run,
                                   StopCallback on_stop,
-                                  ReloadPackagesCallback on_reload_packages)
+                                  ReloadPackagesCallback on_reload_packages,
+                                  OpenFileFinderCallback on_open_file_finder)
     {
         on_close_project_ = std::move(on_close_project);
         on_quit_ = std::move(on_quit);
@@ -29,6 +30,7 @@ namespace editor
         on_run_ = std::move(on_run);
         on_stop_ = std::move(on_stop);
         on_reload_packages_ = std::move(on_reload_packages);
+        on_open_file_finder_ = std::move(on_open_file_finder);
     }
 
     void MainShell::set_project(const Project *project)
@@ -171,6 +173,21 @@ namespace editor
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Edit"))
+        {
+            const bool can_find = on_open_file_finder_ != nullptr;
+            if (!can_find)
+                ImGui::BeginDisabled();
+            if (ImGui::MenuItem("Go to File...", "Ctrl+P"))
+            {
+                if (on_open_file_finder_)
+                    on_open_file_finder_();
+            }
+            if (!can_find)
+                ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+
         if (ImGui::BeginMenu("Help"))
         {
             if (ImGui::MenuItem("About"))
@@ -237,22 +254,33 @@ namespace editor
                 ImGuiDockNodeFlags_PassthruCentralNode);
         ImGui::DockBuilderSetNodeSize(dockspace_id, ImVec2(width, height));
 
+        // Split off the left column (Explorer). The rest is `central`.
         ImGuiID central = dockspace_id;
-
         ImGuiID left = ImGui::DockBuilderSplitNode(
             central, ImGuiDir_Left, 0.20f, nullptr, &central);
 
+        // Split off the bottom row from `central`. The bottom row
+        // will hold Console and Problems/Diagnostics.
         ImGuiID bottom = ImGui::DockBuilderSplitNode(
             central, ImGuiDir_Down, 0.25f, nullptr, &central);
 
+        // Split the bottom row into Console (left) and
+        // Problems+Diagnostics (right).
         ImGuiID bottom_left = bottom;
         ImGuiID bottom_right = ImGui::DockBuilderSplitNode(
             bottom_left, ImGuiDir_Right, 0.5f, nullptr, &bottom_left);
 
+        // Left column: Explorer.
         ImGui::DockBuilderDockWindow("Explorer", left);
+
+        // Central: Script Editor, with Package as a second tab.
         ImGui::DockBuilderDockWindow("Script Editor", central);
         ImGui::DockBuilderDockWindow("Package", central);
+
+        // Bottom-left: Console.
         ImGui::DockBuilderDockWindow("Console", bottom_left);
+
+        // Bottom-right: Problems, with Diagnostics as a second tab.
         ImGui::DockBuilderDockWindow("Problems", bottom_right);
         ImGui::DockBuilderDockWindow("Diagnostics", bottom_right);
 
