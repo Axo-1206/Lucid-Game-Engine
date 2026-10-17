@@ -72,6 +72,7 @@ namespace editor
         std::vector<CompileState> compile_state_;
         int active_tab_ = -1;
         bool visible_ = true;
+        int pending_select_tab_ = -1;
 
         const engine::PackageManager *packages_ = nullptr;
         DiagnosticStore *diagnostics_ = nullptr;

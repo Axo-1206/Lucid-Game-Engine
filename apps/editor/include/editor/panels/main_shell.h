@@ -25,6 +25,7 @@ namespace editor
         using OpenFileFinderCallback = std::function<void()>;
         using OpenSymbolFinderCallback = std::function<void()>;
         using FindInFilesCallback = std::function<void()>;
+        using OpenPreferencesCallback = std::function<void()>;
 
         void set_callbacks(CloseProjectCallback on_close_project,
                            QuitCallback on_quit,
@@ -38,7 +39,8 @@ namespace editor
                            ReloadPackagesCallback on_reload_packages,
                            OpenFileFinderCallback on_open_file_finder,
                            OpenSymbolFinderCallback on_open_symbol_finder,
-                           FindInFilesCallback on_find_in_files);
+                           FindInFilesCallback on_find_in_files,
+                           OpenPreferencesCallback on_open_preferences);
 
         void set_build_status(std::string status);
         void set_run_status(std::string status);
@@ -86,6 +88,7 @@ namespace editor
         OpenFileFinderCallback on_open_file_finder_;
         OpenSymbolFinderCallback on_open_symbol_finder_;
         FindInFilesCallback on_find_in_files_;
+        OpenPreferencesCallback on_open_preferences_;
 
         void draw_menu_bar();
         void draw_toolbar();

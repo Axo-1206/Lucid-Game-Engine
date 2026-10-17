@@ -30,6 +30,7 @@ add_library(luc_editor STATIC
     src/run.cpp
     src/runtime_diagnostics.cpp
     src/symbol_index.cpp
+    src/find_in_files.cpp
 
     # Editor Panels
     src/panels/launch_panel.cpp
@@ -41,8 +42,8 @@ add_library(luc_editor STATIC
     src/panels/diagnostics_panel.cpp
     src/panels/file_finder.cpp
     src/panels/symbol_finder.cpp
-    src/find_in_files.cpp
     src/panels/find_in_files_panel.cpp
+    src/panels/preferences_panel.cpp
 )
 
 target_include_directories(luc_editor

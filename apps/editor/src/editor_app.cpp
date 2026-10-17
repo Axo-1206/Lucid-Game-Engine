@@ -59,6 +59,9 @@ namespace editor
         find_in_files_.set_jump_callback(
             [this](const std::filesystem::path &f, std::uint32_t l)
             { on_jump_to_diagnostic(f, l); });
+        preferences_.set_save_callback(
+            [this](const Settings &s)
+            { on_save_preferences(s); });
 
         package_manager_ = std::make_unique<engine::PackageManager>();
         load_default_packages(*package_manager_);
@@ -131,7 +134,9 @@ namespace editor
             /*open_symbol_finder=*/[this]
             { open_symbol_finder(); },
             /*open_find_in_files=*/[this]
-            { open_find_in_files(); });
+            { open_find_in_files(); },
+            /*open_preferences=*/[this]
+            { on_open_preferences(); });
 
         main_shell_.set_panel_visibility(&console_.visible(),
                                          &explorer_.visible(),
@@ -300,6 +305,7 @@ namespace editor
         {
         case Mode::Launch:
             launch_.draw();
+            preferences_.draw();
             break;
         case Mode::Project:
             main_shell_.draw();
@@ -310,6 +316,7 @@ namespace editor
             console_.draw();
             package_panel_.draw();
             find_in_files_.draw();
+            preferences_.draw();
 
             file_finder_.draw();
             if (auto chosen = file_finder_.take_open_request())
@@ -753,6 +760,38 @@ namespace editor
             files.size(), files.size() == 1 ? "" : "s");
 
         find_in_files_.set_results(query, std::move(matches));
+    }
+
+    void EditorApp::on_open_preferences()
+    {
+        preferences_.open(settings_);
+    }
+
+    void EditorApp::on_save_preferences(const Settings &new_settings)
+    {
+        settings_ = new_settings;
+
+        std::string error;
+        if (!SettingsStore::save_global(settings_, error))
+        {
+            engine::log_error("Could not save settings: %s",
+                              error.c_str());
+        }
+
+        // Rebuild roots_ from the new settings. This picks up
+        // added/removed roots and drops any whose directory
+        // disappeared while the modal was open.
+        roots_ = ProjectRoots::load(settings_);
+
+        // Refresh the launch panel's default root and its scan
+        // results so a new root is visible immediately if the user
+        // closes the project and returns to the launch panel.
+        launch_.set_default_project_root(roots_.default_root());
+        refresh_launch_scan();
+
+        engine::log_info("Preferences saved (%zu extra root%s).",
+                         settings_.project_roots.size(),
+                         settings_.project_roots.size() == 1 ? "" : "s");
     }
 
 } // namespace editor

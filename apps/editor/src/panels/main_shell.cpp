@@ -20,7 +20,8 @@ namespace editor
                                   ReloadPackagesCallback on_reload_packages,
                                   OpenFileFinderCallback on_open_file_finder,
                                   OpenSymbolFinderCallback on_open_symbol_finder,
-                                  FindInFilesCallback on_find_in_files)
+                                  FindInFilesCallback on_find_in_files,
+                                  OpenPreferencesCallback on_open_preferences)
     {
         on_close_project_ = std::move(on_close_project);
         on_quit_ = std::move(on_quit);
@@ -35,6 +36,7 @@ namespace editor
         on_open_file_finder_ = std::move(on_open_file_finder);
         on_open_symbol_finder_ = std::move(on_open_symbol_finder);
         on_find_in_files_ = std::move(on_find_in_files);
+        on_open_preferences_ = std::move(on_open_preferences);
     }
 
     void MainShell::set_project(const Project *project)
@@ -110,6 +112,12 @@ namespace editor
             {
                 if (on_save_all_)
                     on_save_all_();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Preferences..."))
+            {
+                if (on_open_preferences_)
+                    on_open_preferences_();
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Close Project"))

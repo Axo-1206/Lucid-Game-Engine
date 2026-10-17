@@ -12,6 +12,7 @@
 #include "editor/panels/file_finder.h"
 #include "editor/panels/symbol_finder.h"
 #include "editor/panels/find_in_files_panel.h"
+#include "editor/panels/preferences_panel.h"
 #include "editor/diagnostics.h"
 #include "editor/project.h"
 #include "editor/project_roots.h"
@@ -60,6 +61,7 @@ namespace editor
 
         void open_file_finder();
         void open_symbol_finder();
+        void open_find_in_files();
 
         void on_open_project(const std::filesystem::path &folder);
         void on_create_project(const std::filesystem::path &folder,
@@ -98,6 +100,7 @@ namespace editor
         DiagnosticsPanel diagnostics_panel_;
         FileFinderPanel file_finder_;
         FindInFilesPanel find_in_files_;
+        PreferencesPanel preferences_;
 
         SymbolIndex symbol_index_;
         SymbolFinderPanel symbol_finder_;
@@ -121,8 +124,10 @@ namespace editor
         void on_run();
         void on_stop();
         void on_reload_packages();
-        void open_find_in_files();
         void on_find_in_files(const std::string &query, bool case_sensitive);
+
+        void on_open_preferences();
+        void on_save_preferences(const Settings &new_settings);
     };
 
 } // namespace editor

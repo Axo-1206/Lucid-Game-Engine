@@ -123,8 +123,8 @@ namespace editor
         {
             if (documents_[i]->path() == path)
             {
-                active_tab_ = static_cast<int>(i);
-                return active_tab_;
+                pending_select_tab_ = static_cast<int>(i); // NEW
+                return static_cast<int>(i);
             }
         }
 
@@ -344,6 +344,9 @@ namespace editor
                                     ImGuiTabBarFlags_FittingPolicyScroll))
             return;
 
+        const int select_this_frame = pending_select_tab_;
+        pending_select_tab_ = -1;
+
         for (std::size_t i = 0; i < documents_.size(); ++i)
         {
             Document &doc = *documents_[i];
@@ -357,6 +360,8 @@ namespace editor
             ImGuiTabItemFlags flags = 0;
             if (doc.dirty())
                 flags |= ImGuiTabItemFlags_UnsavedDocument;
+            if (static_cast<int>(i) == select_this_frame)
+                flags |= ImGuiTabItemFlags_SetSelected;
 
             if (ImGui::BeginTabItem(label.c_str(), &open, flags))
             {
@@ -368,9 +373,6 @@ namespace editor
 
             if (!open)
             {
-                // Defer the close to next frame: we're mid-iteration.
-                // The panel stores the request and processes it after
-                // EndTabBar.
                 request_close_tab(i, nullptr);
                 break;
             }
@@ -550,38 +552,31 @@ namespace editor
     void ScriptEditorPanel::request_jump(const std::filesystem::path &path,
                                          std::uint32_t line)
     {
-        // If the file isn't open, open it.
-        bool found = false;
-        for (auto &doc : documents_)
+        // Find or open the file.
+        int target_tab = -1;
+        for (std::size_t i = 0; i < documents_.size(); ++i)
         {
-            if (doc->path() == path)
+            if (documents_[i]->path() == path)
             {
-                found = true;
+                target_tab = static_cast<int>(i);
                 break;
             }
         }
-        if (!found)
+        if (target_tab < 0)
         {
             std::string error;
-            if (open(path, error) < 0)
+            target_tab = open(path, error);
+            if (target_tab < 0)
             {
                 engine::log_error("%s", error.c_str());
                 return;
             }
         }
-        else
-        {
-            // Focus the existing tab.
-            for (std::size_t i = 0; i < documents_.size(); ++i)
-            {
-                if (documents_[i]->path() == path)
-                {
-                    active_tab_ = static_cast<int>(i);
-                    break;
-                }
-            }
-        }
 
+        // Request ImGui to select the tab. Setting active_tab_ is
+        // not enough: ImGui's tab bar owns its selection and will
+        // overwrite active_tab_ on the next draw_tab_bar().
+        pending_select_tab_ = target_tab;
         jump_.path = path;
         jump_.line = line;
         jump_.active = true;

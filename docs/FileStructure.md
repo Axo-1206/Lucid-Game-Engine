@@ -220,6 +220,7 @@ apps/
 │   │       ├── launch_panel.h
 │   │       ├── main_shell.h
 │   │       ├── package_panel.h
+│   │       ├── preferences_panel.h
 │   │       ├── problems_panel.h
 │   │       ├── script_editor_panel.h
 │   │       └── symbol_finder.h
@@ -246,6 +247,7 @@ apps/
 │   │       ├── launch_panel.cpp
 │   │       ├── main_shell.cpp
 │   │       ├── package_panel.cpp
+│   │       ├── preferences_panel.cpp
 │   │       ├── problems_panel.cpp
 │   │       ├── script_editor_panel.cpp
 │   │       └── symbol_finder.cpp
@@ -309,6 +311,7 @@ tests/
 │   ├── test_explorer_panel.cpp
 │   ├── test_file_finder.cpp
 │   ├── test_platform_paths.cpp
+│   ├── test_preferences_panel.cpp
 │   ├── test_project_roots.cpp
 │   ├── test_project.cpp
 │   └── test_reload_packages.cpp
