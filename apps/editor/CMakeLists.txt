@@ -28,6 +28,7 @@ add_library(luc_editor STATIC
     src/diagnostics.cpp
     src/build.cpp
     src/run.cpp
+    src/runtime_diagnostics.cpp
 
     # Editor Panels
     src/panels/launch_panel.cpp
@@ -36,6 +37,7 @@ add_library(luc_editor STATIC
     src/panels/explorer_panel.cpp
     src/panels/problems_panel.cpp
     src/panels/package_panel.cpp
+    src/panels/diagnostics_panel.cpp
 )
 
 target_include_directories(luc_editor

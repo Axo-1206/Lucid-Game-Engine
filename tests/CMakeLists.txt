@@ -73,4 +73,5 @@ lucid_add_test_group(lucid_tests_editor
     editor/test_build.cpp
     editor/test_run.cpp
     editor/test_reload_packages.cpp
+    editor/test_diagnostics_panel.cpp
 )

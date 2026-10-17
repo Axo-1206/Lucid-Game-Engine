@@ -517,6 +517,7 @@ namespace editor
             e.column = d.column;
             e.severity = d.severity;
             e.message = d.message;
+            e.code = d.code;
             e.source = DiagnosticSource::Compiler;
             entries.push_back(std::move(e));
         }

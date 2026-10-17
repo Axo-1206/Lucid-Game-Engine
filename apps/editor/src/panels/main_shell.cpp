@@ -50,13 +50,15 @@ namespace editor
                                          bool *explorer_visible,
                                          bool *script_editor_visible,
                                          bool *problems_visible,
-                                         bool *package_visible)
+                                         bool *package_visible,
+                                         bool *diganostics_visible)
     {
         console_visible_ = console_visible;
         explorer_visible_ = explorer_visible;
         script_editor_visible_ = script_editor_visible;
         problems_visible_ = problems_visible;
         package_visible_ = package_visible;
+        diagnostics_visible_ = diganostics_visible;
     }
 
     void MainShell::draw()
@@ -157,6 +159,9 @@ namespace editor
                 ImGui::MenuItem("Problems", "Ctrl+Shift+P", problems_visible_);
             if (package_visible_)
                 ImGui::MenuItem("Package", "Ctrl+Shift+G", package_visible_);
+            if (diagnostics_visible_)
+                ImGui::MenuItem("Diagnostics", "Ctrl+Shift+D", diagnostics_visible_);
+
             ImGui::Separator();
             if (ImGui::MenuItem("Reset Layout"))
             {
@@ -249,6 +254,7 @@ namespace editor
         ImGui::DockBuilderDockWindow("Package", central);
         ImGui::DockBuilderDockWindow("Console", bottom_left);
         ImGui::DockBuilderDockWindow("Problems", bottom_right);
+        ImGui::DockBuilderDockWindow("Diagnostics", bottom_right);
 
         ImGui::DockBuilderFinish(dockspace_id);
     }

@@ -45,6 +45,14 @@ namespace editor
 
         console_.attach_to_log();
 
+        // Wire the runtime diagnostics path. The store is created
+        // with the EditorApp; the panel registers the sink below.
+        diagnostics_panel_.set_store(&runtime_diagnostics_);
+        diagnostics_panel_.set_jump_callback(
+            [this](const std::filesystem::path &f, std::uint32_t l)
+            { on_jump_to_diagnostic(f, l); });
+        diagnostics_panel_.attach_to_engine();
+
         package_manager_ = std::make_unique<engine::PackageManager>();
         load_default_packages(*package_manager_);
 
@@ -116,7 +124,8 @@ namespace editor
                                          &explorer_.visible(),
                                          &script_editor_.visible(),
                                          &problems_.visible(),
-                                         &package_panel_.visible());
+                                         &package_panel_.visible(),
+                                         &diagnostics_panel_.visible());
 
         refresh_launch_scan();
 
@@ -235,6 +244,11 @@ namespace editor
         {
             on_stop();
         }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_D,
+                            ImGuiInputFlags_RouteGlobal))
+        {
+            diagnostics_panel_.visible() = !diagnostics_panel_.visible();
+        }
     }
 
     void EditorApp::frame()
@@ -260,6 +274,7 @@ namespace editor
             explorer_.draw();
             script_editor_.draw();
             problems_.draw();
+            diagnostics_panel_.draw();
             console_.draw();
             package_panel_.draw();
 
@@ -354,6 +369,7 @@ namespace editor
         main_shell_.set_project(nullptr);
         explorer_.clear();
         diagnostics_.clear();
+        runtime_diagnostics_.clear();
         build_status_.clear();
         main_shell_.set_build_status(build_status_);
         launch_.set_error("");

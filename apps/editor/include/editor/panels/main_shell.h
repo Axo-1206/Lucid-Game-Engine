@@ -45,7 +45,8 @@ namespace editor
                                   bool *explorer_visible,
                                   bool *script_editor_visible,
                                   bool *problems_visible,
-                                  bool *package_visible);
+                                  bool *package_visible,
+                                  bool *diagnostics_visible);
 
         void draw();
 
@@ -62,6 +63,7 @@ namespace editor
         bool *script_editor_visible_ = nullptr;
         bool *problems_visible_ = nullptr;
         bool *package_visible_ = nullptr;
+        bool *diagnostics_visible_ = nullptr;
 
         CloseProjectCallback on_close_project_;
         QuitCallback on_quit_;

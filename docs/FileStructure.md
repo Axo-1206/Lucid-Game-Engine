@@ -207,9 +207,11 @@ apps/
 │   │   ├── project_roots.h
 │   │   ├── project.h
 │   │   ├── run.h
+│   │   ├── runtime_diagnostic.h
 │   │   ├── settings.h
 │   │   └── panels/
 │   │       ├── console_panel.h
+│   │       ├── diagnostics_panel.h
 │   │       ├── explorer_panel.h
 │   │       ├── launch_panel.h
 │   │       ├── main_shell.h
@@ -226,9 +228,11 @@ apps/
 │   │   ├── project_roots.cpp
 │   │   ├── project.cpp
 │   │   ├── run.cpp
+│   │   ├── runtime_diagnostic.cpp
 │   │   ├── settings.cpp
 │   │   └── panels/
 │   │       ├── console_panel.cpp
+│   │       ├── diagnostics_panel.cpp
 │   │       ├── explorer_panel.cpp
 │   │       ├── launch_panel.cpp
 │   │       ├── main_shell.cpp
@@ -288,6 +292,7 @@ tests/
 │   ├── helper_echo.cpp
 │   ├── test_build.cpp
 │   ├── test_console_panel.cpp
+│   ├── test_diagnostics_panel.cpp
 │   ├── test_diagnostics.cpp
 │   ├── test_document.cpp
 │   ├── test_editor_app.cpp

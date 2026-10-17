@@ -23,10 +23,10 @@ namespace editor
         std::filesystem::path file;
         std::uint32_t line = 0;   // 1-based; 0 = unknown
         std::uint32_t column = 0; // 1-based; 0 = unknown
-        engine::CompileDiagnostic::Severity severity =
-            engine::CompileDiagnostic::Severity::Note;
+        engine::CompileDiagnostic::Severity severity = engine::CompileDiagnostic::Severity::Note;
         std::string message;
         DiagnosticSource source = DiagnosticSource::Compiler;
+        std::uint32_t code = 0;
     };
 
     // A flat collection of diagnostics, grouped by file on replace.

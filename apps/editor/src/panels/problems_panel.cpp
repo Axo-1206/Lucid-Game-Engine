@@ -1,5 +1,7 @@
 #include "editor/panels/problems_panel.h"
 
+#include "engine/core/format_diagnostics.h"
+
 #include "imgui.h"
 
 namespace editor
@@ -7,6 +9,16 @@ namespace editor
 
     namespace
     {
+        std::string format_code_badge(std::uint32_t code,
+                                      engine::CompileDiagnostic::Severity sev)
+        {
+            using S = engine::CompileDiagnostic::Severity;
+            const bool is_warning = (sev == S::Warning);
+            const char prefix = is_warning ? 'W' : 'E';
+            if (code == 0)
+                return std::string(1, prefix) + "-";
+            return std::string(1, prefix) + std::to_string(code);
+        }
 
         ImVec4 severity_color(engine::CompileDiagnostic::Severity s)
         {
@@ -100,7 +112,8 @@ namespace editor
                           std::to_string(e.column)
                     : file_name;
 
-            const std::string label = location + "  " + e.message;
+            const std::string code_badge = format_code_badge(e.code, e.severity);
+            const std::string label = code_badge + "  " + location + "  " + e.message;
 
             if (ImGui::Selectable(label.c_str()))
             {
@@ -112,11 +125,13 @@ namespace editor
 
             if (ImGui::IsItemHovered())
             {
+                const char *band = engine::diagnostic_code_name(e.code);
                 ImGui::SetTooltip("%s:%u:%u\n%s [%s]",
                                   e.file.string().c_str(),
                                   e.line, e.column,
                                   e.message.c_str(),
-                                  severity_short(e.severity));
+                                  severity_short(e.severity),
+                                  band);
             }
             ImGui::PopID();
         }

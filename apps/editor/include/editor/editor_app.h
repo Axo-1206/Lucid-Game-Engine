@@ -8,11 +8,13 @@
 #include "editor/panels/package_panel.h"
 #include "editor/panels/problems_panel.h"
 #include "editor/panels/script_editor_panel.h"
+#include "editor/panels/diagnostics_panel.h"
 #include "editor/diagnostics.h"
 #include "editor/project.h"
 #include "editor/project_roots.h"
 #include "editor/settings.h"
 #include "editor/run.h"
+#include "editor/runtime_diagnostics.h"
 
 #include "engine/core/clock.h"
 #include "engine/platform/window.h"
@@ -76,6 +78,7 @@ namespace editor
 
         std::unique_ptr<engine::PackageManager> package_manager_;
         DiagnosticStore diagnostics_;
+        RuntimeDiagnosticStore runtime_diagnostics_;
 
         LaunchPanel launch_;
         MainShell main_shell_;
@@ -84,6 +87,7 @@ namespace editor
         ScriptEditorPanel script_editor_;
         ProblemsPanel problems_;
         PackagePanel package_panel_;
+        DiagnosticsPanel diagnostics_panel_;
 
         engine::Window window_;
         engine::Clock clock_;
