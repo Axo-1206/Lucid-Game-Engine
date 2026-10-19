@@ -3,17 +3,17 @@
 This note defines how the engine names its content: node types,
 enum types, handle types, struct types, and table names. It
 explains the prefix convention, why it exists, how the engine
-enforces it, the node type name convention, and what a package
-author and a script author need to know.
+enforces it, and what a package author needs to know.
 
 See also:
-- `docs/notes/TriggerModel.md` — how a graph expresses control flow.
-- `docs/notes/PackageComposition.md` — what a package contributes
-  and how packages compose.
+- `docs/notes/PackageComposition.md` — what a package
+  contributes and how packages compose.
+- `docs/notes/PackageTables.md` — the package-owned-table
+  convention.
+- `docs/notes/ExecutionModel.md` — the walker, the phases, the
+  sub-graphs.
 - `docs/notes/EditorMetadata.md` — the editor metadata a package
   registers for its nodes.
-- `docs/notes/RegistryContractNote.md` (in the format library's
-  docs) — the boundary between the engine and the format library.
 - `docs/Decision.md` — the design decisions that led to this
   convention (Decision 16 for node type names).
 
@@ -21,34 +21,33 @@ See also:
 
 ## 1. The problem
 
-The format library's `NodeTypeInfo` carries **one name**. Two
-packages that both declare a node type called `GravityNode` produce
-two entries in the merged registry with the same `name`. Sema
-cannot tell them apart when a `.lucid` file writes
-`GravityNode(...)`.
-
-The same problem applies to enum types, handle types, struct types,
-and table names. The engine's registry is a flat namespace; two
-declarations with the same name collide.
-
-The format library's `LucidGraphFormat.md` §4.2 documents this as
-an open gap. The library's import model supports a one-level `::`
-qualifier (`module::Name`), but the engine's package names are
-dotted paths (`alice.physics`), and the qualifier is the last
-segment. Two packages whose last segments collide (`alice.physics`
-and `bob.physics`) cannot both be loaded.
+The engine's node registry is a flat namespace. Every node type,
+enum type, handle type, struct type, and table has one name. Two
+packages that both register a node type called `Gravity_Node`
+produce two entries in the registry with the same name. The
+editor cannot tell them apart in the palette; the project cannot
+tell them apart when it references a node type by name.
 
 The engine has three options:
 
 1. Refuse to load conflicting packages.
-2. Change the format library to support package-scoped names.
+2. Change the registry to support package-scoped names.
 3. Enforce a naming convention at the package level.
 
 The engine chooses **option 3**: a prefix convention. Every node
 type, enum type, handle type, and struct type has a name of the
 form `<Prefix>_<BaseName>`. Table names are also prefixed. The
-prefix is the provider's short identifier. The engine enforces the
-prefix at package load time.
+prefix is the provider's short identifier. The engine enforces
+the prefix at package load time.
+
+> [!NOTE]
+> The old §1 also explained the format library's `::` qualifier,
+> the one-level qualifier depth limit, and why the qualifier
+> approach was rejected. That entire discussion is gone: there
+> is no format library, no `.lucid` text, no `::` qualifier. The
+> prefix convention is the *only* namespacing mechanism, and the
+> doc's explanation of why is now one paragraph instead of three
+> sections.
 
 ---
 
@@ -73,9 +72,8 @@ Where:
 Examples:
 
 ```
-Engine_Print_Float_Node           a node type from the engine's core package
-Engine_EveryFrame_Node            a node type from the engine's core package
-Engine_If_Bool_Node               a node type from the engine's logic package
+Engine_Log_Node                   a node type from the engine's core package
+Engine_Branch_Bool_Node           an engine control-flow node
 Engine_Key                        an enum type from the engine's core package
 Engine_Vector2                    a struct type from the engine's math package
 Alice_Gravity_Body_Node           a node type from Alice's physics package
@@ -92,8 +90,8 @@ Provider_Operation[_ArgType]*_Node
 ```
 
 - `Provider` is the package's prefix.
-- `Operation` is one segment: what the node does (`Print`, `Add`,
-  `LessThan`, `If`, `EveryFrame`).
+- `Operation` is one segment: what the node does (`Log`, `Add`,
+  `LessThan`, `Branch`, `Jump`).
 - Each `ArgType` is one segment: the base name of an argument's
   type, in argument order (`Float`, `Int`, `Bool`, `Vector2`,
   `BodyRef`). A node with no arguments has none.
@@ -101,45 +99,44 @@ Provider_Operation[_ArgType]*_Node
 
 A node that produces a constant of a primitive type uses the
 type-form, `Provider_Type_Node`. It has one type segment and no
-operation: `Engine_Float_Node` is a node that produces a float, and
-its `Operation` is `Operation::None`. Every other node uses the
-operation-form above. A constructor such as
-`Engine_Vector2_Float_Float_Node` is operation-form: the type name
-is the operation, and the two floats are its arguments.
+operation.
 
 ```
-Engine_Float_Node                    a float constant
-Engine_Int_Node                      an int constant
-Engine_Bool_Node                     a bool constant
-Engine_EveryFrame_Node               no arguments
-Engine_Print_Float_Node              print a float
-Engine_Print_Bool_Node               print a bool
-Engine_LessThan_Float_Float_Node     compare two floats
-Engine_LessThan_Int_Int_Node         compare two ints
-Engine_If_Bool_Node                  gate on a bool
-Engine_Add_Vector2_Vector2_Node      add two Vector2 values
+Engine_Log_Node                    log a value
+Engine_Branch_Bool_Node            branch on a bool
+Engine_Jump_Node                   unconditional jump
+Engine_LessThan_Float_Float_Node   compare two floats
+Engine_Add_Vector2_Vector2_Node    add two Vector2 values
 Engine_MoveBody_BodyRef_Float_Float_Node
-                                     move a body by two floats
+                                   move a body by two floats
 ```
 
 The same operation over different argument types is a different
-node type: `Engine_Print_Float_Node` and `Engine_Print_Bool_Node`
-are two entries in the registry. The name says what the node does
-and what it takes, so a reader of a `.lucid` file does not have to
-look up a signature to know which one is being called.
+node type: `Engine_Log_Float_Node` and `Engine_Log_Bool_Node`
+are two entries in the registry. The name says what the node
+does and what it takes.
 
 The prefix rule is the only part of the convention the engine
 enforces. The rest is a recommendation that every package in the
 engine follows, and that a package author should follow so that
-nodes from different packages read alike in a palette and in a
-`.lucid` file. A package may register a node whose name does not
-follow it.
+nodes from different packages read alike in a palette. A package
+may register a node whose name does not follow it.
 
 The engine does not parse node type names. The registry
 (`NodeTypeInfo`) supplies a node's shape, and the editor metadata
-(`NodeEditorInfo`) supplies its display and its operation. The name
-is a convention for human readers. See `Decision.md` Decisions 16
-and 17.
+(`NodeEditorInfo`) supplies its display and its operation. The
+name is a convention for human readers. See `Decision.md`
+Decisions 16 and 17.
+
+> [!NOTE]
+> The old §2.2 example list included `Engine_Float_Node`,
+> `Engine_Int_Node`, `Engine_Bool_Node` (constant nodes),
+> `Engine_EveryFrame_Node` (a source trigger), and
+> `Engine_If_Bool_Node` (a gating trigger). Constant nodes are
+> gone (a literal is an argument, not a node). Triggers are gone
+> (control flow is `Branch`/`Jump`). The replacement examples are
+> the engine's actual control-flow nodes and the package actions
+> that survive.
 
 ### 2.3 Tables
 
@@ -157,15 +154,24 @@ Engine_Transform          the local transform table
 Engine_WorldTransform     the world transform table
 Engine_Velocity           the velocity table
 Engine_Sprite             the 2D sprite table
-Engine_Script             the script table (references a .lucgraph)
 Engine_Camera             the camera table
 Engine_EngineState        the engine's internal state table
+Engine_Body               a physics component table
+Engine_BodyRuntime        a physics runtime table (no codec)
 Alice_Player              a table from Alice's player package
 Alice_Inventory           a table from Alice's inventory package
+Alice_Vector3Table        a plain table from Alice's math package
 ```
 
 Table names carry no `_Node` suffix and no argument segments; the
 node type convention in §2.2 applies to node types only.
+
+> [!NOTE]
+> The old table list included `Engine_Script` (a reference to a
+> `.lucgraph` file). Under the pivot, `Engine_Script` is
+> repurposed: its column holds the name of a sub-graph in the
+> project, not a file path. See `SceneFormat.md`. The name is
+> unchanged; its meaning is not.
 
 ### 2.4 Why the underscore
 
@@ -175,11 +181,16 @@ underscore when it needs to distinguish prefix from base name.
 
 Why underscore:
 
-- It is a legal identifier character in Lucid.
-- It is not a legal `::` or `.`, so it does not conflict with
-  the format's qualifier syntax.
+- It is a legal identifier character.
 - It is the standard convention for module prefixes in languages
   without module-scoped names (C libraries, some C++ libraries).
+
+> [!NOTE]
+> The old §2.4 justified the underscore by "It is not a legal
+> `::` or `.`, so it does not conflict with the format's
+> qualifier syntax." There is no qualifier syntax; that
+> justification is gone. The underscore is still the convention
+> because it is portable and unambiguous.
 
 ### 2.5 The reserved prefix
 
@@ -187,19 +198,24 @@ The engine reserves the prefix `Engine`. No third-party package
 may declare `Engine` as its prefix. All built-in engine content
 uses `Engine_`:
 
-- `Engine_Float_Node`, `Engine_Int_Node`, `Engine_Print_Float_Node`,
-  `Engine_Print_Bool_Node`, `Engine_EveryFrame_Node` — the engine's
-  core package.
-- `Engine_Bool_Node`, `Engine_LessThan_Float_Float_Node`,
-  `Engine_LessThan_Int_Int_Node`, `Engine_If_Bool_Node` — the
-  engine's logic package.
-- `Engine_Vector2`, `Engine_Add_Vector2_Vector2_Node` — the
-  engine's math package.
+- `Engine_Log_Node`, `Engine_Branch_Bool_Node`, `Engine_Jump_Node`,
+  `Engine_Entry_Node`, `Engine_Call_Node`, `Engine_Return_Node`,
+  `Engine_Yield_Node` — the engine's core control-flow and utility
+  nodes.
+- `Engine_Key` — the engine's core enum.
+- `Engine_Vector2` — the engine's math struct.
 - `Engine_Entity`, `Engine_Transform`, and the other core tables.
 
 A package that tries to register a node type starting with
 `Engine_` from a package whose prefix is not `Engine` is rejected
 at load time.
+
+> [!NOTE]
+> The old §2.5 list included `Engine_Float_Node`,
+> `Engine_Int_Node`, `Engine_Print_Float_Node`,
+> `Engine_Print_Bool_Node`, `Engine_EveryFrame_Node`, and
+> `Engine_If_Bool_Node`. Those node types do not exist under the
+> pivot. The replacement list is the actual engine vocabulary.
 
 ### 2.6 The prefix pattern
 
@@ -210,9 +226,7 @@ A prefix must match:
 ```
 
 That is: a letter, followed by any number of letters or digits. No
-underscores, no dots, no other punctuation. This keeps the prefix
-identifiable by `name.find('_')` and keeps the base name after the
-first underscore.
+underscores, no dots, no other punctuation.
 
 Examples of valid prefixes: `Engine`, `Alice`, `Bob`, `Physics2D`,
 `MyLib`, `X`.
@@ -231,8 +245,9 @@ enter the merged registry.
 
 ### 3.1 Package metadata
 
-A package declares its name and prefix in its metadata. The format
-is a `package.json`-like file at the package's root:
+A package declares its name, prefix, and dependencies in its
+metadata. The format is a `package.json`-like file at the
+package's root:
 
 ```json
 {
@@ -240,44 +255,56 @@ is a `package.json`-like file at the package's root:
     "prefix": "Alice",
     "version": "1.0.0",
     "description": "2D physics for Lucid",
-    "author": "Alice"
+    "author": "Alice",
+    "dependencies": ["engine.core"]
 }
 ```
 
-The engine reads `name` and `prefix`. A package that contributes
-anything to the merged registry — node types, enums, handles,
-structs, tables, or exported `.lucid` helper nodes — must declare a
-prefix. The prefix is what makes the package's content unique in the
-shared namespace.
+The engine reads `name`, `prefix`, and `dependencies`. A package
+that contributes anything to the merged registry — node types,
+enums, handles, structs, tables, or components — must declare a
+prefix. The prefix is what makes the package's content unique in
+the shared namespace.
 
-A package with no `prefix` may still load if it registers nothing: no
-node types, enums, handles, structs, tables, components, or exported
-`.lucid` helper nodes. Such a package contributes nothing to the
-registry; the engine logs it and registers no content. A `.lucid`
-file whose nodes are private (not marked `@export`) does not require a
-prefix: only exported nodes enter the shared namespace, and private
-node names are file-local.
+A package with no `prefix` may still load if it registers nothing:
+no node types, enums, handles, structs, tables, or components.
+Such a package contributes nothing to the registry; the engine
+logs it and registers no content.
+
+> [!NOTE]
+> The old §3.1 said "A `.lucid` file whose nodes are private (not
+> marked `@export`) does not require a prefix." There is no
+> `.lucid` file. The exception is now narrower: a package with
+> no prefix may load if it registers *nothing*. The dependency
+> list is new; see `PackageComposition.md` §8.1.
 
 ### 3.2 Package name rules
 
 - The package name is unique across all loaded packages.
 - The package name is a dotted path: `<provider>.<thing>` or
   `<provider>.<thing>.<sub>`.
-- The last segment of the package name is used by the format
-  library's import model as the module qualifier. It must be
-  unique across loaded packages, or two packages cannot both be
-  imported in the same `.lucid` file.
+
+> [!NOTE]
+> The old §3.2 added "The last segment of the package name is
+> used by the format library's import model as the module
+> qualifier. It must be unique across loaded packages, or two
+> packages cannot both be imported in the same `.lucid` file."
+> There is no import model and no `.lucid` file. The
+> last-segment-uniqueness rule is gone.
 
 ### 3.3 Prefix rules
 
 - The prefix is unique across loaded packages, except that two
   packages from the same provider may share a prefix. The
-  provider is the first segment of the package name. `alice.physics`
-  and `alice.render` share the provider `alice` and may both use
-  the prefix `Alice`. `alice.physics` and `bob.physics` have
-  different providers and must have different prefixes.
+  provider is the first segment of the package name.
+  `alice.physics` and `alice.render` share the provider `alice`
+  and may both use the prefix `Alice`. `alice.physics` and
+  `bob.physics` have different providers and must have different
+  prefixes.
 - The prefix is `Engine` only for the engine's built-in packages.
 - The prefix matches `[A-Za-z][A-Za-z0-9]*`.
+
+Unchanged from the old model. The rule is the same.
 
 ### 3.4 Registration rules
 
@@ -293,16 +320,22 @@ enter the registry.
 
 The registration calls are:
 
-- `add_node_type`, with `add_node_executor` and `add_trigger_mode`,
-  for a node type.
+- `add_action_node`, with `add_node_editor_info` for the editor
+  metadata.
 - `add_handle` for a handle type, and the matching `add_*` call for
   an enum type.
 - `add_struct` for a struct type.
 - `add_component` for a component table: it registers the table
   and its scene codec together.
 - `add_table` for a table without a codec.
-- `add_node_editor_info` for a node's editor metadata. The
-  metadata carries an `Operation` value (see `EditorMetadata.md`).
+- `add_subgraph_template` for a sub-graph template.
+
+> [!NOTE]
+> The old §3.4 listed `add_node_type`, `add_node_executor`, and
+> `add_trigger_mode` for a node type. Those three are replaced by
+> `add_action_node` (which takes the info and the executor in one
+> call). `add_subgraph_template` is new; see
+> `PackageComposition.md` §11.
 
 ### 3.5 Error messages
 
@@ -348,7 +381,8 @@ A package author follows this workflow:
    `Alice`. If the prefix is taken by another package (for a
    different provider), choose a longer prefix: `AlicePhysics`.
 
-3. **Declare both in `package.json`.** The engine reads them.
+3. **Declare name, prefix, and dependencies in `package.json`.**
+   The engine reads them.
 
 4. **Register node types with the prefix.** Name each node type
    `Alice_Operation[_ArgType]*_Node` (§2.2). Every enum type,
@@ -361,159 +395,81 @@ A package author follows this workflow:
    each node type, with an `Operation` value. See
    `EditorMetadata.md`.
 
-7. **Write `.lucid` helpers with the package's prefix.** An exported
-   `.lucid` node (marked `@export`) carries the package's prefix, like
-   any C++-registered node. A private `.lucid` node is file-local, and
-   the convention does not apply to it. A helper that composes your
-   C++ nodes writes:
-
-   ```lucid
-   @export
-   node Alice_ApplyFriction_Body_Float_Node(body, amount) =
-       Alice_Multiply_Float_Float_Node(amount, Alice_BodyFriction_Body_Node(body))
-   ```
-
-   The helper is declared in the package's `.lucid` file, not in
-   the C++ registry, and it carries the package's prefix like any
-   other exported node. See §6.
+7. **Register sub-graph templates.** If your package participates
+   in a phase, ship a default sub-graph for that phase. See
+   `PackageComposition.md` §11.
 
 8. **Test the package loads.** The engine rejects a package whose
    names don't match the prefix. Test this before shipping.
 
+> [!NOTE]
+> The old §4 had a step 7 ("Write `.lucid` helpers with the
+> package's prefix"). There is no `.lucid`. The new step 7 is
+> sub-graph templates, which is the pivot's replacement for
+> "shipping a composed behavior."
+
 ---
 
-## 5. What a script author does
-
-A script author writes `.lucid` files that use the nodes from the
-packages they've imported:
-
-```lucid
-import engine.core
-import alice.physics
-
-node frame = Engine_EveryFrame_Node()
-node body  = Alice_CreateBody_Entity_Node(player)
-node grav  = Alice_Gravity_Body_Node(body)
-node p     = Engine_Print_Float_Node(grav) on frame
-```
-
-Every node type name is written in full, with its prefix. Every
-table name a script references (via `resource` or via a node's
-argument) is also written in full.
+## 5. What the editor shows the user
 
 The editor hides the prefix visually. The palette groups nodes by
 provider, shows the display name, and displays the prefix as a
-badge. Dragging `Gravity` from the `Alice` group writes
-`Alice_Gravity_Body_Node` in the underlying `.lucid` file.
+badge. Dragging `Gravity` from the `Alice` group creates a node
+whose type is `Alice_Gravity_Body_Node` in the project file.
 
-The `.lucid` text is the source of truth; it is verbose and
-explicit. The editor's presentation is a convenience layered on
-top.
+The project file stores the full name. The editor's
+presentation is a convenience layered on top.
 
----
-
-## 6. `.lucid`-defined nodes
-
-A package may ship a `.lucid` file that declares helper nodes. These
-nodes are written in the Lucid language and composed from other
-nodes.
-
-**Prefix rule for `.lucid`-defined nodes.** A `.lucid`-defined node
-declared by a package follows the same prefix convention as a
-C++-registered node, and the same node type name convention
-(§2.2):
-
-```lucid
-@export
-node Alice_ApplyFriction_Body_Float_Node(body, amount) =
-    Alice_Multiply_Float_Float_Node(amount, Alice_BodyFriction_Body_Node(body))
-```
-
-The `@export` attribute makes the node visible to modules that
-import the package. Without it, the node is private to the
-package's `.lucid` file.
-
-**What this means for the user.** The user sees the package's
-exported nodes — both the C++-registered ones and the `.lucid`-defined
-ones — through a single import. From the user's perspective, there's
-no difference. The prefix convention applies uniformly.
-
-**Why `.lucid`-defined nodes need the prefix too.** They end up in
-the same namespace as C++-registered nodes. Any node the package
-exports has the package's prefix, so a reader can tell which
-package provides it.
-
-**The prefix is explicit in the source.** The compiler does not add
-the prefix at export time. A `.lucid` file's content does not
-depend on where it is loaded: write `Alice_ApplyFriction_Body_Float_Node`
-if the node is the package's export.
+> [!NOTE]
+> The old §5 was "What a script author does" and showed `.lucid`
+> source. There is no `.lucid` source and no script author. The
+> section is now about the editor's display, which is the
+> surface the user actually sees.
 
 ---
 
-## 7. Why not qualifiers
+## 6. What is not covered
 
-An alternative convention would be to use the format's existing
-`::` qualifier:
+### 6.1 Function names in C++
 
-```lucid
-import alice.physics
+The convention applies to *engine-visible* names: node types,
+enum types, handle types, struct types, tables. It does not
+apply to C++ function names, class names, or file names. The
+engine's C++ code keeps its own conventions; those are separate
+from the engine's namespace.
 
-node grav = physics::GravityNode(body)
-```
+### 6.2 Resource names
 
-This is what the format library's import model supports. Why not
-use it?
+A project's `resource` declarations are local names within the
+project. Two projects can each declare `resource Config { ... }`
+without colliding. The convention does not apply.
 
-**The last-segment collision.** The format's qualifier is the last
-segment of the import path. `alice.physics` and `bob.physics` both
-bind the qualifier `physics`. A `.lucid` file that imports both
-cannot distinguish them. The only fix within the format's current
-grammar is to require unique last segments, which is a constraint
-on package names, not on node names.
+### 6.3 Node instance names
 
-**The dotted-path gap.** The format's type position accepts one
-qualifier (`IDENTIFIER '::' IDENTIFIER`). `alice.physics::GravityNode`
-is not expressible; you would need `physics::GravityNode` and a
-package named `physics` (which collides with any other package
-ending in `.physics`).
+A project's node *instance* names (the names the editor gives a
+placed node for its own bookkeeping) are local to the project.
+The convention does not apply.
 
-**Forward-compatibility.** The prefix convention is
-forward-compatible with a future library change that supports
-package-scoped names. `Alice_Gravity_Body_Node` parses as the pair
-`(Alice, Gravity_Body_Node)` if the library ever wants to make that
-split.
+### 6.4 Scratchpad cell names
 
-The prefix convention sidesteps both problems without a library
-change. It is the standard solution for languages without
-module-scoped names.
+A sub-graph's scratchpad cell names are local to the sub-graph.
+Two sub-graphs can each declare a cell named `hp` without
+colliding. The convention does not apply.
+
+> [!NOTE]
+> The old §6 was "`.lucid`-defined nodes" and explained the
+> prefix rule for `.lucid` helper nodes. There is no `.lucid`.
+> The section is replaced with the four "what the convention
+> does not apply to" cases, which are the local-name categories
+> that survive.
 
 ---
 
-## 8. What is not covered
+## 7. Summary in one line
 
-Three things the convention does not cover.
-
-### 8.1 Function names in C++
-
-The convention applies to *Lucid-visible* names: node types, enum
-types, handle types, struct types, tables. It does not apply to C++
-function names, class names, or file names. The engine's C++ code
-keeps its own conventions; those are separate from the Lucid
-namespace.
-
-### 8.2 Resource names
-
-A `.lucid` `resource` declaration's name is a local name within
-the file that declares it. Two `.lucid` files can each declare
-`resource Config { ... }` without colliding, because resources are
-file-local. The convention does not apply.
-
-### 8.3 Node instance names
-
-A `.lucid` `node` declaration's name (e.g. `node p = ...`) is a
-local name. It refers to the node instance within the graph, not
-to a node type. Two nodes can be named `p` and `q`; nothing
-collides. The convention does not apply.
-
-The convention applies only to *type* names and *table* names, not
-to *instance* names or *local* names.
+**Every engine-visible name is `<Prefix>_<BaseName>`; the prefix
+is the package's, unique per provider, enforced at load time;
+node types follow `<Prefix>_<Operation>[_<ArgType>]*_Node` by
+convention; tables follow `<Prefix>_<BaseName>`; local names
+(resources, node instances, scratchpad cells) do not follow the
+convention.**

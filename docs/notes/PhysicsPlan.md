@@ -8,6 +8,11 @@ It is a design document; the code follows it.
 See also:
 - `docs/notes/Dataflow.md` — the table-mediated dataflow model
   that physics follows.
+- `docs/notes/ExecutionModel.md` — the walker, the phases, the
+  sub-graphs, the scratchpad.
+- `docs/notes/PackageTables.md` — the package-owned-table
+  convention, and why `Engine_Body` and `Engine_BodyRuntime` are
+  physics-owned.
 - `docs/notes/SceneFormat.md` — the `.lscene` format, which
   gains an `Engine_Body` component.
 - `docs/notes/PackageNaming.md` — how a physics package names
@@ -38,6 +43,18 @@ The split matches the renderer's: `Renderer` is the interface;
 the interface; `physics::Box2DBackend` is the Box2D
 implementation.
 
+> [!NOTE]
+> The old §1 described the package's content in the format
+> library's terms ("registers the `Engine_Body` component, the
+> `Engine_BodyRuntime` component, the `Engine_BodyRef` handle,
+> the physics enums, and the physics nodes"). Under the pivot,
+> the package's primary content is **tables** (the two component
+> tables and any plain tables the package needs), and its nodes
+> are **Actions** whose executors call the backend and write the
+> package's tables and the sub-graph's scratchpad. The "two
+> layers" split is unchanged; the package's content list is
+> updated.
+
 ---
 
 ## 2. Which backend, for which dimension
@@ -64,10 +81,10 @@ characteristics. Using a 3D engine for 2D work is possible but
 wasteful; using a 2D engine for 3D is impossible.
 
 **Why not let users bring their own physics:** the editor needs
-a physics vocabulary to display; Sema needs handle types and
-node arguments to check. A default physics package gives both.
-A user who wants a different backend loads a package with a
-different prefix and its own components.
+a physics vocabulary to display; the project validator needs
+handle types and node argument types to check. A default physics
+package gives both. A user who wants a different backend loads a
+package with a different prefix and its own components.
 
 ---
 
@@ -185,7 +202,8 @@ implement, test, and evolve.
 
 ## 4. The components
 
-Physics uses two component tables.
+Physics uses two component tables, and the physics package owns
+both.
 
 **`Engine_Body` — the serializable description.**
 
@@ -234,48 +252,117 @@ backend's state (backend-specific, not serialized). If the
 backend changes, only `Engine_BodyRuntime` changes; the
 description is stable.
 
+**The two tables are physics-owned.** Under the
+package-owned-table convention (`PackageTables.md`), the physics
+package's nodes are the only sanctioned way to read or write
+them. `bob.game` does not call `world.get_table("Engine_BodyRuntime")`
+directly; it uses `Engine_BodyPosition_BodyRef_Node` and reads
+the scratch cell the node wrote. This is a policy; the engine
+cannot enforce it. See `PackageComposition.md` §8.
+
+**`Engine_BodyRef` is a handle.** A handle is an opaque id; the
+value lives in `Engine_BodyRuntime`. A node's argument of type
+`Engine_BodyRef` is a handle, and the node's executor resolves it
+to the `Engine_BodyRuntime` row. The handle is not an entity
+reference; it names a body, not the entity the body belongs to.
+In practice the handle stores the entity's `RowRef`, and the
+executor looks up the runtime row by entity. The two are
+conceptually different: an entity might have no body, and a body
+handle should not be usable as an entity handle.
+
+> [!NOTE]
+> The old §4 described `Engine_BodyRef` as a handle the runtime
+> resolves; that's unchanged. The changes are (a) the package
+> *owns* the two tables, and (b) `Engine_BodyRef` is produced by
+> an `Action` node that writes the handle to a scratch cell, not
+> by a `Value` node that returns the handle via
+> `ctx.results[node_index]`. The package-ownership note is new;
+> see `PackageTables.md`.
+
 ---
 
 ## 5. The nodes
 
-The `engine.physics_2d` package registers these node types.
+The `engine.physics_2d` package registers these node types. All
+of them are `Action`s; under the pivot, the user surface has no
+`Value` nodes.
 
 The node names follow the engine's naming convention
-(`Provider_Operation[_ArgType]*_Node`); see `PackageNaming.md` §2.2.
+(`Provider_Operation[_ArgType]*_Node`); see `PackageNaming.md`
+§2.2. Each node that "reads" a body writes its result to a
+scratchpad cell (or a World cell); the user's `Branch` reads the
+cell.
 
-**Value nodes:**
+**Lifecycle nodes:**
 
-- `Engine_CreateBody_Entity_Node(entity)` — creates a body at runtime
-  for the entity, from its `Engine_Body` row. Produces an
-  `Engine_BodyRef`.
-- `Engine_BodyPosition_BodyRef_Node(body)` — reads the body's position.
-  Produces a `float32`.
-- `Engine_BodyVelocity_BodyRef_Node(body)` — reads the body's velocity.
-  Produces a `float32`.
+- `Engine_CreateBody_Entity_Node(entity, out_bodyref)` — creates a
+  body at runtime for the entity, from its `Engine_Body` row, and
+  writes the new `Engine_BodyRef` to `out_bodyref`. `out_bodyref`
+  is a scratch cell path.
+- `Engine_DestroyBody_BodyRef_Node(body)` — destroys the backend
+  body, removes the `Engine_BodyRuntime` row.
 
-**Action nodes:**
+**Read nodes (Actions that write their result to a scratch cell):**
 
-- `Engine_MoveBody_BodyRef_Float_Float_Node(body, dx, dy)` — teleports a body.
-- `Engine_ApplyForce_BodyRef_Float_Float_Node(body, fx, fy)` — applies a force.
-- `Engine_ApplyImpulse_BodyRef_Float_Float_Node(body, ix, iy)` — applies an impulse.
+- `Engine_BodyPosition_BodyRef_Node(body, out_x, out_y)` — reads
+  the body's position; writes `out_x` and `out_y`.
+- `Engine_BodyVelocity_BodyRef_Node(body, out_dx, out_dy)` —
+  reads the body's velocity; writes `out_dx` and `out_dy`.
 
-**Trigger nodes:**
+**Action nodes (side effects):**
 
-- `Engine_OnCollision_BodyRef_String_Node(body, tag)` — fires when the body
-  collides with something tagged `tag`.
+- `Engine_MoveBody_BodyRef_Float_Float_Node(body, dx, dy)` —
+  teleports a body.
+- `Engine_ApplyForce_BodyRef_Float_Float_Node(body, fx, fy)` —
+  applies a force.
+- `Engine_ApplyImpulse_BodyRef_Float_Float_Node(body, ix, iy)` —
+  applies an impulse.
 
-**The `Engine_BodyRef` handle.** A body reference is a handle. A
-node's argument that is a body takes an `Engine_BodyRef`. The
-runtime resolves the handle to the entity's `Engine_BodyRuntime`
-row, which holds the `backend_id`.
+**Collision node (deferred):**
 
-**What a body reference is *not*: an entity reference.** A body
-is a component of an entity. The `Engine_BodyRef` names the
-body, not the entity. In practice, the handle stores the entity's
-`RowRef`, and the runtime looks up the runtime row by entity. But
-the two are conceptually different: an entity might have no
-body, and the same body handle should not be usable as an
-entity handle.
+- `Engine_OnCollision_BodyRef_String_Node(body, tag, on_collision, on_no_collision)`
+  — reads the backend's current contacts, checks whether `body`
+  collides with anything tagged `tag`, and returns `on_collision`
+  or `on_no_collision`. The firing rule is described in §11.
+
+The `Engine_BodyRef` handle is a `Value`-kind argument: it comes
+from a scratchpad cell (written by `Engine_CreateBody_Entity_Node`)
+or a World cell. The body is a component of an entity; the handle
+is the body's reference.
+
+**Why every read is an Action that writes a cell.** The pivot has
+no `Value` nodes on the user surface. `Engine_BodyPosition_BodyRef_Node`
+must produce a value that a `Branch` can read; the value goes to
+a scratchpad cell, and the `Branch` reads the cell. The user's
+composition is:
+
+```
+sub-graph MyGameplay {
+    scratch { body: Engine_BodyRef, x: float32, y: float32, below: bool }
+    nodes:
+        create   : Engine_CreateBody_Entity_Node(player, "scratch.body")  successor: read
+        read     : Engine_BodyPosition_BodyRef_Node("scratch.body", "scratch.x", "scratch.y") successor: cmp
+        cmp      : Game_LessThan_Float_Float_Node("scratch.y", 0.0, "scratch.below") successor: gate
+        gate     : Engine_Branch_Bool_Node("scratch.below", on_true -> fell, on_false -> done)
+        fell     : Game_Log_Node("player fell below 0")  successor: done
+        done     : Engine_Yield_Node
+}
+```
+
+This is the pivot's composition idiom. The old model's "read a
+value and pass it as an argument" is replaced by "read a value
+into a scratch cell; the next node's path argument names the
+cell."
+
+> [!NOTE]
+> The old §5 listed "Value nodes" (`Engine_CreateBody_Entity_Node`,
+> `Engine_BodyPosition_BodyRef_Node`, `Engine_BodyVelocity_BodyRef_Node`)
+> and "Action nodes" and "Trigger nodes" separately. Under the
+> pivot, every node is an `Action`; the "read" nodes write their
+> result to a scratch cell; the "trigger" node
+> (`Engine_OnCollision_*`) takes two successors and returns one
+> based on the collision check. The composition example at the
+> end of the section is new and shows the pivot's idiom.
 
 ---
 
@@ -309,7 +396,9 @@ package.
 
 ```
 1. input poll
-2. runtime.tick(dt)
+2. runtime.tick(dt)          -- runs all phases; the physics
+                             -- phase (if any) is a phase the
+                             -- project registered
 3. physics_step_system(ctx, dt)
 4. physics_sync_system(ctx, dt)
 5. hierarchy_system(ctx, dt)
@@ -329,6 +418,19 @@ future optimization (say, a backend that writes directly to the
 world) would change the sync, not the step. Keeping them separate
 preserves the option.
 
+**The physics phase.** The engine defines a `physics` phase. The
+project registers a sub-graph on it — either the package's
+`DefaultPhysics` template or a user-composed one. That sub-graph
+runs during `runtime.tick(dt)` (step 2 of the loop), before
+`physics_step_system` runs. A node in the phase can apply forces;
+`physics_step_system` steps the backend after the phase; the
+effects are visible to the next tick.
+
+This is the phase model from `ExecutionModel.md` §3: phases are
+engine-owned scheduling boundaries; the project populates them.
+The physics phase is not special; it is a phase the engine
+declares and the package ships a template for.
+
 ---
 
 ## 7. The physics owns the position
@@ -342,14 +444,14 @@ Concretely:
   `Engine_Transform` each frame. Any value a graph wrote to
   `Engine_Transform` in the same tick is overwritten.
 
-- To move a physics body, a graph calls `Engine_MoveBody_BodyRef_Float_Float_Node`.
-  That node tells the backend to teleport the body. The next
-  `physics_sync_system` writes the new position to
-  `Engine_Transform`.
+- To move a physics body, a graph calls
+  `Engine_MoveBody_BodyRef_Float_Float_Node`. That node tells the
+  backend to teleport the body. The next `physics_sync_system`
+  writes the new position to `Engine_Transform`.
 
 - Writing `Engine_Transform.x` directly (via a hypothetical
-  `Engine_SetTransform_Entity_Float_Float_Node`) does **not** move the body. The
-  next sync overwrites it.
+  `Engine_SetTransform_Entity_Float_Float_Node`) does **not**
+  move the body. The next sync overwrites it.
 
 **This is a deliberate policy.** A physics body is authoritative
 about its own position. The transform is a copy for rendering
@@ -372,10 +474,11 @@ expects `Engine_Transform` to be authoritative.
   `backend_id`. The first `physics_step_system` sees the row,
   creates the backend body, and stores the id.
 
-- **By a node.** `Engine_CreateBody_Entity_Node` takes the entity as
-  an argument. Its executor writes an `Engine_BodyRuntime` row keyed
-  by that entity, with a zero `backend_id`. The next
-  `physics_step_system` creates the backend body.
+- **By a node.** `Engine_CreateBody_Entity_Node` takes the entity
+  as an argument. Its executor writes an `Engine_BodyRuntime`
+  row keyed by that entity, with a zero `backend_id`, and writes
+  the new `Engine_BodyRef` to the caller's scratch cell. The
+  next `physics_step_system` creates the backend body.
 
 **Destruction.**
 
@@ -385,10 +488,9 @@ expects `Engine_Transform` to be authoritative.
   a runtime row it knew about is gone and destroys the backend
   body.
 
-- **By a node.** If there is an `Engine_DestroyBody_BodyRef_Node` (not in
-  the initial node set), it removes the `Engine_Body` and
-  `Engine_BodyRuntime` rows. The next step destroys the backend
-  body.
+- **By a node.** `Engine_DestroyBody_BodyRef_Node` removes the
+  `Engine_Body` and `Engine_BodyRuntime` rows. The next step
+  destroys the backend body.
 
 **The diff.** `physics_step_system` maintains a mapping from
 entity `RowRef` to `BodyId`. Each step:
@@ -402,6 +504,14 @@ The mapping lives in the physics backend wrapper (the
 `Box2DBackend` holds it) or in a small engine-side struct. It is
 not a table; it is the sync between the tables and the backend's
 internal state.
+
+> [!NOTE]
+> The old §8 said `Engine_CreateBody_Entity_Node` was a `Value`
+> node that "produces an `Engine_BodyRef`". Under the pivot, it
+> is an `Action` that writes the handle to a scratch cell. The
+> lifecycle (scene loader creates a runtime row with a zero
+> `backend_id`; the first `physics_step_system` creates the
+> backend body; destruction is by row removal) is unchanged.
 
 ---
 
@@ -497,46 +607,69 @@ physics. **The latter is simpler.** A game that wants physics
 constructs a `Box2DBackend`, puts it in `Services`, and loads
 `Physics2DPackage`. A game that doesn't, doesn't.
 
+**The physics package declares a dependency on `engine.core`.**
+This ensures the engine's core tables and the `Services`
+struct's `physics` field are available before the physics
+package's `register_into` runs. See `PackageComposition.md` §8.1.
+
+> [!NOTE]
+> The old §10 said `TickContext` gains `Services* services`; that
+> is unchanged. The dependency declaration is new: it ensures
+> the physics package is loaded after `engine.core`, which is
+> the package that provides `Engine_Entity` and the rest of the
+> core tables the physics package's executors assume exist.
+
 ---
 
-## 11. Collision triggers (deferred)
+## 11. Collision handling (deferred)
 
-`Engine_OnCollision_BodyRef_String_Node(body, tag)` is a trigger that fires when a
-body collides with something tagged `tag`.
+`Engine_OnCollision_BodyRef_String_Node(body, tag, on_collision, on_no_collision)`
+is a control-flow node: it reads the backend's current contacts,
+checks whether `body` collides with anything tagged `tag`, and
+returns `on_collision` or `on_no_collision`.
 
 The node type is registered, but its firing semantics are
-**deferred to a later step**. For now, its executor is a no-op.
+**deferred to a later step**. For now, its executor returns
+`on_no_collision` unconditionally (i.e., it behaves as if no
+collision occurred).
 
-**Why deferred.** Firing collision triggers requires:
+**Why deferred.** Implementing collision handling requires:
 
 - Reading `Backend::contacts()` after each step.
 - Mapping each contact's two `BodyId`s back to their entities.
 - Filtering by tag.
-- Firing the `OnCollision` node once per matching contact.
-- Propagating to its subscribers, with the "fire at most once
-  per firing event" rule (see `TriggerModel.md`).
+- Choosing the successor for each contact.
+- Handling the "one node, many contacts" case: a body may
+  collide with multiple tagged bodies in one tick. The node
+  cannot run once per contact within a single tick; it must
+  either (a) return `on_collision` if *any* matching contact
+  exists, or (b) run once per matching contact via a loop. The
+  choice is a design decision, deferred.
 
-The last point is the complication. The current runtime's
-`fired` set is per-tick; a node fires at most once per tick. A
-collision trigger can fire multiple times per tick (multiple
-contacts). The rule needs to be "per firing event," not "per
-tick."
-
-This is a change to the graph runtime's firing model. It is
-scoped and understandable, but it is a change. It is deferred so
-that Step 6 can focus on the physics backend and the basic node
-set.
+The deferral is scoped: the node type is registered, its
+semantics are `on_no_collision` for now, and its behavior is a
+later addition. It does not block the physics backend or the
+basic node set.
 
 **What "deferred" means concretely:**
 
 - The node type is registered. It appears in the palette.
-- Its executor is a no-op. It never fires.
-- Attempting to use it in a `.lucid` file compiles, but the
-  trigger never fires.
+- Its executor returns `on_no_collision` unconditionally.
+- The editor shows the node with a "not yet implemented" badge.
 - Documentation says so.
 
-When the firing semantics are implemented, the node type is
-already in place. Only the runtime's firing dispatch changes.
+When the collision semantics land, the executor is updated; the
+node type's name, arguments, and successors are already in place.
+Only the executor's behavior changes.
+
+> [!NOTE]
+> The old §11 was "Collision triggers (deferred)" and described
+> `Engine_OnCollision_BodyRef_String_Node` as a trigger whose
+> "firing semantics are deferred." Triggers don't exist under the
+> pivot. The node is now a **control-flow node** (an Action with
+> two successors) whose collision check is deferred. The
+> deferral reasoning and the "what deferred means" list are
+> otherwise unchanged.
 
 ---
 
@@ -561,7 +694,7 @@ design choice of the engine.
 
 ## 13. What is deferred
 
-Beyond collision triggers, these are deferred:
+Beyond collision handling, these are deferred:
 
 - **3D physics.** A future `engine.physics_3d` package with a
   Jolt backend.
@@ -591,18 +724,20 @@ Summarized:
    separate packages. Unity's model.
 3. **`Engine_Body` is the serializable description.
    `Engine_BodyRuntime` is the backend's state, not
-   serialized.**
+   serialized.** Both are physics-owned tables.
 4. **Physics owns the position of any entity with an
-   `Engine_Body` component.** `Engine_MoveBody_BodyRef_Float_Float_Node` is how a
-   graph moves a body.
+   `Engine_Body` component.**
+   `Engine_MoveBody_BodyRef_Float_Float_Node` is how a graph
+   moves a body.
 5. **Two systems: `physics_step_system` and
    `physics_sync_system`.** The first steps the backend; the
    second copies runtime state to `Engine_Transform` and
    `Engine_Velocity`.
 6. **The backend is reached through a `Services` struct.**
    `SystemContext` and `TickContext` gain access to it.
-7. **Collision trigger firing is deferred.** The node type
-   exists; the firing semantics are a later step.
+7. **Collision handling is deferred.** The node type exists;
+   its executor returns `on_no_collision` for now; its full
+   semantics are a later step.
 8. **`Engine_Body` is a component with a codec.** The package
    registers it with `add_component`; the scene loader and saver
    reach it through the `ComponentRegistry`.
@@ -611,6 +746,11 @@ Summarized:
 10. **The interface is small and backend-neutral.** Raycasts,
     joints, sensors, and character controllers are future
     methods.
+
+> [!NOTE]
+> Decision 7 changed from "Collision trigger firing is
+> deferred" to "Collision handling is deferred," because there
+> are no triggers. The other decisions are unchanged.
 
 ---
 
@@ -632,19 +772,30 @@ rest. No package, no scene integration.
 `Engine_BodyRuntime` tables, the nodes, the two systems, the
 scene schema, and the integration test.
 
+**Step 6d — the physics phase template.** A `DefaultPhysics`
+sub-graph template the package ships, so a user can register it
+on the `physics` phase without composing it by hand.
+
 After Step 6c, a `.lscene` file with an `Engine_Body` component
 loads, ticks, and the body falls under gravity. A graph can
 apply forces, teleport bodies, and read positions. Collision
-triggers are registered but do not fire.
+handling is registered but returns `on_no_collision`.
+
+> [!NOTE]
+> Step 6d is new: the sub-graph template mechanism is new under
+> the pivot (see `PackageComposition.md` §11), and the physics
+> package should ship a default template for its phase.
 
 ---
 
 ## 16. Cross-references
 
 - `docs/notes/Dataflow.md` — the model physics follows.
-- `docs/notes/TriggerModel.md` — how collision triggers will
-  eventually fire, once the "per firing event" rule is
-  implemented.
+- `docs/notes/ExecutionModel.md` — the walker, the phases, the
+  sub-graphs, the scratchpad.
+- `docs/notes/PackageTables.md` — the package-owned-table
+  convention, and why `Engine_Body` and `Engine_BodyRuntime` are
+  physics-owned.
 - `docs/notes/SceneFormat.md` — the `.lscene` format, extended
   with `Engine_Body`.
 - `docs/notes/PackageNaming.md` — how `engine.physics_2d` names

@@ -5,13 +5,25 @@ they carry, and one or more cameras. It is JSON. It is read and written
 by the scene loader and saver (`SceneLoader_load`, `SceneSaver_save`,
 declared in `engine/scene/scene.h`).
 
-A `.lscene` file is **not** a `.lucgraph`. A `.lucgraph` describes
-behavior — a graph of nodes and subscriptions — and is read and written
-by the format library (`lucid::serialization`). A scene is data; a graph
-is behavior. They are separate, and the only interface between them is a
-`Engine_Script` component that holds a path to a `.lucgraph` file.
+A `.lscene` file is **not** the project file. A `.lscene` describes a
+scene's *data* (entities, components, cameras). A project file
+describes the game's *behavior* (sub-graphs, phases, node instances,
+scratchpad declarations) and is documented in `ProjectFormat.md`.
+They are separate, and the only interface between them is the
+`Engine_Script` component: a scene row whose `graph` column holds the
+name of a sub-graph in the project. See `docs/Decision.md` Decision 8
+for why the two are separate.
 
-See `docs/Decision.md` Decision 8 for why the two are separate.
+> [!NOTE]
+> The old header said "A `.lscene` file is **not** a `.lucgraph`. A
+> `.lucgraph` describes behavior — a graph of nodes and
+> subscriptions — and is read and written by the format library
+> (`lucid::serialization`)." There is no `.lucgraph` and no format
+> library. The behavior side is the project file (`ProjectFormat.md`).
+> The `Engine_Script` interface survives; what it references changed.
+> The Decision.md reference survives in spirit (scenes are data,
+> behavior is the project) but the Decision's text will need
+> updating in a follow-up.
 
 ---
 
@@ -20,10 +32,11 @@ See `docs/Decision.md` Decision 8 for why the two are separate.
 The file carries `"version": N`. The current version is
 `kSceneSchemaVersion` (see `engine/scene/scene_schema.h`), which is 1.
 
-The version is the **scene schema's version**. It is independent of the
-format library's registry fingerprint and of the engine's overall
-version. Adding a component or a field bumps this version when the team
-chooses to; removing or repurposing a field must bump it.
+The version is the **scene schema's version**. It is independent of
+the project format's version (which is the project's own version,
+documented in `ProjectFormat.md`) and of the engine's overall
+version. Adding a component or a field bumps this version when the
+team chooses to; removing or repurposing a field must bump it.
 
 The loader:
 
@@ -32,6 +45,12 @@ The loader:
   compatible changes don't break old scenes,
 - refuses newer versions. A scene from a newer engine may have fields
   this engine doesn't know; refusing is safer than guessing.
+
+> [!NOTE]
+> The old text said "It is independent of the format library's
+> registry fingerprint." There is no registry fingerprint (the
+> format library is gone). It is now independent of the *project
+> format's* version. Same idea, new referent.
 
 ---
 
@@ -49,6 +68,8 @@ that component. The same registry drives the saver: a component table
 with no codec is not serialized. This is what makes a scene portable
 across engines with different package sets, and what makes adding a
 package's component a one-line change in the package's `register_into`.
+
+> Kept as-is. Component recognition is unchanged by the pivot.
 
 ---
 
@@ -194,35 +215,65 @@ it is.
 
 ### `Engine_Script`
 
-A reference to a compiled behavior graph.
+A reference to a sub-graph in the project.
 
 ```json
-{ "graph": "scripts/player.lucgraph" }
+{ "graph": "player_default" }
 ```
 
-- `graph`: string. An asset path (see below) to a `.lucgraph` file.
+- `graph`: string. The **name** of a sub-graph in the project. Empty
+  string if the entity has no script.
 
-The scene loader stores the path. The runtime loads the graph separately,
-at scene-runtime setup time, and passes the engine's node registry to
-`lucid::serialization::deserialize`. If the graph was compiled against a
-different node registry, the load fails loudly.
+The scene loader stores the name. The runtime resolves it against the
+project's sub-graph declarations at project load time. If the named
+sub-graph does not exist in the project, the load fails with a clear
+error (`Error_UnknownScript`) at load time; the scene still loads, but
+the entity's script does not attach.
 
-The scene neither compiles nor loads the graph. The path is a reference,
-not a dependency.
+The scene neither loads nor validates the sub-graph. The name is a
+reference, not a dependency.
 
 The runtime reads the row after `Scene::apply_to` returns, not during
-the tick. The engine loop calls `scene.apply_to(world, components,
-ApplyMode::Clear)` and then `runtime.load()`; `load()` walks the
-`Engine_Script` table, loads each path, and is idempotent. A scene
-reload calls `apply_to` and then `load()` again. Nothing else in the
-loop reads `Engine_Script`; the runtime does not poll. See
-`docs/notes/Dataflow.md` §7 and `docs/Decision.md` Decision 11.
+the tick. The engine loop calls
+`scene.apply_to(world, components, ApplyMode::Clear)` and then
+`runtime.load()`; `load()` reads the project file, resolves each
+entity's `Engine_Script.graph` against the project's sub-graphs, and
+attaches the entity to the sub-graph. A scene reload calls
+`apply_to` and then `load()` again. Nothing else in the loop reads
+`Engine_Script`; the runtime does not poll. See `Dataflow.md` §7 and
+`docs/Decision.md` Decision 11.
+
+**What "attach the entity to the sub-graph" means.** The engine's
+runtime is a walker (`ExecutionModel.md` §1). A sub-graph is a
+sequence of nodes. An `Engine_Script` row says "this entity has this
+sub-graph." The runtime instantiates a per-entity frame for the
+sub-graph and walks it as part of the tick. The mechanism by which
+this happens is the runtime's; the scene format's job is to carry
+the name.
+
+> [!NOTE]
+> The old `Engine_Script.graph` held a path to a `.lucgraph` file
+> (`"scripts/player.lucgraph"`). Under the pivot it holds the
+> **name of a sub-graph in the project** (`"player_default"`). The
+> column is still a string; the semantics changed. Old scenes with
+> `.lucgraph` paths will fail to load (the path won't match any
+> sub-graph name), so this is a **breaking change** in the scene
+> format's *meaning*, even though the *schema* is unchanged. Bump
+> `kSceneSchemaVersion` when the engine starts reading the new
+> meaning.
+>
+> The old text also said "the runtime loads the graph separately,
+> at scene-runtime setup time, and passes the engine's node
+> registry to `lucid::serialization::deserialize`." That whole
+> mechanism is gone: no `deserialize`, no node registry, no
+> `.lucgraph`. The runtime resolves the name against the loaded
+> project.
 
 ---
 
 ## Asset paths
 
-Asset references — `texture_path`, `graph`, future `mesh_path`,
+Asset references — `texture_path`, future `mesh_path`,
 `material_path` — are strings. They are relative to the project's asset
 root, which is the folder that contains `assets/`. They use `/` as the
 separator regardless of platform.
@@ -234,6 +285,12 @@ the scene loader's.
 
 Example: a project whose asset root is `assets/` and whose scene refers
 to `textures/player.png` expects the file at `assets/textures/player.png`.
+
+> Kept as-is. The old list included `graph` as an asset path
+> reference; under the pivot `graph` is a sub-graph *name*, not an
+> asset path, so it's removed from the list. Everything else
+> (`texture_path`, future `mesh_path`/`material_path`) is
+> unchanged.
 
 ---
 
@@ -323,6 +380,16 @@ The format version tracks the shape of the envelope — the top-level
 keys, the entity object, the camera object — not the set of components a
 given engine knows.
 
+> [!NOTE]
+> The old text said "Repurposing a field (keeping the name, changing
+> the meaning)" is the worst kind of breaking change. The
+> `Engine_Script.graph` field is being repurposed: the column name
+> is unchanged; its meaning changed (`.lucgraph` path → sub-graph
+> name). This *is* the worst kind, and the team should bump
+> `kSceneSchemaVersion` and either migrate old scenes (rewrite
+> `.lucgraph` paths to sub-graph names) or refuse them with a
+> clear message. The rest of the evolution rules are unchanged.
+
 ---
 
 ## Future: 3D
@@ -334,11 +401,12 @@ which components it has: `Engine_Sprite` is 2D, a future `Mesh` is 3D.
 3D support will be additive:
 
 - Rotation: `Engine_Transform` is 2D-only (`rot_z`). 3D will either add
-  `rot_x`/`rot_y` columns to `Engine_Transform`, or add a `Rot3D` component with
-  a quaternion. Existing 2D scenes are unaffected either way.
+  `rot_x`/`rot_y` columns to `Engine_Transform`, or add a `Rot3D`
+  component with a quaternion. Existing 2D scenes are unaffected either
+  way.
 - Rendering: a `Mesh` component alongside `Engine_Sprite`. A 3D entity has
-  `Mesh`; a 2D entity has `Engine_Sprite`; an entity with both is unusual but
-  not forbidden.
+  `Mesh`; a 2D entity has `Engine_Sprite`; an entity with both is unusual
+  but not forbidden.
 - Materials, lights, skeletons: new components, added as needed.
 
 Existing 2D scenes load unchanged when 3D support is added, because every
@@ -351,10 +419,11 @@ Existing 2D scenes load unchanged when 3D support is added, because every
 The scene schema is backend-agnostic. Swapping the physics or graphics
 backend does not change the schema.
 
-- Components describe properties in engine-agnostic terms. An `Engine_Body`
-  component (see `PhysicsPlan.md`) describes mass, shape, type; a backend interprets
-  it. Backend-specific runtime data — a Jolt body id, a GPU handle —
-  is stored in runtime tables that are never serialized.
+- Components describe properties in engine-agnostic terms. An
+  `Engine_Body` component (see `PhysicsPlan.md`) describes mass, shape,
+  type; a backend interprets it. Backend-specific runtime data — a Jolt
+  body id, a GPU handle — is stored in runtime tables that are never
+  serialized.
 - Assets are referenced by path. A texture is a `.png`; a future mesh
   might be a `.gltf`. The scene stores the path; the backend loads it in
   whatever format it uses.
@@ -370,16 +439,38 @@ Assets are referenced by path.**
 The scene format is documented JSON. Any JSON tool can inspect, edit, or
 generate a `.lscene` file. Scene-specific tools (a scene inspector, a
 version-migration tool, a procedural-level generator) will live under
-`tools/scene/`. These tools read and write `.lscene` files directly; they
-do not go through the format library.
+`tools/scene/`. These tools read and write `.lscene` files directly.
 
-The format library is used only for behavior graphs (`.lucid` source and
-`.lucgraph` binaries). It is never invoked by scene tools.
+A scene's `Engine_Script` component references a sub-graph by name in
+the project. The tool that authors the scene does not need to know the
+project's content; it needs only to know the names of the sub-graphs the
+scene is expected to reference. A future `tools/scene/` tool that
+validates a scene against a project could check that each
+`Engine_Script.graph` names a sub-graph that exists, but that is
+orthogonal to the scene format itself.
+
+> [!NOTE]
+> The old "Tools" section said "The format library is used only for
+> behavior graphs (`.lucid` source and `.lucgraph` binaries). It is
+> never invoked by scene tools." There is no format library and no
+> `.lucgraph`. The scene tools now read `.lscene` files and (if
+> they want to) validate `Engine_Script.graph` names against a
+> project's sub-graphs. The `tools/scene/` location is unchanged.
 
 ---
 
 ## Related
 
-A scene's `Engine_Script` component references a `.lucgraph` file. For what a
-graph does when it runs — how triggers fire, how conditions gate actions,
-how the engine scheduler walks the graph — see `docs/notes/TriggerModel.md`.
+A scene's `Engine_Script` component references a sub-graph by name in
+the project. For what a sub-graph does when it runs — the walker, the
+phases, the sub-graphs, the scratchpad — see
+`docs/notes/ExecutionModel.md`. For the project file's schema — the
+sub-graphs, phases, node instances, scratchpad declarations — see
+`docs/notes/ProjectFormat.md`.
+
+> [!NOTE]
+> The old "Related" section pointed at `TriggerModel.md` for the
+> graph's execution model. `TriggerModel.md` is gone; the
+> execution model is now `ExecutionModel.md`. The
+> `ProjectFormat.md` reference is new, since the project file now
+> carries what the `.lucgraph` used to.
